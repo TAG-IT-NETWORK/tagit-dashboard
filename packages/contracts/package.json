@@ -1,0 +1,27 @@
+{
+  "name": "@tagit/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.21.51",
+    "wagmi": "^2.14.1"
+  },
+  "devDependencies": {
+    "@tagit/tsconfig": "workspace:*",
+    "@types/react": "^18",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "react": "^18"
+  }
+}

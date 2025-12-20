@@ -1,0 +1,14 @@
+{
+  "extends": "@tagit/tsconfig/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@tagit/ui": ["../../packages/ui/src"],
+      "@tagit/contracts": ["../../packages/contracts/src"],
+      "@tagit/config": ["../../packages/config/src"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

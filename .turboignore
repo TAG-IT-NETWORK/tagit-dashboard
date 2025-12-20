@@ -1,0 +1,2 @@
+# Ignore demo app from turbo builds
+apps/demo
