@@ -1,3 +1,50 @@
+// Asset lifecycle states
+export const AssetState = {
+  MINTED: 0,
+  BOUND: 1,
+  ACTIVATED: 2,
+  CLAIMED: 3,
+  FLAGGED: 4,
+  RECYCLED: 5,
+} as const;
+
+export type AssetStateType = (typeof AssetState)[keyof typeof AssetState];
+
+export const AssetStateNames: Record<AssetStateType, string> = {
+  [AssetState.MINTED]: "Minted",
+  [AssetState.BOUND]: "Bound",
+  [AssetState.ACTIVATED]: "Activated",
+  [AssetState.CLAIMED]: "Claimed",
+  [AssetState.FLAGGED]: "Flagged",
+  [AssetState.RECYCLED]: "Recycled",
+};
+
+// Resolution types for flagged assets
+export const Resolution = {
+  CLEAR: 0,
+  QUARANTINE: 1,
+  DECOMMISSION: 2,
+} as const;
+
+export type ResolutionType = (typeof Resolution)[keyof typeof Resolution];
+
+export const ResolutionNames: Record<ResolutionType, string> = {
+  [Resolution.CLEAR]: "Clear",
+  [Resolution.QUARANTINE]: "Quarantine",
+  [Resolution.DECOMMISSION]: "Decommission",
+};
+
+// Asset struct type
+export interface Asset {
+  id: bigint;
+  owner: `0x${string}`;
+  state: AssetStateType;
+  tagId: `0x${string}`;
+  metadataURI: string;
+  createdAt: bigint;
+  updatedAt: bigint;
+}
+
 export const TAGITCoreABI = [
   // Read functions
   {
@@ -109,7 +156,10 @@ export const TAGITCoreABI = [
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "assetId" }],
+    inputs: [
+      { type: "uint256", name: "assetId" },
+      { type: "uint8", name: "resolution" },
+    ],
     name: "resolve",
     outputs: [],
     stateMutability: "nonpayable",

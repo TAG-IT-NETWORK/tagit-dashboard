@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "./providers";
+import { AdminShell } from "@/components/admin-shell";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AdminShell>{children}</AdminShell>
+        </AppProviders>
       </body>
     </html>
   );

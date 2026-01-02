@@ -1,63 +1,78 @@
-export enum IdentityBadgeType {
-  NONE = 0,
-  ADMIN = 1,
-  GOV_MIL = 2,
-  MANUFACTURER = 3,
-  RETAILER = 4,
-  RECYCLER = 5,
+import {
+  Capabilities,
+  CapabilityNames as ContractCapabilityNames,
+  type CapabilityHash,
+  type CapabilityKey,
+  BadgeIds,
+  BadgeIdNames,
+  type BadgeId,
+} from "@tagit/contracts";
+
+// Re-export from contracts for convenience
+export { Capabilities, BadgeIds };
+export type { CapabilityHash, CapabilityKey, BadgeId };
+
+// All capability keys as array
+export const CapabilityKeys: CapabilityKey[] = [
+  "MINTER",
+  "BINDER",
+  "ACTIVATOR",
+  "CLAIMER",
+  "FLAGGER",
+  "RESOLVER",
+  "RECYCLER",
+];
+
+// Capability display names (from contracts)
+export const CapabilityDisplayNames = ContractCapabilityNames;
+
+// Badge display names (from contracts)
+export const BadgeDisplayNames = BadgeIdNames;
+
+// Badge info for display
+export interface BadgeInfo {
+  id: number;
+  name: string;
 }
 
-export const IdentityBadgeTypeNames: Record<IdentityBadgeType, string> = {
-  [IdentityBadgeType.NONE]: "None",
-  [IdentityBadgeType.ADMIN]: "Admin",
-  [IdentityBadgeType.GOV_MIL]: "Government/Military",
-  [IdentityBadgeType.MANUFACTURER]: "Manufacturer",
-  [IdentityBadgeType.RETAILER]: "Retailer",
-  [IdentityBadgeType.RECYCLER]: "Recycler",
-};
-
-export enum Capability {
-  MINT = 1,
-  BIND = 2,
-  ACTIVATE = 3,
-  CLAIM = 4,
-  FLAG = 5,
-  RESOLVE = 6,
-  RECYCLE = 7,
+// User capabilities info
+export interface CapabilityInfo {
+  key: CapabilityKey;
+  hash: CapabilityHash;
+  name: string;
 }
 
-export const CapabilityNames: Record<Capability, string> = {
-  [Capability.MINT]: "Mint",
-  [Capability.BIND]: "Bind",
-  [Capability.ACTIVATE]: "Activate",
-  [Capability.CLAIM]: "Claim",
-  [Capability.FLAG]: "Flag",
-  [Capability.RESOLVE]: "Resolve",
-  [Capability.RECYCLE]: "Recycle",
-};
+// Current user state
+export interface CurrentUser {
+  address: `0x${string}` | undefined;
+  isConnected: boolean;
+  badges: BadgeInfo[];
+  capabilities: CapabilityKey[];
+  isLoading: boolean;
+}
 
-// Capabilities granted by each identity badge type
-export const BadgeCapabilities: Record<IdentityBadgeType, Capability[]> = {
-  [IdentityBadgeType.NONE]: [Capability.CLAIM, Capability.FLAG],
-  [IdentityBadgeType.ADMIN]: [
-    Capability.MINT,
-    Capability.BIND,
-    Capability.ACTIVATE,
-    Capability.CLAIM,
-    Capability.FLAG,
-    Capability.RESOLVE,
-    Capability.RECYCLE,
-  ],
-  [IdentityBadgeType.GOV_MIL]: [
-    Capability.MINT,
-    Capability.BIND,
-    Capability.ACTIVATE,
-    Capability.CLAIM,
-    Capability.FLAG,
-    Capability.RESOLVE,
-    Capability.RECYCLE,
-  ],
-  [IdentityBadgeType.MANUFACTURER]: [Capability.MINT, Capability.BIND],
-  [IdentityBadgeType.RETAILER]: [Capability.ACTIVATE],
-  [IdentityBadgeType.RECYCLER]: [Capability.RECYCLE],
+// Capability to key lookup
+export function getCapabilityKey(hash: CapabilityHash): CapabilityKey | undefined {
+  for (const key of CapabilityKeys) {
+    if (Capabilities[key] === hash) {
+      return key;
+    }
+  }
+  return undefined;
+}
+
+// Key to capability hash lookup
+export function getCapabilityHash(key: CapabilityKey): CapabilityHash {
+  return Capabilities[key];
+}
+
+// Badge capabilities mapping - which capabilities each badge grants
+export const BadgeCapabilities: Record<number, CapabilityKey[]> = {
+  [BadgeIds.KYC_L1]: ["CLAIMER", "FLAGGER"],
+  [BadgeIds.KYC_L2]: ["CLAIMER", "FLAGGER"],
+  [BadgeIds.KYC_L3]: ["CLAIMER", "FLAGGER"],
+  [BadgeIds.MANUFACTURER]: ["MINTER", "BINDER"],
+  [BadgeIds.RETAILER]: ["ACTIVATOR"],
+  [BadgeIds.GOV_MIL]: ["MINTER", "BINDER", "ACTIVATOR", "CLAIMER", "FLAGGER", "RESOLVER", "RECYCLER"],
+  [BadgeIds.LAW_ENFORCEMENT]: ["FLAGGER", "RESOLVER"],
 };

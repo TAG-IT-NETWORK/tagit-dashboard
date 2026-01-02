@@ -1,7 +1,9 @@
 {
   "extends": "@tagit/tsconfig/react-library.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src/**/*"]
 }

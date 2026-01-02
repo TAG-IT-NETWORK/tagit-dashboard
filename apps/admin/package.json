@@ -11,17 +11,25 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.2",
     "@tagit/auth": "workspace:*",
     "@tagit/config": "workspace:*",
     "@tagit/contracts": "workspace:*",
     "@tagit/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@wagmi/core": "^2",
+    "lucide-react": "^0.468.0",
     "next": "^14.2.21",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "recharts": "^3.6.0",
+    "viem": "^2.21.51",
+    "wagmi": "^2.14.1"
   },
   "devDependencies": {
     "@tagit/tsconfig": "workspace:*",
+    "@tanstack/query-core": "^5.90.16",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

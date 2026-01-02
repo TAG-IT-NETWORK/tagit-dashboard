@@ -1,4 +1,27 @@
-export { TAGITCoreABI } from "./TAGITCore";
-export { TAGITAccessABI } from "./TAGITAccess";
-export { IdentityBadgeABI } from "./IdentityBadge";
+export {
+  TAGITCoreABI,
+  AssetState,
+  AssetStateNames,
+  Resolution,
+  ResolutionNames,
+  type AssetStateType,
+  type ResolutionType,
+  type Asset,
+} from "./TAGITCore";
+export {
+  TAGITAccessABI,
+  Capabilities,
+  CapabilityNames,
+  CapabilityList,
+  type CapabilityKey,
+  type CapabilityHash,
+} from "./TAGITAccess";
+export {
+  IdentityBadgeABI,
+  BadgeIds,
+  BadgeIdNames,
+  BadgeIdList,
+  BadgeCategories,
+  type BadgeId,
+} from "./IdentityBadge";
 export { CapabilityBadgeABI } from "./CapabilityBadge";

@@ -7,17 +7,38 @@ export {
   TAGITAccessABI,
   IdentityBadgeABI,
   CapabilityBadgeABI,
+  // TAGITCore types and constants
+  AssetState,
+  AssetStateNames,
+  Resolution,
+  ResolutionNames,
+  type AssetStateType,
+  type ResolutionType,
+  type Asset,
+  // TAGITAccess types and constants
+  Capabilities,
+  CapabilityNames,
+  CapabilityList,
+  type CapabilityKey,
+  type CapabilityHash,
+  // IdentityBadge types and constants
+  BadgeIds,
+  BadgeIdNames,
+  BadgeIdList,
+  BadgeCategories,
+  type BadgeId,
 } from "./abis";
 
 // Hooks
 export {
-  // TAGITCore
+  // TAGITCore Read
   useAsset,
   useAssetState,
   useAssetOwner,
   useTotalSupply,
   useContractName,
   useContractSymbol,
+  // TAGITCore Write
   useMint,
   useBindTag,
   useActivate,
@@ -26,36 +47,18 @@ export {
   useResolve,
   useRecycle,
   // TAGITAccess
-  useHasCapability,
+  useCapabilityGate,
   useCapabilities,
+  useGrantCapability,
+  useRevokeCapability,
   // IdentityBadge
-  useIdentityBadgeType,
-  useHasBadge,
+  useBadgeCheck,
+  useBadges,
+  useGrantBadge,
+  useRevokeBadge,
   // CapabilityBadge
   useCapabilityBadgeBalance,
 } from "./hooks";
-
-// Asset state enum
-export const AssetState = {
-  MINTED: 0,
-  BOUND: 1,
-  ACTIVATED: 2,
-  CLAIMED: 3,
-  FLAGGED: 4,
-  RECYCLED: 5,
-} as const;
-
-export type AssetStateType = (typeof AssetState)[keyof typeof AssetState];
-
-// Asset state names for display
-export const AssetStateNames: Record<AssetStateType, string> = {
-  [AssetState.MINTED]: "Minted",
-  [AssetState.BOUND]: "Bound",
-  [AssetState.ACTIVATED]: "Activated",
-  [AssetState.CLAIMED]: "Claimed",
-  [AssetState.FLAGGED]: "Flagged",
-  [AssetState.RECYCLED]: "Recycled",
-};
 
 // Utility functions
 export function shortenAddress(address: string, chars = 4): string {

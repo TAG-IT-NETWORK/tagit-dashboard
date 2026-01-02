@@ -1,101 +1,207 @@
 import { useAccount } from "wagmi";
 import {
-  useIdentityBadgeType,
-  useHasCapability as useContractHasCapability,
   useCapabilities as useContractCapabilities,
+  useCapabilityGate,
+  useBadges,
+  useBadgeCheck,
+  Capabilities,
+  BadgeIdNames,
+  type CapabilityHash,
 } from "@tagit/contracts";
-import { IdentityBadgeType, Capability, BadgeCapabilities } from "./types";
+import {
+  type CapabilityKey,
+  type BadgeInfo,
+  type CurrentUser,
+  CapabilityKeys,
+  getCapabilityKey,
+  BadgeCapabilities,
+} from "./types";
 
 /**
- * Returns the identity badge type for the given address or connected wallet
+ * Returns all badges for the connected wallet or specified address
  */
-export function useIdentityBadge(address?: `0x${string}`) {
+export function useUserBadges(address?: `0x${string}`) {
   const { address: connectedAddress } = useAccount();
   const targetAddress = address || connectedAddress;
 
-  const { data: badgeType, isLoading, error } = useIdentityBadgeType(targetAddress);
+  const { badges, badgeIds, isLoading, error, refetch } = useBadges(targetAddress);
 
   return {
-    badgeType: (badgeType as IdentityBadgeType) ?? IdentityBadgeType.NONE,
+    badges,
+    badgeIds,
     isLoading,
     error,
-    hasBadge: badgeType !== undefined && badgeType !== IdentityBadgeType.NONE,
+    refetch,
   };
 }
 
 /**
- * Returns array of capabilities for the given address or connected wallet
+ * Returns capabilities for the connected wallet or specified address
  */
-export function useCapabilities(address?: `0x${string}`) {
+export function useUserCapabilities(address?: `0x${string}`) {
   const { address: connectedAddress } = useAccount();
   const targetAddress = address || connectedAddress;
 
-  const { data: capabilities, isLoading, error } = useContractCapabilities(targetAddress);
+  const { capabilities: rawCapabilities, isLoading, error, refetch } = useContractCapabilities(targetAddress);
+
+  // Convert capability hashes to keys
+  const capabilities: CapabilityKey[] = [];
+  for (const hash of rawCapabilities) {
+    const key = getCapabilityKey(hash as CapabilityHash);
+    if (key) {
+      capabilities.push(key);
+    }
+  }
 
   return {
-    capabilities: (capabilities as bigint[])?.map((c) => Number(c) as Capability) ?? [],
+    capabilities,
+    capabilityHashes: rawCapabilities,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Checks if the connected wallet can perform a specific capability
+ */
+export function useCanPerform(capability: CapabilityKey, address?: `0x${string}`) {
+  const { address: connectedAddress, isConnected } = useAccount();
+  const targetAddress = address || connectedAddress;
+
+  const capabilityHash = Capabilities[capability];
+  const { hasCapability, isLoading, error } = useCapabilityGate(targetAddress, capabilityHash);
+
+  // CLAIMER and FLAGGER are public capabilities - any connected wallet can use them
+  const isPublicCapability = capability === "CLAIMER" || capability === "FLAGGER";
+
+  return {
+    canPerform: hasCapability || (isPublicCapability && isConnected),
     isLoading,
     error,
   };
 }
 
 /**
- * Checks if the given address or connected wallet can perform a specific capability
+ * Returns the current user's complete profile including address, badges, and capabilities.
+ * Aggregates wallet state from wagmi useAccount, fetches all badge balances, and capability checks.
+ * Cached with TanStack Query (5 min stale time via wagmi defaults).
  */
-export function useCanPerform(capability: Capability, address?: `0x${string}`) {
-  const { address: connectedAddress } = useAccount();
-  const targetAddress = address || connectedAddress;
+export function useCurrentUser(): CurrentUser {
+  const { address, isConnected } = useAccount();
 
-  const { data: hasCapability, isLoading, error } = useContractHasCapability(
-    targetAddress,
-    capability
-  );
+  // Fetch badges
+  const { badges: rawBadges, isLoading: badgesLoading } = useBadges(address);
 
-  // Consumers (no badge) can always CLAIM and FLAG
-  const isPublicCapability =
-    capability === Capability.CLAIM || capability === Capability.FLAG;
+  // Fetch capabilities
+  const { capabilities: rawCapabilities, isLoading: capabilitiesLoading } = useUserCapabilities(address);
+
+  // Transform badges to BadgeInfo format
+  const badges: BadgeInfo[] = rawBadges.map((badge) => ({
+    id: badge.id,
+    name: badge.name,
+  }));
+
+  // Derive capabilities from badges
+  const badgeCapabilities = new Set<CapabilityKey>();
+  for (const badge of badges) {
+    const caps = BadgeCapabilities[badge.id] ?? [];
+    for (const cap of caps) {
+      badgeCapabilities.add(cap);
+    }
+  }
+
+  // Merge badge-derived capabilities with explicit capabilities
+  const allCapabilities = new Set([...badgeCapabilities, ...rawCapabilities]);
+
+  // Any connected wallet has CLAIMER and FLAGGER capabilities
+  if (isConnected) {
+    allCapabilities.add("CLAIMER");
+    allCapabilities.add("FLAGGER");
+  }
 
   return {
-    canPerform: hasCapability === true || (isPublicCapability && !!targetAddress),
-    isLoading,
-    error,
+    address,
+    isConnected,
+    badges,
+    capabilities: Array.from(allCapabilities),
+    isLoading: badgesLoading || capabilitiesLoading,
   };
 }
 
 /**
- * Returns all permissions for the current user based on their badge and capabilities
+ * Check if user has a specific badge
+ */
+export function useHasBadge(badgeId: number, address?: `0x${string}`) {
+  const { address: connectedAddress } = useAccount();
+  const targetAddress = address || connectedAddress;
+
+  return useBadgeCheck(targetAddress, badgeId);
+}
+
+/**
+ * Check if user has a specific capability
+ */
+export function useHasCapability(capability: CapabilityKey, address?: `0x${string}`) {
+  const { address: connectedAddress } = useAccount();
+  const targetAddress = address || connectedAddress;
+
+  const capabilityHash = Capabilities[capability];
+  return useCapabilityGate(targetAddress, capabilityHash);
+}
+
+/**
+ * Returns all permissions for the current user with convenience booleans
  */
 export function usePermissions(address?: `0x${string}`) {
   const { address: connectedAddress, isConnected } = useAccount();
   const targetAddress = address || connectedAddress;
 
-  const { badgeType, isLoading: badgeLoading } = useIdentityBadge(targetAddress);
-  const { capabilities, isLoading: capabilitiesLoading } = useCapabilities(targetAddress);
+  const { badges, isLoading: badgesLoading } = useBadges(targetAddress);
+  const { capabilities, isLoading: capabilitiesLoading } = useUserCapabilities(targetAddress);
 
-  const isLoading = badgeLoading || capabilitiesLoading;
+  const isLoading = badgesLoading || capabilitiesLoading;
 
-  // Get default capabilities from badge type
-  const badgeCapabilities = BadgeCapabilities[badgeType] ?? [];
+  // Derive capabilities from badges
+  const badgeCapabilities = new Set<CapabilityKey>();
+  for (const badge of badges) {
+    const caps = BadgeCapabilities[badge.id] ?? [];
+    for (const cap of caps) {
+      badgeCapabilities.add(cap);
+    }
+  }
 
-  // Merge with explicit capabilities from contract
+  // Merge with explicit capabilities
   const allCapabilities = new Set([...badgeCapabilities, ...capabilities]);
+
+  // Public capabilities for connected users
+  if (isConnected) {
+    allCapabilities.add("CLAIMER");
+    allCapabilities.add("FLAGGER");
+  }
+
+  // Check for specific badge types
+  const badgeIds = badges.map((b) => b.id);
+  const hasGovMil = badgeIds.includes(20);
+  const hasLawEnforcement = badgeIds.includes(21);
+  const hasManufacturer = badgeIds.includes(10);
+  const hasRetailer = badgeIds.includes(11);
 
   return {
     isConnected,
-    badgeType,
+    badges,
     capabilities: Array.from(allCapabilities),
-    canMint: allCapabilities.has(Capability.MINT),
-    canBind: allCapabilities.has(Capability.BIND),
-    canActivate: allCapabilities.has(Capability.ACTIVATE),
-    canClaim: allCapabilities.has(Capability.CLAIM) || isConnected,
-    canFlag: allCapabilities.has(Capability.FLAG) || isConnected,
-    canResolve: allCapabilities.has(Capability.RESOLVE),
-    canRecycle: allCapabilities.has(Capability.RECYCLE),
-    isAdmin: badgeType === IdentityBadgeType.ADMIN,
-    isGovMil: badgeType === IdentityBadgeType.GOV_MIL,
-    isManufacturer: badgeType === IdentityBadgeType.MANUFACTURER,
-    isRetailer: badgeType === IdentityBadgeType.RETAILER,
-    isRecycler: badgeType === IdentityBadgeType.RECYCLER,
+    canMint: allCapabilities.has("MINTER"),
+    canBind: allCapabilities.has("BINDER"),
+    canActivate: allCapabilities.has("ACTIVATOR"),
+    canClaim: allCapabilities.has("CLAIMER"),
+    canFlag: allCapabilities.has("FLAGGER"),
+    canResolve: allCapabilities.has("RESOLVER"),
+    canRecycle: allCapabilities.has("RECYCLER"),
+    isGovMil: hasGovMil,
+    isLawEnforcement: hasLawEnforcement,
+    isManufacturer: hasManufacturer,
+    isRetailer: hasRetailer,
     isLoading,
   };
 }

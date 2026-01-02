@@ -1,17 +1,29 @@
 // Types
 export {
-  IdentityBadgeType,
-  IdentityBadgeTypeNames,
-  Capability,
-  CapabilityNames,
+  Capabilities,
+  BadgeIds,
+  CapabilityKeys,
+  CapabilityDisplayNames,
+  BadgeDisplayNames,
   BadgeCapabilities,
+  getCapabilityKey,
+  getCapabilityHash,
+  type CapabilityHash,
+  type CapabilityKey,
+  type BadgeId,
+  type BadgeInfo,
+  type CapabilityInfo,
+  type CurrentUser,
 } from "./types";
 
 // Hooks
 export {
-  useIdentityBadge,
-  useCapabilities,
+  useCurrentUser,
+  useUserBadges,
+  useUserCapabilities,
   useCanPerform,
+  useHasBadge,
+  useHasCapability,
   usePermissions,
 } from "./hooks";
 
@@ -20,6 +32,17 @@ export {
   RequireCapability,
   RequireBadge,
   RequireConnected,
-  RequireAdmin,
+  RequireAnyBadge,
   ShowIfCapable,
+  ShowIfBadge,
+  CapabilityGate,
+  BadgeGate,
+  type RequireCapabilityProps,
+  type RequireBadgeProps,
+  type RequireConnectedProps,
+  type RequireAnyBadgeProps,
+  type ShowIfCapableProps,
+  type ShowIfBadgeProps,
+  type CapabilityGateProps,
+  type BadgeGateProps,
 } from "./guards";
