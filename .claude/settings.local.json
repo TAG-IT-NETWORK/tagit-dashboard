@@ -7,7 +7,8 @@
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm add:*)",
       "Bash(cat:*)",
-      "Bash(pnpm remove:*)"
+      "Bash(pnpm remove:*)",
+      "Bash(pnpm --filter @tagit/admin build:*)"
     ]
   }
 }

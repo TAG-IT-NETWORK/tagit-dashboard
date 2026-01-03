@@ -28,5 +28,28 @@ export { MetricCard, type MetricCardProps } from "./components/metric-card";
 export { StateBadge, getStateLabel, getStateColor, type StateBadgeProps } from "./components/state-badge";
 export { AddressBadge, type AddressBadgeProps } from "./components/address-badge";
 
+// Phase 3 Components
+export {
+  ResolutionBadge,
+  getResolutionLabel,
+  type ResolutionType,
+  type ResolutionBadgeProps,
+} from "./components/resolution-badge";
+export {
+  ProposalStateBadge,
+  getProposalStateLabel,
+  type ProposalState,
+  type ProposalStateBadgeProps,
+} from "./components/proposal-state-badge";
+export { VoteBar, type VoteBarProps } from "./components/vote-bar";
+export { CountdownTimer, type CountdownTimerProps } from "./components/countdown-timer";
+export {
+  PriorityBadge,
+  calculatePriority,
+  formatTimeOpen,
+  type Priority,
+  type PriorityBadgeProps,
+} from "./components/priority-badge";
+
 // Utils
 export { cn } from "./lib/utils";

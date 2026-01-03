@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/admin-shell";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "TAG IT Admin",
   description: "Internal dashboard for TAG IT Network",
