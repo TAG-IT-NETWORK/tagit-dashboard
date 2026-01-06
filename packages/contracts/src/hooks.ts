@@ -193,7 +193,7 @@ export function useAllAssets(options?: {
 
   // Transform raw contract data into typed Asset objects
   const assets: Asset[] = (assetsData ?? [])
-    .map((result, index) => {
+    .map((result) => {
       if (result.status === "success" && result.result) {
         const data = result.result as {
           id: bigint;
@@ -260,6 +260,16 @@ export function useAssetsByState(
     error,
     refetch,
   };
+}
+
+/**
+ * Fetches flagged assets (state === FLAGGED)
+ * Convenience wrapper for useAssetsByState
+ * @param options.pageSize - Max items to return (default: 50)
+ * @param options.refetchInterval - Auto-refresh interval in ms
+ */
+export function useFlaggedAssets(options?: { pageSize?: number; refetchInterval?: number }) {
+  return useAssetsByState(AssetState.FLAGGED as AssetStateType, options);
 }
 
 // ============================================================================

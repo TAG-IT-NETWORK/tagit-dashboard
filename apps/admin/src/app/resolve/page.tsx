@@ -15,8 +15,6 @@ import {
   type SortingState,
   type RowSelectionState,
 } from "@tanstack/react-table";
-// Development mode: RequireCapability disabled while wagmi context issue is being debugged
-// import { RequireCapability } from "@tagit/auth";
 import {
   Card,
   CardContent,
@@ -48,12 +46,20 @@ import {
   Timer,
   Flag,
   Shield,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
-import {
-  mockFlaggedAssets,
-  getFlagQueueStats,
-  type FlaggedAsset,
-} from "@/lib/mocks/flagged-assets";
+import { useFlaggedAssets, type Asset, shortenAddress } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
+
+// Row type for flagged assets table
+interface FlaggedAssetRow {
+  tokenId: string;
+  owner: string;
+  tagId: string | null;
+  flaggedAt: number; // Using updatedAt as proxy for flaggedAt
+  priority: Priority;
+}
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -73,7 +79,25 @@ function formatDuration(ms: number): string {
   return `${days}d ${hours % 24}h`;
 }
 
-const columns: ColumnDef<FlaggedAsset & { priority: Priority }>[] = [
+// Transform contract Asset to table row
+function toFlaggedRow(asset: Asset): FlaggedAssetRow {
+  const zeroTag = "0x0000000000000000000000000000000000000000000000000000000000000000";
+  const flaggedAt = Number(asset.updatedAt) * 1000; // Use updatedAt as proxy for when it was flagged
+  return {
+    tokenId: asset.id.toString(),
+    owner: asset.owner,
+    tagId: asset.tagId === zeroTag ? null : asset.tagId,
+    flaggedAt,
+    priority: calculatePriority(flaggedAt),
+  };
+}
+
+// Simple skeleton for loading
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-muted rounded ${className ?? ""}`} />;
+}
+
+const columns: ColumnDef<FlaggedAssetRow>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -116,23 +140,11 @@ const columns: ColumnDef<FlaggedAsset & { priority: Priority }>[] = [
     ),
   },
   {
-    accessorKey: "flagReason",
-    header: "Flag Reason",
-    cell: ({ row }) => (
-      <div
-        className="max-w-[200px] truncate text-sm"
-        title={row.original.flagReason}
-      >
-        {row.original.flagReason}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "flaggedBy",
-    header: "Flagged By",
+    accessorKey: "owner",
+    header: "Owner",
     cell: ({ row }) => (
       <AddressBadge
-        address={row.original.flaggedBy}
+        address={row.original.owner}
         showCopy={false}
         showEtherscan={false}
       />
@@ -146,7 +158,7 @@ const columns: ColumnDef<FlaggedAsset & { priority: Priority }>[] = [
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         className="p-0 hover:bg-transparent"
       >
-        Flagged At
+        Flagged
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
@@ -227,6 +239,14 @@ function AccessDenied() {
 }
 
 function FlagQueueContent() {
+  // Fetch live flagged assets from contract
+  const {
+    assets: flaggedAssets,
+    isLoading,
+    error,
+    refetch,
+  } = useFlaggedAssets({ pageSize: 50, refetchInterval: 30000 });
+
   const [sorting, setSorting] = useState<SortingState>([
     { id: "flaggedAt", desc: false }, // Oldest first by default
   ]);
@@ -234,21 +254,30 @@ function FlagQueueContent() {
   const [priorityFilter, setPriorityFilter] = useState<Priority | "ALL">("ALL");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  const stats = getFlagQueueStats();
-
-  // Add priority to each asset
+  // Transform to table rows with priority
   const assetsWithPriority = useMemo(() => {
-    return mockFlaggedAssets.map((asset) => ({
-      ...asset,
-      priority: calculatePriority(asset.flaggedAt),
-    }));
-  }, []);
+    return flaggedAssets.map(toFlaggedRow);
+  }, [flaggedAssets]);
 
   // Filter by priority
   const filteredData = useMemo(() => {
     if (priorityFilter === "ALL") return assetsWithPriority;
     return assetsWithPriority.filter((a) => a.priority === priorityFilter);
   }, [assetsWithPriority, priorityFilter]);
+
+  // Stats calculated from live data
+  const stats = useMemo(() => {
+    const high = assetsWithPriority.filter((a) => a.priority === "HIGH").length;
+    const medium = assetsWithPriority.filter((a) => a.priority === "MEDIUM").length;
+    const low = assetsWithPriority.filter((a) => a.priority === "LOW").length;
+    return {
+      totalFlagged: assetsWithPriority.length,
+      pendingReview: assetsWithPriority.length,
+      highPriority: high,
+      resolvedToday: 0, // Requires indexer
+      avgResolutionTimeMs: 0, // Requires indexer
+    };
+  }, [assetsWithPriority]);
 
   const table = useReactTable({
     data: filteredData,
@@ -284,15 +313,35 @@ function FlagQueueContent() {
             Resolution Queue
           </h1>
           <p className="text-muted-foreground">
-            Review and resolve flagged assets through AIRP
+            {isLoading ? "Loading flagged assets..." : `${stats.totalFlagged} assets awaiting resolution`}
           </p>
         </div>
-        {selectedCount > 0 && (
-          <Button variant="outline">
-            Bulk Resolve ({selectedCount} selected)
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
           </Button>
-        )}
+          {selectedCount > 0 && (
+            <Button variant="outline">
+              Bulk Resolve ({selectedCount} selected)
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive text-sm">
+              Error loading flagged assets: {error.message}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -353,11 +402,11 @@ function FlagQueueContent() {
         </CardContent>
       </Card>
 
-      {/* Demo Mode Indicator */}
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-        <span className="text-sm text-yellow-600">
-          Demo Mode: Using mock data. Connect to deployed contracts for live data.
+      {/* Info: Flag details require indexer */}
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <AlertTriangle className="h-4 w-4 text-blue-600" />
+        <span className="text-sm text-blue-600">
+          Note: Flag reason and reporter details require event indexer (Phase 5). Currently showing on-chain asset data.
         </span>
       </div>
 
@@ -392,7 +441,20 @@ function FlagQueueContent() {
                 ))}
               </thead>
               <tbody>
-                {table.getRowModel().rows.length ? (
+                {isLoading ? (
+                  // Loading skeleton
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-b">
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-4" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-20" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-8 w-16" /></td>
+                    </tr>
+                  ))
+                ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
@@ -414,7 +476,7 @@ function FlagQueueContent() {
                       colSpan={columns.length}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      No flagged assets found.
+                      No flagged assets found. All assets are in good standing!
                     </td>
                   </tr>
                 )}
@@ -474,7 +536,9 @@ function FlagQueueContent() {
 }
 
 export default function ResolvePage() {
-  // Development mode: Skip capability check while wagmi context issue is being debugged
-  // TODO: Re-enable RequireCapability when wagmi integration is fixed
-  return <FlagQueueContent />;
+  return (
+    <WagmiGuard>
+      <FlagQueueContent />
+    </WagmiGuard>
+  );
 }

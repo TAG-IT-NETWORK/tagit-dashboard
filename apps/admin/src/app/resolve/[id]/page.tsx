@@ -2,11 +2,18 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-// Development mode: RequireCapability disabled while wagmi context issue is being debugged
-// import { RequireCapability } from "@tagit/auth";
-import { AssetState, AssetStateNames } from "@tagit/contracts";
+import { useRouter } from "next/navigation";
+import {
+  AssetState,
+  AssetStateNames,
+  useAsset,
+  useResolve,
+  Resolution,
+  type ResolutionType,
+  getBlockscoutTxUrl,
+} from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
@@ -259,6 +266,7 @@ function AccessDenied() {
 }
 
 function ResolveDetailContent({ tokenId }: { tokenId: string }) {
+  const router = useRouter();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     ownership: true,
     verification: false,
@@ -266,30 +274,70 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     similar: false,
   });
   const [activeModal, setActiveModal] = useState<"CLEAR" | "QUARANTINE" | "DECOMMISSION" | null>(null);
+  const [txSuccess, setTxSuccess] = useState(false);
 
-  // Find the asset from mock data
-  const asset = mockFlaggedAssets.find((a) => a.tokenId === tokenId);
-  const priority = asset ? calculatePriority(asset.flaggedAt) : "LOW";
+  // Fetch live asset data
+  const {
+    asset: contractAsset,
+    isLoading: assetLoading,
+    error: assetError,
+    refetch: refetchAsset,
+  } = useAsset(BigInt(tokenId));
 
-  // Get resolution history for this asset
-  const assetResolutions = mockResolutionHistory.filter(
-    (r) => r.tokenId === tokenId
-  );
+  // Resolution hook
+  const {
+    resolve,
+    hash: txHash,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error: resolveError,
+  } = useResolve();
 
-  // Development mode: useResolve hook disabled while wagmi context issue is being debugged
-  // TODO: Re-enable useResolve when wagmi integration is fixed
-  const isPending = false;
+  // Calculate priority from updatedAt (when it was flagged)
+  const flaggedAt = contractAsset ? Number(contractAsset.updatedAt) * 1000 : Date.now();
+  const priority = calculatePriority(flaggedAt);
+
+  // Check if asset is actually flagged
+  const isFlagged = contractAsset?.state === AssetState.FLAGGED;
+
+  // Handle successful resolution
+  useEffect(() => {
+    if (isSuccess && !txSuccess) {
+      setTxSuccess(true);
+      // Refetch asset data after resolution
+      setTimeout(() => {
+        refetchAsset();
+      }, 2000);
+    }
+  }, [isSuccess, txSuccess, refetchAsset]);
+
+  // Map UI resolution type to contract Resolution enum
+  const resolveTypeToContract = (type: "CLEAR" | "QUARANTINE" | "DECOMMISSION"): ResolutionType => {
+    switch (type) {
+      case "CLEAR":
+        return Resolution.CLEAR as ResolutionType;
+      case "QUARANTINE":
+        return Resolution.QUARANTINE as ResolutionType;
+      case "DECOMMISSION":
+        return Resolution.DECOMMISSION as ResolutionType;
+    }
+  };
 
   const handleResolve = (type: "CLEAR" | "QUARANTINE" | "DECOMMISSION", _notes: string) => {
-    // In production, this would call the resolve contract function
-    console.log(`[Dev Mode] Would resolve asset #${tokenId} with action: ${type}`);
+    const resolution = resolveTypeToContract(type);
+    resolve(BigInt(tokenId), resolution);
   };
+
+  // Mock data for investigation panels (requires indexer)
+  const assetResolutions: typeof mockResolutionHistory = [];
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  if (!asset) {
+  // Loading state
+  if (assetLoading) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" asChild>
@@ -300,12 +348,103 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
         </Button>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Asset not found in flag queue.</p>
+            <p className="text-muted-foreground">Loading asset data...</p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  // Error state
+  if (assetError) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" asChild>
+          <Link href="/resolve">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Queue
+          </Link>
+        </Button>
+        <Card className="border-destructive">
+          <CardContent className="py-12 text-center">
+            <p className="text-destructive">Error loading asset: {assetError.message}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Asset not found or not flagged
+  if (!contractAsset || contractAsset.owner === "0x0000000000000000000000000000000000000000") {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" asChild>
+          <Link href="/resolve">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Queue
+          </Link>
+        </Button>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">Asset #{tokenId} not found.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Asset not flagged anymore (already resolved)
+  if (!isFlagged && txSuccess) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" asChild>
+          <Link href="/resolve">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Queue
+          </Link>
+        </Button>
+        <Card className="border-green-500">
+          <CardContent className="py-12 text-center space-y-4">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+            <h2 className="text-lg font-semibold text-green-600">Resolution Successful!</h2>
+            <p className="text-muted-foreground">
+              Asset #{tokenId} has been resolved. Current state: {AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}
+            </p>
+            {txHash && (
+              <a
+                href={getBlockscoutTxUrl(txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline inline-flex items-center gap-1"
+              >
+                View transaction <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            <div className="pt-4">
+              <Button asChild>
+                <Link href="/resolve">Return to Queue</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Create asset object for display (use contractAsset as source)
+  const asset = {
+    tokenId,
+    owner: contractAsset.owner,
+    tagId: contractAsset.tagId === "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ? null
+      : contractAsset.tagId,
+    metadataURI: contractAsset.metadataURI,
+    previousState: AssetState.ACTIVATED, // We don't have previous state without indexer
+    flaggedBy: contractAsset.owner, // Placeholder - requires indexer
+    flaggedAt,
+    flagReason: "Flag details require event indexer", // Placeholder
+    txHash: "0x...", // Placeholder - requires indexer
+  };
 
   return (
     <div className="space-y-6">
@@ -613,19 +752,64 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
 
         {/* Sidebar - Resolution Actions */}
         <div className="space-y-6">
+          {/* Transaction Status */}
+          {(isPending || isConfirming || resolveError) && (
+            <Card className={resolveError ? "border-destructive" : "border-blue-500"}>
+              <CardContent className="pt-6">
+                {isPending && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <Clock className="h-4 w-4 animate-pulse" />
+                    <span className="text-sm">Waiting for wallet confirmation...</span>
+                  </div>
+                )}
+                {isConfirming && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <Clock className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Transaction confirming...</span>
+                  </div>
+                )}
+                {resolveError && (
+                  <div className="text-sm text-destructive">
+                    Error: {resolveError.message?.slice(0, 100)}
+                  </div>
+                )}
+                {txHash && !isSuccess && (
+                  <a
+                    href={getBlockscoutTxUrl(txHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
+                  >
+                    View on Blockscout <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-2 border-dashed">
             <CardHeader>
               <CardTitle>Resolution Actions</CardTitle>
               <CardDescription>
-                Choose an action to resolve this flagged asset
+                {isFlagged
+                  ? "Choose an action to resolve this flagged asset"
+                  : "Asset is not currently flagged"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {!isFlagged && (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
+                  <p className="text-sm text-yellow-600">
+                    This asset is in state "{AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}" and cannot be resolved.
+                  </p>
+                </div>
+              )}
+
               {/* CLEAR */}
               <Button
                 onClick={() => setActiveModal("CLEAR")}
                 className="w-full bg-green-600 hover:bg-green-700 text-white"
-                disabled={isPending}
+                disabled={isPending || isConfirming || !isFlagged}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Clear
@@ -638,7 +822,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
               <Button
                 onClick={() => setActiveModal("QUARANTINE")}
                 className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
-                disabled={isPending}
+                disabled={isPending || isConfirming || !isFlagged}
               >
                 <AlertTriangle className="h-4 w-4 mr-2" />
                 Quarantine
@@ -652,7 +836,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                 onClick={() => setActiveModal("DECOMMISSION")}
                 variant="destructive"
                 className="w-full"
-                disabled={isPending}
+                disabled={isPending || isConfirming || !isFlagged}
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Decommission

@@ -40,6 +40,7 @@ export {
   useContractSymbol,
   useAllAssets,
   useAssetsByState,
+  useFlaggedAssets,
   // TAGITCore Write
   useMint,
   useBindTag,

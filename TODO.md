@@ -1,6 +1,6 @@
 # TODO.md — TAGIT Admin Dashboard
 # Live Blockchain Integration Roadmap
-# Updated: 2026-01-05
+# Updated: 2026-01-06
 
 ## Current Status
 - UI pages built with mock data
@@ -37,15 +37,15 @@
 
 ---
 
-## PHASE 3: AIRP Resolution Flow
+## PHASE 3: AIRP Resolution Flow ✅ COMPLETE
 **Goal:** Enable full arbitration workflow for flagged assets.
 
-- [ ] Create useFlaggedAssets() — filter where state === 5
-- [ ] Connect /resolve page to flagged assets list
-- [ ] Enable useResolve() on /resolve/[id] page
-- [ ] Implement resolution type selector (CLEAR=0, QUARANTINE=1, DECOMMISSION=2)
-- [ ] Add transaction status feedback
-- [ ] Auto-refetch asset data after resolution
+- [x] Create useFlaggedAssets() — filter where state === FLAGGED
+- [x] Connect /resolve page to flagged assets list
+- [x] Enable useResolve() on /resolve/[id] page
+- [x] Implement resolution type selector (CLEAR=0, QUARANTINE=1, DECOMMISSION=2)
+- [x] Add transaction status feedback
+- [x] Auto-refetch asset data after resolution
 
 ---
 
@@ -115,5 +115,5 @@
 | CapabilityBadge | 0xfa7e212efc6e9214c5de5bd29c9f1e4ef0894860 |
 
 ### Available Hooks
-**Read:** useAsset, useAssetState, useTotalSupply, useAllAssets, useAssetsByState, useBadges, useCapabilities, useCapabilityGate, useBadgeCheck
+**Read:** useAsset, useAssetState, useTotalSupply, useAllAssets, useAssetsByState, useFlaggedAssets, useBadges, useCapabilities, useCapabilityGate, useBadgeCheck
 **Write:** useMint, useBindTag, useActivate, useClaim, useFlag, useResolve, useRecycle, useGrantBadge, useRevokeBadge, useGrantCapability, useRevokeCapability
