@@ -8,11 +8,21 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter @tagit/admin test:e2e",
+    "test:all": "turbo test && pnpm test:e2e",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "wagmi": "^2.19.5",
+      "viem": "^2.21.51",
+      "@tanstack/react-query": "^5.90.12"
+    }
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {

@@ -8,7 +8,12 @@
       "Bash(pnpm add:*)",
       "Bash(cat:*)",
       "Bash(pnpm remove:*)",
-      "Bash(pnpm --filter @tagit/admin build:*)"
+      "Bash(pnpm --filter @tagit/admin build:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(curl:*)",
+      "Bash(findstr:*)",
+      "Bash(pnpm why:*)",
+      "Bash(ping:*)"
     ]
   }
 }

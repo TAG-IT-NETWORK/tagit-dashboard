@@ -13,8 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "viem": "^2.21.51",
-    "wagmi": "^2.14.1"
+    "viem": "^2.21.51"
   },
   "devDependencies": {
     "@tagit/tsconfig": "workspace:*",
@@ -23,6 +22,7 @@
     "typescript": "^5.7.2"
   },
   "peerDependencies": {
-    "react": "^18"
+    "react": "^18",
+    "wagmi": "^2.19.5"
   }
 }

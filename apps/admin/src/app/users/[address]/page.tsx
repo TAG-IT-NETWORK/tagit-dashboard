@@ -5,8 +5,6 @@ export const dynamic = "force-dynamic";
 import { use } from "react";
 import Link from "next/link";
 import {
-  useBadges,
-  useCapabilities,
   BadgeIds,
   BadgeIdNames,
   CapabilityNames,
@@ -122,34 +120,10 @@ function getCapabilityName(hash: CapabilityHash): string {
 export default function UserDetailPage({ params }: UserDetailPageProps) {
   const { address } = use(params);
 
-  // In production, these would fetch real data
-  const { badgeIds, isLoading: badgesLoading } = useBadges(address as `0x${string}`);
-  const { capabilities, isLoading: capsLoading } = useCapabilities(address as `0x${string}`);
-
-  // Mock data for demonstration
-  const mockBadgeIds = [BadgeIds.KYC_L1, BadgeIds.KYC_L2, BadgeIds.MANUFACTURER];
-  const mockCapabilities: CapabilityHash[] = [Capabilities.MINTER, Capabilities.BINDER];
-
-  const displayBadgeIds = badgeIds.length > 0 ? badgeIds : mockBadgeIds;
-  const displayCapabilities = capabilities.length > 0 ? capabilities : mockCapabilities;
-  const isLoading = badgesLoading || capsLoading;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="h-32 bg-muted animate-pulse rounded" />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Development mode: Using mock data while wagmi context issue is being debugged
+  // TODO: Re-enable useBadges and useCapabilities hooks when wagmi integration is fixed
+  const displayBadgeIds: number[] = [BadgeIds.KYC_L1, BadgeIds.KYC_L2, BadgeIds.MANUFACTURER];
+  const displayCapabilities: CapabilityHash[] = [Capabilities.MINTER, Capabilities.BINDER];
 
   return (
     <div className="space-y-6">

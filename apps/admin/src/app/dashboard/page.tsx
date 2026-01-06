@@ -9,12 +9,14 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  CardDescription,
   MetricCard,
   Button,
   StateBadge,
   AddressBadge,
+  Badge,
 } from "@tagit/ui";
-import { Package, Users, AlertTriangle, TrendingUp, Plus, ArrowRight, ExternalLink } from "lucide-react";
+import { Package, Users, AlertTriangle, TrendingUp, Plus, ArrowRight, ExternalLink, FlaskConical, Nfc, Play } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 // Mock data for demonstration - in production, fetch from events/indexer
@@ -149,6 +151,42 @@ export default function DashboardPage() {
           className={flaggedAssets > 0 ? "border-red-500/50" : ""}
         />
       </div>
+
+      {/* NFC Lifecycle Test Card */}
+      {process.env.NODE_ENV === "development" && (
+        <Card className="border-dashed border-primary/50 bg-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">NFC Lifecycle Test</CardTitle>
+                <Badge variant="secondary" className="text-xs">Dev</Badge>
+              </div>
+              <Button asChild size="sm">
+                <Link href="/test/lifecycle">
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Test
+                </Link>
+              </Button>
+            </div>
+            <CardDescription>
+              Test the complete asset lifecycle with NTAG424 DNA tags: MINT → BIND → ACTIVATE → CLAIM → FLAG → RESOLVE
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <Nfc className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Supports Web NFC on Android Chrome</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Manual UID entry for desktop testing</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts and Activity */}
       <div className="grid gap-6 lg:grid-cols-2">

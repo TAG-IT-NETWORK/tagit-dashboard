@@ -1,8 +1,8 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
 import { useAsset, useAssetState, AssetState, AssetStateNames } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
   CardContent,
@@ -98,11 +98,18 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 interface AssetDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
-  const { id } = use(params);
+  return (
+    <WagmiGuard>
+      <AssetDetailContent id={params.id} />
+    </WagmiGuard>
+  );
+}
+
+function AssetDetailContent({ id }: { id: string }) {
   const tokenId = BigInt(id);
 
   const { asset, isLoading: assetLoading, error: assetError } = useAsset(tokenId);

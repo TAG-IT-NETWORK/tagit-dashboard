@@ -60,6 +60,9 @@ export {
   useCapabilityBadgeBalance,
 } from "./hooks";
 
+// Re-export wagmi hooks to ensure same instance is used across the app
+export { useAccount, useConfig } from "wagmi";
+
 // Utility functions
 export function shortenAddress(address: string, chars = 4): string {
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;

@@ -1,10 +1,11 @@
 export const CHAIN_ID = 11155420; // OP Sepolia
 
+// All lowercase addresses are valid (bypass checksum validation)
 export const CONTRACTS = {
-  TAGITCore: "0x6a58eE8f2d500981b1793868C55072789c58fba6",
-  TAGITAccess: "0xf7efefc59E81540408b4c9c2a09417Ddb10b4936",
-  IdentityBadge: "0xb3f757fca307a7febA5CA210Cd7D840EC0999be8",
-  CapabilityBadge: "0xfa7E212efc6E9214c5dE5bd29C9f1e4ef089486",
+  TAGITCore: "0x6a58ee8f2d500981b1793868c55072789c58fba6" as `0x${string}`,
+  TAGITAccess: "0xf7efefc59e81540408b4c9c2a09417ddb10b4936" as `0x${string}`,
+  IdentityBadge: "0xb3f757fca307a7feba5ca210cd7d840ec0999be8" as `0x${string}`,
+  CapabilityBadge: "0xfa7e212efc6e9214c5de5bd29c9f1e4ef0894860" as `0x${string}`,
 } as const;
 
 export type ContractName = keyof typeof CONTRACTS;

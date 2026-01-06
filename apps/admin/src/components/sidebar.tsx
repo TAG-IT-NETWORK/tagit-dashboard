@@ -14,6 +14,7 @@ import {
   Wallet,
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +28,13 @@ const navigation = [
   { name: "Governance", href: "/governance", icon: Vote },
   { name: "Treasury", href: "/treasury", icon: Wallet },
 ];
+
+// Testing section - only visible in development
+const testingNavigation = [
+  { name: "Lifecycle Test", href: "/test/lifecycle", icon: FlaskConical },
+];
+
+const isDev = process.env.NODE_ENV === "development";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -78,6 +86,40 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Testing Section - Dev Only */}
+        {isDev && (
+          <>
+            <div className="pt-4 pb-2">
+              {!collapsed && (
+                <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Testing
+                </span>
+              )}
+              {collapsed && <div className="border-t border-border mx-3" />}
+            </div>
+            {testingNavigation.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    collapsed && "justify-center"
+                  )}
+                  title={collapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span>{item.name}</span>}
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       {/* Collapse Toggle */}
