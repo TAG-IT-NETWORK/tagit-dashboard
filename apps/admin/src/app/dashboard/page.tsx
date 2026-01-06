@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useTotalSupply, AssetState, AssetStateNames } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
   CardHeader,
@@ -92,6 +93,14 @@ function truncateHash(hash: string): string {
 }
 
 export default function DashboardPage() {
+  return (
+    <WagmiGuard>
+      <DashboardContent />
+    </WagmiGuard>
+  );
+}
+
+function DashboardContent() {
   const { data: totalSupply, isLoading: supplyLoading } = useTotalSupply();
 
   const totalAssets = totalSupply ? Number(totalSupply) : 560;

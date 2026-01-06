@@ -2,7 +2,6 @@
 
 export const dynamic = "force-dynamic";
 
-import { use } from "react";
 import Link from "next/link";
 import {
   BadgeIds,
@@ -11,6 +10,7 @@ import {
   Capabilities,
   type CapabilityHash,
 } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
   CardContent,
@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 
 interface UserDetailPageProps {
-  params: Promise<{ address: string }>;
+  params: { address: string };
 }
 
 // Mock data for user's assets
@@ -118,8 +118,14 @@ function getCapabilityName(hash: CapabilityHash): string {
 }
 
 export default function UserDetailPage({ params }: UserDetailPageProps) {
-  const { address } = use(params);
+  return (
+    <WagmiGuard>
+      <UserDetailContent address={params.address} />
+    </WagmiGuard>
+  );
+}
 
+function UserDetailContent({ address }: { address: string }) {
   // Development mode: Using mock data while wagmi context issue is being debugged
   // TODO: Re-enable useBadges and useCapabilities hooks when wagmi integration is fixed
   const displayBadgeIds: number[] = [BadgeIds.KYC_L1, BadgeIds.KYC_L2, BadgeIds.MANUFACTURER];

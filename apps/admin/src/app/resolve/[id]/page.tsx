@@ -2,11 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 // Development mode: RequireCapability disabled while wagmi context issue is being debugged
 // import { RequireCapability } from "@tagit/auth";
 import { AssetState, AssetStateNames } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
   CardContent,
@@ -54,7 +55,7 @@ import {
 } from "@/lib/mocks/flagged-assets";
 
 interface ResolveDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 function formatDate(timestamp: number): string {
@@ -704,9 +705,11 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
 }
 
 export default function ResolveDetailPage({ params }: ResolveDetailPageProps) {
-  const { id } = use(params);
-
   // Development mode: Skip capability check while wagmi context issue is being debugged
   // TODO: Re-enable RequireCapability when wagmi integration is fixed
-  return <ResolveDetailContent tokenId={id} />;
+  return (
+    <WagmiGuard>
+      <ResolveDetailContent tokenId={params.id} />
+    </WagmiGuard>
+  );
 }

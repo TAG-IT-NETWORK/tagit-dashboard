@@ -9,6 +9,8 @@ import {
   useGrantBadge,
   useRevokeBadge,
 } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
+import { getAddress } from "viem";
 import {
   Card,
   CardContent,
@@ -145,10 +147,11 @@ function GrantRevokeModal({ badge, mode, onClose }: GrantRevokeModalProps) {
     setError(null);
 
     try {
+      const normalizedAddress = getAddress(address);
       if (mode === "grant") {
-        grantBadge(address as `0x${string}`, badge.id);
+        grantBadge(normalizedAddress, badge.id);
       } else {
-        revokeBadge(address as `0x${string}`, badge.id);
+        revokeBadge(normalizedAddress, badge.id);
       }
       setSuccess(true);
       setTimeout(() => {
@@ -263,6 +266,14 @@ function GrantRevokeModal({ badge, mode, onClose }: GrantRevokeModalProps) {
 }
 
 export default function BadgesPage() {
+  return (
+    <WagmiGuard>
+      <BadgesContent />
+    </WagmiGuard>
+  );
+}
+
+function BadgesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [modalState, setModalState] = useState<{

@@ -12,6 +12,8 @@ import {
   type CapabilityKey,
   type CapabilityHash,
 } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
+import { getAddress } from "viem";
 import {
   Card,
   CardContent,
@@ -159,10 +161,11 @@ function GrantRevokeModal({ capability, mode, onClose }: GrantRevokeModalProps) 
     setError(null);
 
     try {
+      const normalizedAddress = getAddress(address);
       if (mode === "grant") {
-        grantCapability(address as `0x${string}`, capability.hash);
+        grantCapability(normalizedAddress, capability.hash);
       } else {
-        revokeCapability(address as `0x${string}`, capability.hash);
+        revokeCapability(normalizedAddress, capability.hash);
       }
       setSuccess(true);
       setTimeout(() => {
@@ -289,6 +292,14 @@ function GrantRevokeModal({ capability, mode, onClose }: GrantRevokeModalProps) 
 }
 
 export default function CapabilitiesPage() {
+  return (
+    <WagmiGuard>
+      <CapabilitiesContent />
+    </WagmiGuard>
+  );
+}
+
+function CapabilitiesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<string | null>(null);
   const [modalState, setModalState] = useState<{
