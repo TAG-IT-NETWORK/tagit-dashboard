@@ -9,7 +9,6 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   flexRender,
   type ColumnDef,
   type SortingState,
@@ -35,10 +34,19 @@ import {
   Download,
   Filter,
   Plus,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
+import { useAllAssets, type Asset as ContractAsset, shortenAddress } from "@tagit/contracts";
+import { WagmiGuard } from "@/components/wagmi-guard";
 
-// Mock data - in production, fetch from contract/indexer
-interface Asset {
+// Simple skeleton component for loading states
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-muted rounded ${className ?? ""}`} />;
+}
+
+// Table row type - mapped from contract Asset
+interface AssetRow {
   tokenId: string;
   state: number;
   owner: string;
@@ -46,15 +54,6 @@ interface Asset {
   createdAt: number;
   updatedAt: number;
 }
-
-const mockAssets: Asset[] = Array.from({ length: 100 }, (_, i) => ({
-  tokenId: String(1000 + i),
-  state: Math.floor(Math.random() * 6),
-  owner: `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`,
-  tagId: Math.random() > 0.3 ? `0x${Math.random().toString(16).slice(2, 18)}` : null,
-  createdAt: Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000,
-  updatedAt: Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000,
-}));
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -72,7 +71,20 @@ function truncateHex(hex: string, chars = 6): string {
   return `${hex.slice(0, chars + 2)}...${hex.slice(-chars)}`;
 }
 
-const columns: ColumnDef<Asset>[] = [
+// Transform contract Asset to table row format
+function toAssetRow(asset: ContractAsset): AssetRow {
+  const zeroTag = "0x0000000000000000000000000000000000000000000000000000000000000000";
+  return {
+    tokenId: asset.id.toString(),
+    state: asset.state,
+    owner: asset.owner,
+    tagId: asset.tagId === zeroTag ? null : asset.tagId,
+    createdAt: Number(asset.createdAt) * 1000, // Convert from seconds to ms
+    updatedAt: Number(asset.updatedAt) * 1000,
+  };
+}
+
+const columns: ColumnDef<AssetRow>[] = [
   {
     accessorKey: "tokenId",
     header: ({ column }) => (
@@ -175,18 +187,45 @@ const stateFilters = [
 ];
 
 export default function AssetsPage() {
+  return (
+    <WagmiGuard>
+      <AssetsContent />
+    </WagmiGuard>
+  );
+}
+
+function AssetsContent() {
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
+
+  // Fetch live data from contract
+  const {
+    assets: contractAssets,
+    totalSupply,
+    totalPages,
+    hasNextPage,
+    hasPrevPage,
+    isLoading,
+    error,
+    refetch,
+  } = useAllAssets({ page, pageSize, refetchInterval: 30000 }); // Auto-refresh every 30s
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [stateFilter, setStateFilter] = useState<number[]>([]);
   const [rowSelection, setRowSelection] = useState({});
 
+  // Transform contract assets to table rows
+  const allAssets = useMemo(
+    () => contractAssets.map(toAssetRow),
+    [contractAssets]
+  );
+
+  // Apply state filter client-side
   const filteredData = useMemo(() => {
-    let data = mockAssets;
-    if (stateFilter.length > 0) {
-      data = data.filter((asset) => stateFilter.includes(asset.state));
-    }
-    return data;
-  }, [stateFilter]);
+    if (stateFilter.length === 0) return allAssets;
+    return allAssets.filter((asset) => stateFilter.includes(asset.state));
+  }, [allAssets, stateFilter]);
 
   const table = useReactTable({
     data: filteredData,
@@ -194,7 +233,6 @@ export default function AssetsPage() {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: setRowSelection,
@@ -202,11 +240,6 @@ export default function AssetsPage() {
       sorting,
       globalFilter,
       rowSelection,
-    },
-    initialState: {
-      pagination: {
-        pageSize: 25,
-      },
     },
   });
 
@@ -245,16 +278,40 @@ export default function AssetsPage() {
         <div>
           <h1 className="text-2xl font-bold">Assets</h1>
           <p className="text-muted-foreground">
-            Manage all digital twin assets on the network
+            {isLoading ? (
+              "Loading assets..."
+            ) : (
+              <>Total: {totalSupply.toLocaleString()} assets on the network</>
+            )}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/assets?action=mint">
-            <Plus className="h-4 w-4 mr-2" />
-            Mint Asset
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+          <Button asChild>
+            <Link href="/assets?action=mint">
+              <Plus className="h-4 w-4 mr-2" />
+              Mint Asset
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <p className="text-destructive text-sm">
+              Error loading assets: {error.message}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -327,7 +384,19 @@ export default function AssetsPage() {
                 ))}
               </thead>
               <tbody>
-                {table.getRowModel().rows.length ? (
+                {isLoading ? (
+                  // Loading skeleton
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <tr key={i} className="border-b">
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-20" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-28" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                    </tr>
+                  ))
+                ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
@@ -346,7 +415,7 @@ export default function AssetsPage() {
                       colSpan={columns.length}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      No assets found.
+                      {totalSupply === 0 ? "No assets minted yet." : "No assets match your filters."}
                     </td>
                   </tr>
                 )}
@@ -357,41 +426,48 @@ export default function AssetsPage() {
           {/* Pagination */}
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              Showing {table.getRowModel().rows.length} of {filteredData.length} assets
+              {isLoading ? (
+                <Skeleton className="h-4 w-40 inline-block" />
+              ) : (
+                <>
+                  Showing {filteredData.length} of {totalSupply} assets
+                  {stateFilter.length > 0 && " (filtered)"}
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPage(0)}
+                disabled={!hasPrevPage || isLoading}
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={!hasPrevPage || isLoading}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm">
-                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                Page {page + 1} of {Math.max(1, totalPages)}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNextPage || isLoading}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
+                onClick={() => setPage(Math.max(0, totalPages - 1))}
+                disabled={!hasNextPage || isLoading}
               >
                 <ChevronsRight className="h-4 w-4" />
               </Button>

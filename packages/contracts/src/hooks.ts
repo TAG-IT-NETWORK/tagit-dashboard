@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACTS, CHAIN_ID } from "./addresses";
 import {
   TAGITCoreABI,
@@ -124,6 +124,142 @@ export function useContractSymbol() {
     functionName: "symbol",
     chainId: CHAIN_ID,
   });
+}
+
+/**
+ * Fetches all assets with pagination support
+ * Uses batch contract reads for efficiency
+ * @param options.page - Page number (0-indexed)
+ * @param options.pageSize - Items per page (default: 25)
+ * @param options.refetchInterval - Auto-refresh interval in ms (default: 0 = disabled)
+ */
+export function useAllAssets(options?: {
+  page?: number;
+  pageSize?: number;
+  refetchInterval?: number;
+}) {
+  const page = options?.page ?? 0;
+  const pageSize = options?.pageSize ?? 25;
+  const refetchInterval = options?.refetchInterval ?? 0;
+
+  // First get total supply to know how many assets exist
+  const {
+    data: totalSupply,
+    isLoading: supplyLoading,
+    error: supplyError,
+  } = useReadContract({
+    address: CONTRACTS.TAGITCore as `0x${string}`,
+    abi: TAGITCoreABI,
+    functionName: "totalSupply",
+    chainId: CHAIN_ID,
+    query: {
+      refetchInterval: refetchInterval > 0 ? refetchInterval : undefined,
+    },
+  });
+
+  const total = totalSupply ? Number(totalSupply) : 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  // Calculate which tokenIds to fetch for this page
+  // Token IDs start at 1, not 0
+  const startId = page * pageSize + 1;
+  const endId = Math.min(startId + pageSize - 1, total);
+
+  // Build array of contract calls for batch fetching
+  const contracts =
+    total > 0 && startId <= total
+      ? Array.from({ length: endId - startId + 1 }, (_, i) => ({
+          address: CONTRACTS.TAGITCore as `0x${string}`,
+          abi: TAGITCoreABI,
+          functionName: "getAsset" as const,
+          args: [BigInt(startId + i)],
+          chainId: CHAIN_ID,
+        }))
+      : [];
+
+  // Batch fetch all assets for this page
+  const {
+    data: assetsData,
+    isLoading: assetsLoading,
+    error: assetsError,
+    refetch,
+  } = useReadContracts({
+    contracts,
+    query: {
+      enabled: total > 0 && !supplyLoading,
+      refetchInterval: refetchInterval > 0 ? refetchInterval : undefined,
+    },
+  });
+
+  // Transform raw contract data into typed Asset objects
+  const assets: Asset[] = (assetsData ?? [])
+    .map((result, index) => {
+      if (result.status === "success" && result.result) {
+        const data = result.result as {
+          id: bigint;
+          owner: `0x${string}`;
+          state: number;
+          tagId: `0x${string}`;
+          metadataURI: string;
+          createdAt: bigint;
+          updatedAt: bigint;
+        };
+        return {
+          id: data.id,
+          owner: data.owner,
+          state: data.state as AssetStateType,
+          tagId: data.tagId,
+          metadataURI: data.metadataURI,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      }
+      return null;
+    })
+    .filter((asset): asset is Asset => asset !== null);
+
+  return {
+    assets,
+    totalSupply: total,
+    page,
+    pageSize,
+    totalPages,
+    hasNextPage: page < totalPages - 1,
+    hasPrevPage: page > 0,
+    isLoading: supplyLoading || assetsLoading,
+    error: supplyError || assetsError,
+    refetch,
+  };
+}
+
+/**
+ * Fetches assets filtered by state
+ * @param state - The asset state to filter by
+ * @param options.pageSize - Max items to return
+ */
+export function useAssetsByState(
+  state: AssetStateType,
+  options?: { pageSize?: number; refetchInterval?: number }
+) {
+  const pageSize = options?.pageSize ?? 50;
+  const refetchInterval = options?.refetchInterval ?? 0;
+
+  // Get all assets (up to pageSize * 2 to have buffer for filtering)
+  const { assets, totalSupply, isLoading, error, refetch } = useAllAssets({
+    pageSize: pageSize * 2,
+    refetchInterval,
+  });
+
+  // Filter by state client-side
+  const filteredAssets = assets.filter((asset) => asset.state === state).slice(0, pageSize);
+
+  return {
+    assets: filteredAssets,
+    totalSupply,
+    isLoading,
+    error,
+    refetch,
+  };
 }
 
 // ============================================================================

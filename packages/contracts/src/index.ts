@@ -38,6 +38,8 @@ export {
   useTotalSupply,
   useContractName,
   useContractSymbol,
+  useAllAssets,
+  useAssetsByState,
   // TAGITCore Write
   useMint,
   useBindTag,

@@ -112,28 +112,20 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
 function AssetDetailContent({ id }: { id: string }) {
   const tokenId = BigInt(id);
 
-  const { asset, isLoading: assetLoading, error: assetError } = useAsset(tokenId);
+  const { asset, isLoading: assetLoading, error: assetError, refetch } = useAsset(tokenId);
   const { state, stateName, isLoading: stateLoading } = useAssetState(tokenId);
 
-  // Mock data for demonstration
-  const mockAsset = {
-    id: tokenId,
-    owner: "0x1234567890abcdef1234567890abcdef12345678" as `0x${string}`,
-    state: 2,
-    tagId: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" as `0x${string}`,
-    metadataURI: "ipfs://QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco",
-    createdAt: BigInt(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    updatedAt: BigInt(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  };
-
-  const displayAsset = asset ?? mockAsset;
-  const displayState = state ?? mockAsset.state;
-  const displayStateName = stateName ?? AssetStateNames[mockAsset.state as keyof typeof AssetStateNames];
   const isLoading = assetLoading || stateLoading;
+  const hasAsset = asset && asset.owner !== "0x0000000000000000000000000000000000000000";
+
+  // Convert blockchain timestamp (seconds) to milliseconds for display
+  const createdAtMs = asset ? Number(asset.createdAt) * 1000 : 0;
+  const updatedAtMs = asset ? Number(asset.updatedAt) * 1000 : 0;
 
   // Actions based on state
   const getActions = () => {
-    switch (displayState) {
+    if (!hasAsset) return [];
+    switch (state) {
       case AssetState.MINTED:
         return [
           { label: "Bind to Tag", icon: Link2, variant: "default" as const },
@@ -184,6 +176,54 @@ function AssetDetailContent({ id }: { id: string }) {
     );
   }
 
+  if (assetError) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" asChild className="mb-2">
+          <Link href="/assets">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Assets
+          </Link>
+        </Button>
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-lg font-semibold text-destructive">Error Loading Asset</h2>
+              <p className="text-muted-foreground">{assetError.message}</p>
+              <Button onClick={() => refetch()}>Try Again</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!hasAsset) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" asChild className="mb-2">
+          <Link href="/assets">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Assets
+          </Link>
+        </Button>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-lg font-semibold">Asset Not Found</h2>
+              <p className="text-muted-foreground">
+                Asset #{id} does not exist or has not been minted yet.
+              </p>
+              <Button asChild>
+                <Link href="/assets">View All Assets</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Back Button */}
@@ -199,12 +239,12 @@ function AssetDetailContent({ id }: { id: string }) {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold font-mono">#{id}</h1>
-            <StateBadge state={displayState} />
+            <StateBadge state={state!} />
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <User className="h-4 w-4" />
             <span>Owned by</span>
-            <AddressBadge address={displayAsset.owner} />
+            <AddressBadge address={asset!.owner} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -242,39 +282,43 @@ function AssetDetailContent({ id }: { id: string }) {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">State</div>
-                  <StateBadge state={displayState} />
+                  <StateBadge state={state!} />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Tag ID</div>
-                  {displayAsset.tagId &&
-                  displayAsset.tagId !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
-                    <code className="text-sm break-all">{displayAsset.tagId}</code>
+                  {asset!.tagId &&
+                  asset!.tagId !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
+                    <code className="text-sm break-all">{asset!.tagId}</code>
                   ) : (
                     <span className="text-muted-foreground">Not bound</span>
                   )}
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Metadata URI</div>
-                  <a
-                    href={displayAsset.metadataURI}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
-                  >
-                    {displayAsset.metadataURI.slice(0, 30)}...
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  {asset!.metadataURI ? (
+                    <a
+                      href={asset!.metadataURI}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                    >
+                      {asset!.metadataURI.length > 30 ? `${asset!.metadataURI.slice(0, 30)}...` : asset!.metadataURI}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">Not set</span>
+                  )}
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Created</div>
                   <div className="text-sm">
-                    {formatDate(Number(displayAsset.createdAt))}
+                    {createdAtMs > 0 ? formatDate(createdAtMs) : "—"}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Last Updated</div>
                   <div className="text-sm">
-                    {formatDate(Number(displayAsset.updatedAt))}
+                    {updatedAtMs > 0 ? formatDate(updatedAtMs) : "—"}
                   </div>
                 </div>
               </div>
