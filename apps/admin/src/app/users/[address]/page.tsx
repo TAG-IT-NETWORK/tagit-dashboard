@@ -2,13 +2,24 @@
 
 export const dynamic = "force-dynamic";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { getAddress } from "viem";
 import {
   BadgeIds,
   BadgeIdNames,
+  BadgeIdList,
   CapabilityNames,
   Capabilities,
+  CapabilityList,
   type CapabilityHash,
+  useBadges,
+  useCapabilities,
+  useGrantBadge,
+  useRevokeBadge,
+  useGrantCapability,
+  useRevokeCapability,
+  getBlockscoutTxUrl,
 } from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import {
@@ -21,6 +32,12 @@ import {
   Badge,
   StateBadge,
   AddressBadge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@tagit/ui";
 import {
   ArrowLeft,
@@ -33,6 +50,10 @@ import {
   ExternalLink,
   Hash,
   User,
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 interface UserDetailPageProps {
@@ -117,6 +138,265 @@ function getCapabilityName(hash: CapabilityHash): string {
   return CapabilityNames[hash] ?? "Unknown";
 }
 
+// Simple skeleton for loading states
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-muted rounded ${className ?? ""}`} />;
+}
+
+// Grant Badge Modal
+interface GrantBadgeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  address: `0x${string}`;
+  existingBadges: number[];
+  onSuccess: () => void;
+}
+
+function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }: GrantBadgeModalProps) {
+  const [selectedBadge, setSelectedBadge] = useState<number | null>(null);
+  const { grantBadge, hash, isPending, isConfirming, isSuccess, error } = useGrantBadge();
+
+  // Available badges (not already granted)
+  const availableBadges = BadgeIdList.filter((b) => !existingBadges.includes(b.id));
+
+  useEffect(() => {
+    if (isSuccess) {
+      onSuccess();
+      setTimeout(() => {
+        onClose();
+        setSelectedBadge(null);
+      }, 1500);
+    }
+  }, [isSuccess, onClose, onSuccess]);
+
+  const handleGrant = () => {
+    if (selectedBadge !== null) {
+      grantBadge(address, selectedBadge);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Grant Badge
+          </DialogTitle>
+          <DialogDescription>
+            Select a badge to grant to this user.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {isSuccess ? (
+            <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium text-green-600">Badge Granted!</p>
+                {hash && (
+                  <a
+                    href={getBlockscoutTxUrl(hash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View transaction
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {availableBadges.length === 0 ? (
+                <p className="text-muted-foreground">User already has all available badges.</p>
+              ) : (
+                <div className="grid gap-2">
+                  {availableBadges.map((badge) => (
+                    <button
+                      key={badge.id}
+                      onClick={() => setSelectedBadge(badge.id)}
+                      disabled={isPending || isConfirming}
+                      className={`p-3 rounded-lg border text-left transition-colors ${
+                        selectedBadge === badge.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <Badge variant={getBadgeVariant(badge.id)}>{badge.name}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive">
+                    Error: {error.message?.slice(0, 100)}
+                  </p>
+                </div>
+              )}
+
+              {(isPending || isConfirming) && (
+                <div className="flex items-center gap-2 text-blue-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">
+                    {isPending ? "Waiting for wallet..." : "Confirming transaction..."}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending || isConfirming}>
+            {isSuccess ? "Close" : "Cancel"}
+          </Button>
+          {!isSuccess && (
+            <Button
+              onClick={handleGrant}
+              disabled={selectedBadge === null || isPending || isConfirming}
+            >
+              {isPending || isConfirming ? "Processing..." : "Grant Badge"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Grant Capability Modal
+interface GrantCapabilityModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  address: `0x${string}`;
+  existingCapabilities: CapabilityHash[];
+  onSuccess: () => void;
+}
+
+function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, onSuccess }: GrantCapabilityModalProps) {
+  const [selectedCapability, setSelectedCapability] = useState<CapabilityHash | null>(null);
+  const { grantCapability, hash, isPending, isConfirming, isSuccess, error } = useGrantCapability();
+
+  // Available capabilities (not already granted)
+  const availableCapabilities = CapabilityList.filter(
+    (c) => !existingCapabilities.includes(c.hash)
+  );
+
+  useEffect(() => {
+    if (isSuccess) {
+      onSuccess();
+      setTimeout(() => {
+        onClose();
+        setSelectedCapability(null);
+      }, 1500);
+    }
+  }, [isSuccess, onClose, onSuccess]);
+
+  const handleGrant = () => {
+    if (selectedCapability !== null) {
+      grantCapability(address, selectedCapability);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            Grant Capability
+          </DialogTitle>
+          <DialogDescription>
+            Select a capability to grant to this user.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {isSuccess ? (
+            <div className="flex items-center gap-2 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="font-medium text-green-600">Capability Granted!</p>
+                {hash && (
+                  <a
+                    href={getBlockscoutTxUrl(hash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View transaction
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {availableCapabilities.length === 0 ? (
+                <p className="text-muted-foreground">User already has all available capabilities.</p>
+              ) : (
+                <div className="grid gap-2">
+                  {availableCapabilities.map((cap) => (
+                    <button
+                      key={cap.key}
+                      onClick={() => setSelectedCapability(cap.hash)}
+                      disabled={isPending || isConfirming}
+                      className={`p-3 rounded-lg border text-left transition-colors ${
+                        selectedCapability === cap.hash
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <Badge variant="outline">{cap.name}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive">
+                    Error: {error.message?.slice(0, 100)}
+                  </p>
+                </div>
+              )}
+
+              {(isPending || isConfirming) && (
+                <div className="flex items-center gap-2 text-blue-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">
+                    {isPending ? "Waiting for wallet..." : "Confirming transaction..."}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending || isConfirming}>
+            {isSuccess ? "Close" : "Cancel"}
+          </Button>
+          {!isSuccess && (
+            <Button
+              onClick={handleGrant}
+              disabled={selectedCapability === null || isPending || isConfirming}
+            >
+              {isPending || isConfirming ? "Processing..." : "Grant Capability"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function UserDetailPage({ params }: UserDetailPageProps) {
   return (
     <WagmiGuard>
@@ -125,11 +405,87 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
   );
 }
 
-function UserDetailContent({ address }: { address: string }) {
-  // Development mode: Using mock data while wagmi context issue is being debugged
-  // TODO: Re-enable useBadges and useCapabilities hooks when wagmi integration is fixed
-  const displayBadgeIds: number[] = [BadgeIds.KYC_L1, BadgeIds.KYC_L2, BadgeIds.MANUFACTURER];
-  const displayCapabilities: CapabilityHash[] = [Capabilities.MINTER, Capabilities.BINDER];
+function UserDetailContent({ address: rawAddress }: { address: string }) {
+  // Normalize address to checksum format
+  let normalizedAddress: `0x${string}`;
+  try {
+    normalizedAddress = getAddress(rawAddress) as `0x${string}`;
+  } catch {
+    normalizedAddress = rawAddress as `0x${string}`;
+  }
+
+  // Modal state
+  const [showGrantBadgeModal, setShowGrantBadgeModal] = useState(false);
+  const [showGrantCapabilityModal, setShowGrantCapabilityModal] = useState(false);
+
+  // Revoke state
+  const [revokingBadge, setRevokingBadge] = useState<number | null>(null);
+  const [revokingCapability, setRevokingCapability] = useState<CapabilityHash | null>(null);
+
+  // Live data hooks
+  const {
+    badges,
+    badgeIds,
+    isLoading: badgesLoading,
+    error: badgesError,
+    refetch: refetchBadges,
+  } = useBadges(normalizedAddress);
+
+  const {
+    capabilities,
+    isLoading: capabilitiesLoading,
+    error: capabilitiesError,
+    refetch: refetchCapabilities,
+  } = useCapabilities(normalizedAddress);
+
+  // Revoke hooks
+  const {
+    revokeBadge,
+    isPending: revokeBadgePending,
+    isConfirming: revokeBadgeConfirming,
+    isSuccess: revokeBadgeSuccess,
+    error: revokeBadgeError,
+  } = useRevokeBadge();
+
+  const {
+    revokeCapability,
+    isPending: revokeCapabilityPending,
+    isConfirming: revokeCapabilityConfirming,
+    isSuccess: revokeCapabilitySuccess,
+    error: revokeCapabilityError,
+  } = useRevokeCapability();
+
+  // Handle badge revoke success
+  useEffect(() => {
+    if (revokeBadgeSuccess) {
+      setTimeout(() => {
+        refetchBadges();
+        setRevokingBadge(null);
+      }, 2000);
+    }
+  }, [revokeBadgeSuccess, refetchBadges]);
+
+  // Handle capability revoke success
+  useEffect(() => {
+    if (revokeCapabilitySuccess) {
+      setTimeout(() => {
+        refetchCapabilities();
+        setRevokingCapability(null);
+      }, 2000);
+    }
+  }, [revokeCapabilitySuccess, refetchCapabilities]);
+
+  const handleRevokeBadge = (badgeId: number) => {
+    setRevokingBadge(badgeId);
+    revokeBadge(normalizedAddress, badgeId);
+  };
+
+  const handleRevokeCapability = (capHash: CapabilityHash) => {
+    setRevokingCapability(capHash);
+    revokeCapability(normalizedAddress, capHash);
+  };
+
+  const isLoading = badgesLoading || capabilitiesLoading;
 
   return (
     <div className="space-y-6">
@@ -146,18 +502,33 @@ function UserDetailContent({ address }: { address: string }) {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <User className="h-6 w-6 text-muted-foreground" />
-            <h1 className="text-xl font-bold font-mono">{address}</h1>
+            <h1 className="text-xl font-bold font-mono">{normalizedAddress}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <AddressBadge address={address} truncate={false} />
+            <AddressBadge address={normalizedAddress} truncate={false} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                refetchBadges();
+                refetchCapabilities();
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setShowGrantBadgeModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Grant Badge
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setShowGrantCapabilityModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Grant Capability
           </Button>
@@ -175,7 +546,7 @@ function UserDetailContent({ address }: { address: string }) {
                   <Shield className="h-5 w-5" />
                   Identity Badges
                 </CardTitle>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setShowGrantBadgeModal(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   Grant
                 </Button>
@@ -183,9 +554,25 @@ function UserDetailContent({ address }: { address: string }) {
               <CardDescription>Badges held by this user</CardDescription>
             </CardHeader>
             <CardContent>
-              {displayBadgeIds.length > 0 ? (
+              {badgesError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+                  <p className="text-sm text-destructive">Error loading badges: {badgesError.message}</p>
+                </div>
+              )}
+              {revokeBadgeError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+                  <p className="text-sm text-destructive">Revoke error: {revokeBadgeError.message?.slice(0, 100)}</p>
+                </div>
+              )}
+              {badgesLoading ? (
                 <div className="flex flex-wrap gap-2">
-                  {displayBadgeIds.map((badgeId) => (
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-28" />
+                  <Skeleton className="h-10 w-20" />
+                </div>
+              ) : badgeIds.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {badgeIds.map((badgeId) => (
                     <div
                       key={badgeId}
                       className="flex items-center gap-2 p-3 rounded-lg border bg-card"
@@ -193,8 +580,18 @@ function UserDetailContent({ address }: { address: string }) {
                       <Badge variant={getBadgeVariant(badgeId)}>
                         {getBadgeName(badgeId)}
                       </Badge>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
-                        <Minus className="h-3 w-3" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRevokeBadge(badgeId)}
+                        disabled={revokingBadge !== null}
+                      >
+                        {revokingBadge === badgeId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -213,7 +610,7 @@ function UserDetailContent({ address }: { address: string }) {
                   <Award className="h-5 w-5" />
                   Capabilities
                 </CardTitle>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setShowGrantCapabilityModal(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   Grant
                 </Button>
@@ -221,9 +618,24 @@ function UserDetailContent({ address }: { address: string }) {
               <CardDescription>Operational capabilities granted to this user</CardDescription>
             </CardHeader>
             <CardContent>
-              {displayCapabilities.length > 0 ? (
+              {capabilitiesError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+                  <p className="text-sm text-destructive">Error loading capabilities: {capabilitiesError.message}</p>
+                </div>
+              )}
+              {revokeCapabilityError && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+                  <p className="text-sm text-destructive">Revoke error: {revokeCapabilityError.message?.slice(0, 100)}</p>
+                </div>
+              )}
+              {capabilitiesLoading ? (
                 <div className="flex flex-wrap gap-2">
-                  {displayCapabilities.map((capHash) => (
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-28" />
+                </div>
+              ) : capabilities.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {capabilities.map((capHash) => (
                     <div
                       key={capHash}
                       className="flex items-center gap-2 p-3 rounded-lg border bg-card"
@@ -231,8 +643,18 @@ function UserDetailContent({ address }: { address: string }) {
                       <Badge variant="outline">
                         {getCapabilityName(capHash as CapabilityHash)}
                       </Badge>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
-                        <Minus className="h-3 w-3" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRevokeCapability(capHash as CapabilityHash)}
+                        disabled={revokingCapability !== null}
+                      >
+                        {revokingCapability === capHash ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -251,7 +673,7 @@ function UserDetailContent({ address }: { address: string }) {
                   <Package className="h-5 w-5" />
                   Owned Assets
                 </CardTitle>
-                <Link href={`/assets?owner=${address}`}>
+                <Link href={`/assets?owner=${normalizedAddress}`}>
                   <Button variant="ghost" size="sm">
                     View All
                   </Button>
@@ -299,7 +721,7 @@ function UserDetailContent({ address }: { address: string }) {
               </div>
               {mockUserAssets.length > 5 && (
                 <div className="mt-2 text-center">
-                  <Link href={`/assets?owner=${address}`}>
+                  <Link href={`/assets?owner=${normalizedAddress}`}>
                     <Button variant="ghost" size="sm">
                       View all {mockUserAssets.length} assets
                     </Button>
@@ -417,15 +839,23 @@ function UserDetailContent({ address }: { address: string }) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Identity Badges</span>
-                <span className="font-medium">{displayBadgeIds.length}</span>
+                {badgesLoading ? (
+                  <Skeleton className="h-5 w-8" />
+                ) : (
+                  <span className="font-medium">{badgeIds.length}</span>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Capabilities</span>
-                <span className="font-medium">{displayCapabilities.length}</span>
+                {capabilitiesLoading ? (
+                  <Skeleton className="h-5 w-8" />
+                ) : (
+                  <span className="font-medium">{capabilities.length}</span>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">First Seen</span>
-                <span className="font-medium">7 days ago</span>
+                <span className="font-medium text-muted-foreground">Requires indexer</span>
               </div>
             </CardContent>
           </Card>
@@ -436,30 +866,40 @@ function UserDetailContent({ address }: { address: string }) {
               <CardTitle className="text-base">KYC Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Level 1</span>
-                {displayBadgeIds.includes(BadgeIds.KYC_L1) ? (
-                  <Badge variant="secondary">Verified</Badge>
-                ) : (
-                  <Badge variant="outline">Not Verified</Badge>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Level 2</span>
-                {displayBadgeIds.includes(BadgeIds.KYC_L2) ? (
-                  <Badge variant="secondary">Verified</Badge>
-                ) : (
-                  <Badge variant="outline">Not Verified</Badge>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Level 3</span>
-                {displayBadgeIds.includes(BadgeIds.KYC_L3) ? (
-                  <Badge variant="secondary">Verified</Badge>
-                ) : (
-                  <Badge variant="outline">Not Verified</Badge>
-                )}
-              </div>
+              {badgesLoading ? (
+                <>
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Level 1</span>
+                    {badgeIds.includes(BadgeIds.KYC_L1) ? (
+                      <Badge variant="secondary">Verified</Badge>
+                    ) : (
+                      <Badge variant="outline">Not Verified</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Level 2</span>
+                    {badgeIds.includes(BadgeIds.KYC_L2) ? (
+                      <Badge variant="secondary">Verified</Badge>
+                    ) : (
+                      <Badge variant="outline">Not Verified</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Level 3</span>
+                    {badgeIds.includes(BadgeIds.KYC_L3) ? (
+                      <Badge variant="secondary">Verified</Badge>
+                    ) : (
+                      <Badge variant="outline">Not Verified</Badge>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -470,7 +910,7 @@ function UserDetailContent({ address }: { address: string }) {
             </CardHeader>
             <CardContent>
               <a
-                href={`https://optimism-sepolia.blockscout.com/address/${address}`}
+                href={`https://optimism-sepolia.blockscout.com/address/${normalizedAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -482,6 +922,22 @@ function UserDetailContent({ address }: { address: string }) {
           </Card>
         </div>
       </div>
+
+      {/* Grant Modals */}
+      <GrantBadgeModal
+        isOpen={showGrantBadgeModal}
+        onClose={() => setShowGrantBadgeModal(false)}
+        address={normalizedAddress}
+        existingBadges={badgeIds}
+        onSuccess={() => refetchBadges()}
+      />
+      <GrantCapabilityModal
+        isOpen={showGrantCapabilityModal}
+        onClose={() => setShowGrantCapabilityModal(false)}
+        address={normalizedAddress}
+        existingCapabilities={capabilities as CapabilityHash[]}
+        onSuccess={() => refetchCapabilities()}
+      />
     </div>
   );
 }

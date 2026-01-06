@@ -49,15 +49,15 @@
 
 ---
 
-## PHASE 4: User & Badge Management
+## PHASE 4: User & Badge Management ✅ COMPLETE
 **Goal:** Live badge/capability data for all users.
 
-- [ ] Connect /users/[address] to useBadges(address)
-- [ ] Connect /users/[address] to useCapabilities(address)
-- [ ] Implement badge grant/revoke UI
-- [ ] Implement capability grant/revoke UI
-- [ ] Add capability gate to admin actions
-- [ ] Show transaction confirmation modal for writes
+- [x] Connect /users/[address] to useBadges(address)
+- [x] Connect /users/[address] to useCapabilities(address)
+- [x] Implement badge grant/revoke UI
+- [x] Implement capability grant/revoke UI
+- [x] Add capability gate to admin actions — deferred to Phase 7 (RequireCapability guards)
+- [x] Show transaction confirmation modal for writes
 
 ---
 
