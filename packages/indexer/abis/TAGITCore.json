@@ -1,0 +1,63 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "from", "type": "address" },
+      { "indexed": true, "name": "to", "type": "address" },
+      { "indexed": true, "name": "tokenId", "type": "uint256" }
+    ],
+    "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "assetId", "type": "uint256" },
+      { "indexed": false, "name": "oldState", "type": "uint8" },
+      { "indexed": false, "name": "newState", "type": "uint8" }
+    ],
+    "name": "StateChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "assetId", "type": "uint256" },
+      { "indexed": true, "name": "reporter", "type": "address" },
+      { "indexed": false, "name": "reason", "type": "string" }
+    ],
+    "name": "AssetFlagged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "assetId", "type": "uint256" },
+      { "indexed": true, "name": "resolver", "type": "address" },
+      { "indexed": false, "name": "resolution", "type": "uint8" }
+    ],
+    "name": "AssetResolved",
+    "type": "event"
+  },
+  {
+    "inputs": [{ "type": "uint256", "name": "assetId" }],
+    "name": "getAsset",
+    "outputs": [
+      {
+        "type": "tuple",
+        "name": "",
+        "components": [
+          { "type": "uint256", "name": "id" },
+          { "type": "address", "name": "owner" },
+          { "type": "uint8", "name": "state" },
+          { "type": "bytes32", "name": "tagId" },
+          { "type": "string", "name": "metadataURI" },
+          { "type": "uint256", "name": "createdAt" },
+          { "type": "uint256", "name": "updatedAt" }
+        ]
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

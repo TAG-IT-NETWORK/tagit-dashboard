@@ -1,0 +1,171 @@
+# =============================================================================
+# TAGIT Subgraph Schema
+# Indexes asset lifecycle, transfers, flags, badges, and capabilities
+# =============================================================================
+
+# Asset entity - represents a TAGIT NFT
+type Asset @entity {
+  id: ID! # tokenId as string
+  tokenId: BigInt!
+  owner: User!
+  state: Int!
+  tagId: Bytes
+  metadataURI: String
+  createdAt: BigInt!
+  updatedAt: BigInt!
+
+  # Relationships
+  stateChanges: [StateChange!]! @derivedFrom(field: "asset")
+  transfers: [Transfer!]! @derivedFrom(field: "asset")
+  flags: [Flag!]! @derivedFrom(field: "asset")
+  resolutions: [Resolution!]! @derivedFrom(field: "asset")
+}
+
+# User entity - represents a wallet address
+type User @entity {
+  id: ID! # address as lowercase hex
+  address: Bytes!
+
+  # Assets
+  ownedAssets: [Asset!]! @derivedFrom(field: "owner")
+
+  # Badges and capabilities
+  badges: [BadgeGrant!]! @derivedFrom(field: "user")
+  capabilities: [CapabilityGrant!]! @derivedFrom(field: "user")
+
+  # Activity
+  flagsReported: [Flag!]! @derivedFrom(field: "reporter")
+  resolutionsMade: [Resolution!]! @derivedFrom(field: "resolver")
+
+  # Stats
+  totalAssetsOwned: Int!
+  totalBadges: Int!
+  totalCapabilities: Int!
+  firstSeenAt: BigInt!
+  lastActiveAt: BigInt!
+}
+
+# StateChange - tracks asset state transitions
+type StateChange @entity {
+  id: ID! # tx hash + log index
+  asset: Asset!
+  oldState: Int!
+  newState: Int!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# Transfer - tracks asset ownership changes
+type Transfer @entity {
+  id: ID! # tx hash + log index
+  asset: Asset!
+  from: User!
+  to: User!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# Flag - tracks flagged assets with reason and reporter
+type Flag @entity {
+  id: ID! # tx hash + log index
+  asset: Asset!
+  reporter: User!
+  reason: String!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+
+  # Resolution status
+  resolved: Boolean!
+  resolution: Resolution
+}
+
+# Resolution - tracks how flagged assets were resolved
+type Resolution @entity {
+  id: ID! # tx hash + log index
+  asset: Asset!
+  resolver: User!
+  resolutionType: Int! # 0=CLEAR, 1=QUARANTINE, 2=DECOMMISSION
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+
+  # Link back to original flag
+  flag: Flag
+}
+
+# BadgeGrant - tracks identity badge grants/revocations
+type BadgeGrant @entity {
+  id: ID! # tx hash + log index
+  user: User!
+  badgeId: BigInt!
+  granter: User
+  grantedAt: BigInt!
+  active: Boolean!
+  blockNumber: BigInt!
+  txHash: Bytes!
+
+  # Revocation info (if revoked)
+  revoker: User
+  revokedAt: BigInt
+}
+
+# CapabilityGrant - tracks capability grants/revocations
+type CapabilityGrant @entity {
+  id: ID! # tx hash + log index
+  user: User!
+  capability: Bytes! # bytes32 hash
+  granter: User
+  grantedAt: BigInt!
+  active: Boolean!
+  blockNumber: BigInt!
+  txHash: Bytes!
+
+  # Revocation info (if revoked)
+  revoker: User
+  revokedAt: BigInt
+}
+
+# Global stats for dashboard
+type GlobalStats @entity {
+  id: ID! # "global"
+  totalAssets: BigInt!
+  totalUsers: BigInt!
+  totalTransfers: BigInt!
+  totalFlags: BigInt!
+  totalResolutions: BigInt!
+
+  # State counts
+  mintedCount: Int!
+  boundCount: Int!
+  activatedCount: Int!
+  claimedCount: Int!
+  flaggedCount: Int!
+  recycledCount: Int!
+
+  # Daily metrics
+  dailyMints: Int!
+  dailyTransfers: Int!
+  dailyFlags: Int!
+  lastUpdated: BigInt!
+}
+
+# Daily snapshot for historical metrics
+type DailySnapshot @entity {
+  id: ID! # date as YYYY-MM-DD
+  date: String!
+  timestamp: BigInt!
+
+  # Daily counts
+  mints: Int!
+  transfers: Int!
+  flags: Int!
+  resolutions: Int!
+  activeUsers: Int!
+
+  # Cumulative totals at end of day
+  totalAssets: BigInt!
+  totalUsers: BigInt!
+}

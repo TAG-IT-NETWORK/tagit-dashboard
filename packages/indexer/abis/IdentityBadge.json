@@ -1,0 +1,29 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "to", "type": "address" },
+      { "indexed": true, "name": "badgeId", "type": "uint256" },
+      { "indexed": false, "name": "granter", "type": "address" }
+    ],
+    "name": "BadgeGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "from", "type": "address" },
+      { "indexed": true, "name": "badgeId", "type": "uint256" },
+      { "indexed": false, "name": "revoker", "type": "address" }
+    ],
+    "name": "BadgeRevoked",
+    "type": "event"
+  },
+  {
+    "inputs": [{ "type": "address", "name": "owner" }],
+    "name": "getBadges",
+    "outputs": [{ "type": "uint256[]", "name": "" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

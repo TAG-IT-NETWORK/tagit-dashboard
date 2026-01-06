@@ -1,0 +1,29 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "user", "type": "address" },
+      { "indexed": true, "name": "capability", "type": "bytes32" },
+      { "indexed": false, "name": "granter", "type": "address" }
+    ],
+    "name": "CapabilityGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "name": "user", "type": "address" },
+      { "indexed": true, "name": "capability", "type": "bytes32" },
+      { "indexed": false, "name": "revoker", "type": "address" }
+    ],
+    "name": "CapabilityRevoked",
+    "type": "event"
+  },
+  {
+    "inputs": [{ "type": "address", "name": "user" }],
+    "name": "getCapabilities",
+    "outputs": [{ "type": "bytes32[]", "name": "" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

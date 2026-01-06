@@ -1,0 +1,84 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  # TAGITCore - Asset lifecycle events
+  - kind: ethereum
+    name: TAGITCore
+    network: optimism-sepolia
+    source:
+      address: "0x6a58ee8f2d500981b1793868c55072789c58fba6"
+      abi: TAGITCore
+      startBlock: 20000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Asset
+        - StateChange
+        - Transfer
+        - Flag
+      abis:
+        - name: TAGITCore
+          file: ./abis/TAGITCore.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
+        - event: StateChanged(indexed uint256,uint8,uint8)
+          handler: handleStateChanged
+        - event: AssetFlagged(indexed uint256,indexed address,string)
+          handler: handleAssetFlagged
+        - event: AssetResolved(indexed uint256,indexed address,uint8)
+          handler: handleAssetResolved
+      file: ./src/mappings/tagit-core.ts
+
+  # TAGITAccess - Capability events
+  - kind: ethereum
+    name: TAGITAccess
+    network: optimism-sepolia
+    source:
+      address: "0xf7efefc59e81540408b4c9c2a09417ddb10b4936"
+      abi: TAGITAccess
+      startBlock: 20000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - CapabilityGrant
+      abis:
+        - name: TAGITAccess
+          file: ./abis/TAGITAccess.json
+      eventHandlers:
+        - event: CapabilityGranted(indexed address,indexed bytes32,address)
+          handler: handleCapabilityGranted
+        - event: CapabilityRevoked(indexed address,indexed bytes32,address)
+          handler: handleCapabilityRevoked
+      file: ./src/mappings/tagit-access.ts
+
+  # IdentityBadge - Badge events
+  - kind: ethereum
+    name: IdentityBadge
+    network: optimism-sepolia
+    source:
+      address: "0xb3f757fca307a7feba5ca210cd7d840ec0999be8"
+      abi: IdentityBadge
+      startBlock: 20000000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - BadgeGrant
+      abis:
+        - name: IdentityBadge
+          file: ./abis/IdentityBadge.json
+      eventHandlers:
+        - event: BadgeGranted(indexed address,indexed uint256,address)
+          handler: handleBadgeGranted
+        - event: BadgeRevoked(indexed address,indexed uint256,address)
+          handler: handleBadgeRevoked
+      file: ./src/mappings/identity-badge.ts

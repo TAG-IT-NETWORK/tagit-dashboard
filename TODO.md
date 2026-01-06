@@ -61,15 +61,21 @@
 
 ---
 
-## PHASE 5: Event Indexing (Subgraph)
+## PHASE 5: Event Indexing (Subgraph) ✅ COMPLETE
 **Goal:** Deploy subgraph for historical data.
 
-- [ ] Create subgraph schema in tagit-indexer repo
-- [ ] Index StateChanged events for asset timeline
-- [ ] Index Transfer events for ownership history
-- [ ] Index AssetFlagged events with reason/reporter
-- [ ] Index badge/capability grants/revocations
-- [ ] Deploy to The Graph or Goldsky
+- [x] Create subgraph schema in packages/indexer
+- [x] Index StateChanged events for asset timeline
+- [x] Index Transfer events for ownership history
+- [x] Index AssetFlagged events with reason/reporter
+- [x] Index badge/capability grants/revocations
+- [ ] Deploy to The Graph or Goldsky (ready for deployment)
+
+**Subgraph Structure (packages/indexer):**
+- schema.graphql: Asset, User, StateChange, Transfer, Flag, Resolution, BadgeGrant, CapabilityGrant, GlobalStats, DailySnapshot
+- mappings: tagit-core.ts, tagit-access.ts, identity-badge.ts
+- ABIs: TAGITCore.json, TAGITAccess.json, IdentityBadge.json
+- Deploy: `pnpm --filter @tagit/indexer deploy:goldsky`
 
 ---
 

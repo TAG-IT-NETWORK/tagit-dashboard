@@ -1,0 +1,18 @@
+{
+  "name": "@tagit/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TAGIT Subgraph for indexing blockchain events",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:goldsky": "goldsky subgraph deploy tagit/v1 --path .",
+    "create-local": "graph create --node http://localhost:8020/ tagit/tagit",
+    "remove-local": "graph remove --node http://localhost:8020/ tagit/tagit",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 tagit/tagit"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.71.0",
+    "@graphprotocol/graph-ts": "^0.32.0"
+  }
+}
