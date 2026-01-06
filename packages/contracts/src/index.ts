@@ -66,6 +66,28 @@ export {
 // Re-export wagmi hooks to ensure same instance is used across the app
 export { useAccount, useConfig } from "wagmi";
 
+// Subgraph hooks for indexed data
+export {
+  // Hooks
+  useGlobalStats,
+  useStateDistribution,
+  useRecentActivity,
+  useRecentFlags,
+  useTopUsers,
+  useDailyMints,
+  useActiveUsers,
+  useDashboardData,
+  // Client
+  getSubgraphClient,
+  isSubgraphAvailable,
+  // Types
+  type DashboardStats,
+  type StateDistribution,
+  type ActivityItem,
+  type FlagItem,
+  type TopUser,
+} from "./subgraph";
+
 // Utility functions
 export function shortenAddress(address: string, chars = 4): string {
   return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;

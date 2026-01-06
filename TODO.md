@@ -79,14 +79,30 @@
 
 ---
 
-## PHASE 6: Dashboard Metrics
+## PHASE 6: Dashboard Metrics ✅ COMPLETE
 **Goal:** Real metrics from indexed events.
 
-- [ ] Query asset state distribution from subgraph
-- [ ] Calculate daily mints from Transfer(from: 0x0) events
-- [ ] Build activity feed from recent StateChanged events
-- [ ] Derive active users from unique signers (7d)
-- [ ] Implement polling (30s) for live updates
+- [x] Query asset state distribution from subgraph
+- [x] Calculate daily mints from Transfer(from: 0x0) events
+- [x] Build activity feed from recent StateChanged events
+- [x] Derive active users from unique signers (7d)
+- [x] Implement polling (30s) for live updates
+
+**Subgraph Hooks (packages/contracts/src/subgraph):**
+- `useDashboardData()` - Combined hook with 30s polling for all dashboard data
+- `useGlobalStats()` - Total assets, users, transfers, flags
+- `useStateDistribution()` - Asset state counts for pie chart
+- `useRecentActivity()` - Recent state changes for activity feed
+- `useDailyMints()` - Mints in last 24 hours
+- `useActiveUsers()` - Active users in last 7 days
+- `useTopUsers()` - Top asset owners
+- `useRecentFlags()` - Recent flagged assets
+
+**Dashboard Features:**
+- Live/Mock data badge indicator
+- Manual refresh button
+- Subgraph sync status in System Health
+- Graceful fallback to contract data + mock when subgraph unavailable
 
 ---
 

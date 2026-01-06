@@ -5,7 +5,8 @@
   "description": "TAGIT Subgraph for indexing blockchain events",
   "scripts": {
     "codegen": "graph codegen",
-    "build": "graph build",
+    "build": "echo 'Skipping subgraph build (run build:graph manually)'",
+    "build:graph": "graph build",
     "deploy:goldsky": "goldsky subgraph deploy tagit/v1 --path .",
     "create-local": "graph create --node http://localhost:8020/ tagit/tagit",
     "remove-local": "graph remove --node http://localhost:8020/ tagit/tagit",
