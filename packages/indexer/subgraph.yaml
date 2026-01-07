@@ -8,7 +8,7 @@ dataSources:
     name: TAGITCore
     network: optimism-sepolia
     source:
-      address: "0x6fFa92efb419E812d5c9C9D0c1B1a0f5c6ffd1C"
+      address: "0x88D2b62FD388b2d7e3df5fc666D68Ac7c7ca02Fe"
       abi: TAGITCore
       startBlock: 37959312
     mapping:
@@ -39,7 +39,7 @@ dataSources:
     name: TAGITAccess
     network: optimism-sepolia
     source:
-      address: "0x4f09a869a813E7E596bF5Bf5cBC08fB092Ce6340"
+      address: "0x8611fE68f6E37238b0af84c5f2Ac2dc9012138a9"
       abi: TAGITAccess
       startBlock: 37959312
     mapping:
@@ -64,7 +64,7 @@ dataSources:
     name: IdentityBadge
     network: optimism-sepolia
     source:
-      address: "0x26D0B385FF2061fB38ce1aA66433a8f4439e4fa8"
+      address: "0x26F2E8b84664EF1ef8554e15777E8Ec6611256A6"
       abi: IdentityBadge
       startBlock: 37959311
     mapping:

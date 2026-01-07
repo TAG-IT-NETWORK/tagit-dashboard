@@ -146,10 +146,10 @@
 
 | Contract | Address | Start Block |
 |----------|---------|-------------|
-| TAGITCore | 0x6fFa92efb419E812d5c9C9D0c1B1a0f5c6ffd1C | 37959312 |
-| TAGITAccess | 0x4f09a869a813E7E596bF5Bf5cBC08fB092Ce6340 | 37959312 |
-| IdentityBadge | 0x26D0B385FF2061fB38ce1aA66433a8f4439e4fa8 | 37959311 |
-| CapabilityBadge | 0x62a3CF048E668E0119f0cD97Ec964B726B9a982 | 37959312 |
+| TAGITCore | 0x88D2b62FD388b2d7e3df5fc666D68Ac7c7ca02Fe | 37959312 |
+| TAGITAccess | 0x8611fE68f6E37238b0af84c5f2Ac2dc9012138a9 | 37959312 |
+| IdentityBadge | 0x26F2E8b84664EF1ef8554e15777E8Ec6611256A6 | 37959311 |
+| CapabilityBadge | 0x5e198f6Ebde4BD1e11a5566a1e81a933c40f3585 | 37959312 |
 
 ### Available Hooks
 **Read:** useAsset, useAssetState, useTotalSupply, useAllAssets, useAssetsByState, useFlaggedAssets, useBadges, useCapabilities, useCapabilityGate, useBadgeCheck
