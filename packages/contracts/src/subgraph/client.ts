@@ -1,10 +1,10 @@
 // Subgraph client for TAGIT
 
-// Default subgraph URL - can be overridden via environment variable
+// Default subgraph URL - can be configured via SubgraphClientConfig
 // For Goldsky: https://api.goldsky.com/api/public/project_XXX/subgraphs/tagit/v1/gn
 // For The Graph: https://api.thegraph.com/subgraphs/name/tagit/tagit-core
 const DEFAULT_SUBGRAPH_URL =
-  process.env.NEXT_PUBLIC_SUBGRAPH_URL ||
+  (typeof window !== "undefined" && (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
   "https://api.goldsky.com/api/public/project_placeholder/subgraphs/tagit/v1/gn";
 
 export interface SubgraphClientConfig {

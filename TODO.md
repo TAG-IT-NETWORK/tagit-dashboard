@@ -141,13 +141,15 @@
 
 ## Quick Reference
 
-### Deployed Contracts (OP Sepolia)
-| Contract | Address |
-|----------|---------|
-| TAGITCore | 0x6a58ee8f2d500981b1793868c55072789c58fba6 |
-| TAGITAccess | 0xf7efefc59e81540408b4c9c2a09417ddb10b4936 |
-| IdentityBadge | 0xb3f757fca307a7feba5ca210cd7d840ec0999be8 |
-| CapabilityBadge | 0xfa7e212efc6e9214c5de5bd29c9f1e4ef0894860 |
+### Deployed Contracts (OP Sepolia) — NIST CSF 2.0 Deployment
+*Updated: Jan 6, 2026 — All contracts include CircuitBreaker + RateLimiter*
+
+| Contract | Address | Start Block |
+|----------|---------|-------------|
+| TAGITCore | 0x6fFFa92efb419E812d5c9C9D0c1B1a0f5c6fFd1C | 37959312 |
+| TAGITAccess | 0x4609a869a813E7E596bF5Bf5cBC08F8092Ce6340 | 37959312 |
+| IdentityBadge | 0x26D0B3B5FF2061fB38ce1aA66433a8F4439e46a8 | 37959311 |
+| CapabilityBadge | 0x62a3CF048E66BE0119F0ccD97Ec964B726B9a982 | 37959312 |
 
 ### Available Hooks
 **Read:** useAsset, useAssetState, useTotalSupply, useAllAssets, useAssetsByState, useFlaggedAssets, useBadges, useCapabilities, useCapabilityGate, useBadgeCheck

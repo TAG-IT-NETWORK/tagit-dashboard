@@ -3,13 +3,14 @@ schema:
   file: ./schema.graphql
 dataSources:
   # TAGITCore - Asset lifecycle events
+  # NIST CSF 2.0 Deployment - Jan 6, 2026
   - kind: ethereum
     name: TAGITCore
     network: optimism-sepolia
     source:
-      address: "0x6a58ee8f2d500981b1793868c55072789c58fba6"
+      address: "0x6fFFa92efb419E812d5c9C9D0c1B1a0f5c6fFd1C"
       abi: TAGITCore
-      startBlock: 20000000
+      startBlock: 37959312
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -38,9 +39,9 @@ dataSources:
     name: TAGITAccess
     network: optimism-sepolia
     source:
-      address: "0xf7efefc59e81540408b4c9c2a09417ddb10b4936"
+      address: "0x4609a869a813E7E596bF5Bf5cBC08F8092Ce6340"
       abi: TAGITAccess
-      startBlock: 20000000
+      startBlock: 37959312
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -63,9 +64,9 @@ dataSources:
     name: IdentityBadge
     network: optimism-sepolia
     source:
-      address: "0xb3f757fca307a7feba5ca210cd7d840ec0999be8"
+      address: "0x26D0B3B5FF2061fB38ce1aA66433a8F4439e46a8"
       abi: IdentityBadge
-      startBlock: 20000000
+      startBlock: 37959311
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

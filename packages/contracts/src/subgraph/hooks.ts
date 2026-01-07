@@ -40,7 +40,7 @@ function useSubgraphQuery<TData, TResult>(
   const [data, setData] = useState<TResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const enabled = options?.enabled ?? true;
   const pollingInterval = options?.pollingInterval;
