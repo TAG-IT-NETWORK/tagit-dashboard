@@ -89,13 +89,13 @@ export const IdentityBadgeABI = [
     stateMutability: "view",
     type: "function",
   },
-  // Admin functions
+  // Admin functions (matching deployed contract)
   {
     inputs: [
       { type: "address", name: "to" },
       { type: "uint256", name: "badgeId" },
     ],
-    name: "grant",
+    name: "grantIdentity",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -105,7 +105,7 @@ export const IdentityBadgeABI = [
       { type: "address", name: "from" },
       { type: "uint256", name: "badgeId" },
     ],
-    name: "revoke",
+    name: "revokeIdentity",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

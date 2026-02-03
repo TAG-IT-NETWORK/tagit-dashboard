@@ -59,13 +59,13 @@ export const TAGITAccessABI = [
     stateMutability: "view",
     type: "function",
   },
-  // Write functions
+  // Write functions (matching deployed contract)
   {
     inputs: [
       { type: "address", name: "user" },
       { type: "bytes32", name: "capability" },
     ],
-    name: "grantCapability",
+    name: "grant",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -75,7 +75,7 @@ export const TAGITAccessABI = [
       { type: "address", name: "user" },
       { type: "bytes32", name: "capability" },
     ],
-    name: "revokeCapability",
+    name: "revoke",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

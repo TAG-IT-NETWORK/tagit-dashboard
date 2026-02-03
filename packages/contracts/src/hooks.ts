@@ -8,9 +8,17 @@ import {
   type AssetStateType,
   type ResolutionType,
 } from "./abis/TAGITCore";
-import { TAGITAccessABI, Capabilities, type CapabilityHash } from "./abis/TAGITAccess";
+import { TAGITAccessABI, Capabilities, CapabilityNames, type CapabilityHash } from "./abis/TAGITAccess";
 import { IdentityBadgeABI, BadgeIds, BadgeIdNames, type BadgeId } from "./abis/IdentityBadge";
-import { CapabilityBadgeABI } from "./abis/CapabilityBadge";
+import {
+  CapabilityBadgeABI,
+  CapabilityIds,
+  CapabilityIdNames,
+  CapabilityIdList,
+  CapabilityHashes,
+  HashToCapabilityId,
+  type CapabilityId,
+} from "./abis/CapabilityBadge";
 
 // ============================================================================
 // TAGITCore Read Hooks
@@ -459,12 +467,12 @@ export function useGrantCapability() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const grantCapability = (user: `0x${string}`, capability: CapabilityHash) => {
+  const grantCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
-      address: CONTRACTS.TAGITAccess as `0x${string}`,
-      abi: TAGITAccessABI,
-      functionName: "grantCapability",
-      args: [user, capability],
+      address: CONTRACTS.CapabilityBadge as `0x${string}`,
+      abi: CapabilityBadgeABI,
+      functionName: "mint",
+      args: [user, BigInt(capabilityId), 1n, "0x"],
       chainId: CHAIN_ID,
     });
   };
@@ -476,12 +484,12 @@ export function useRevokeCapability() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const revokeCapability = (user: `0x${string}`, capability: CapabilityHash) => {
+  const revokeCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
-      address: CONTRACTS.TAGITAccess as `0x${string}`,
-      abi: TAGITAccessABI,
-      functionName: "revokeCapability",
-      args: [user, capability],
+      address: CONTRACTS.CapabilityBadge as `0x${string}`,
+      abi: CapabilityBadgeABI,
+      functionName: "burn",
+      args: [user, BigInt(capabilityId), 1n],
       chainId: CHAIN_ID,
     });
   };
@@ -561,7 +569,7 @@ export function useGrantBadge() {
     writeContract({
       address: CONTRACTS.IdentityBadge as `0x${string}`,
       abi: IdentityBadgeABI,
-      functionName: "grant",
+      functionName: "grantIdentity",
       args: [to, BigInt(badgeId)],
       chainId: CHAIN_ID,
     });
@@ -578,7 +586,7 @@ export function useRevokeBadge() {
     writeContract({
       address: CONTRACTS.IdentityBadge as `0x${string}`,
       abi: IdentityBadgeABI,
-      functionName: "revoke",
+      functionName: "revokeIdentity",
       args: [from, BigInt(badgeId)],
       chainId: CHAIN_ID,
     });
@@ -608,5 +616,17 @@ export function useCapabilityBadgeBalance(
 }
 
 // Re-export types and constants for convenience
-export { AssetState, AssetStateNames, Capabilities, BadgeIds, BadgeIdNames };
-export type { Asset, AssetStateType, ResolutionType, CapabilityHash, BadgeId };
+export {
+  AssetState,
+  AssetStateNames,
+  Capabilities,
+  CapabilityNames,
+  BadgeIds,
+  BadgeIdNames,
+  CapabilityIds,
+  CapabilityIdNames,
+  CapabilityIdList,
+  CapabilityHashes,
+  HashToCapabilityId,
+};
+export type { Asset, AssetStateType, ResolutionType, CapabilityHash, BadgeId, CapabilityId };

@@ -1,13 +1,17 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { http, createConfig } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { optimismSepolia } from "viem/chains";
 import { supportedChains } from "./chains";
 
 export function createWagmiConfig(projectId: string) {
-  // If no projectId is provided, create a basic config without WalletConnect
+  // If no projectId is provided, create a basic config with injected wallets only
   if (!projectId) {
     return createConfig({
       chains: supportedChains,
+      connectors: [
+        injected({ target: "metaMask" }),
+      ],
       transports: {
         [optimismSepolia.id]: http(),
       },

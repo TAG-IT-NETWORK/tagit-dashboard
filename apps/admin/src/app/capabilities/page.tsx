@@ -4,13 +4,12 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import {
-  Capabilities,
-  CapabilityNames,
-  CapabilityList,
+  CapabilityIds,
+  CapabilityIdNames,
+  CapabilityHashes,
   useGrantCapability,
   useRevokeCapability,
-  type CapabilityKey,
-  type CapabilityHash,
+  type CapabilityId,
 } from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { getAddress } from "viem";
@@ -37,11 +36,14 @@ import {
   Copy,
 } from "lucide-react";
 
+type CapabilityKey = keyof typeof CapabilityIds;
+
 // Capability info with mock holder counts
 interface CapabilityInfo {
   key: CapabilityKey;
   name: string;
-  hash: CapabilityHash;
+  id: CapabilityId;
+  hash: string; // For display only
   description: string;
   holders: number;
   riskLevel: "low" | "medium" | "high";
@@ -50,56 +52,63 @@ interface CapabilityInfo {
 const capabilityInfoList: CapabilityInfo[] = [
   {
     key: "MINTER",
-    name: CapabilityNames[Capabilities.MINTER],
-    hash: Capabilities.MINTER,
+    name: CapabilityIdNames[CapabilityIds.MINTER],
+    id: CapabilityIds.MINTER,
+    hash: CapabilityHashes.MINTER,
     description: "Can mint new asset tokens",
     holders: 12,
     riskLevel: "medium",
   },
   {
     key: "BINDER",
-    name: CapabilityNames[Capabilities.BINDER],
-    hash: Capabilities.BINDER,
+    name: CapabilityIdNames[CapabilityIds.BINDER],
+    id: CapabilityIds.BINDER,
+    hash: CapabilityHashes.BINDER,
     description: "Can bind assets to physical tags",
     holders: 18,
     riskLevel: "medium",
   },
   {
     key: "ACTIVATOR",
-    name: CapabilityNames[Capabilities.ACTIVATOR],
-    hash: Capabilities.ACTIVATOR,
+    name: CapabilityIdNames[CapabilityIds.ACTIVATOR],
+    id: CapabilityIds.ACTIVATOR,
+    hash: CapabilityHashes.ACTIVATOR,
     description: "Can activate bound assets",
     holders: 25,
     riskLevel: "low",
   },
   {
     key: "CLAIMER",
-    name: CapabilityNames[Capabilities.CLAIMER],
-    hash: Capabilities.CLAIMER,
+    name: CapabilityIdNames[CapabilityIds.CLAIMER],
+    id: CapabilityIds.CLAIMER,
+    hash: CapabilityHashes.CLAIMER,
     description: "Can claim assets on behalf of users",
     holders: 15,
     riskLevel: "low",
   },
   {
     key: "FLAGGER",
-    name: CapabilityNames[Capabilities.FLAGGER],
-    hash: Capabilities.FLAGGER,
+    name: CapabilityIdNames[CapabilityIds.FLAGGER],
+    id: CapabilityIds.FLAGGER,
+    hash: CapabilityHashes.FLAGGER,
     description: "Can flag assets for review",
     holders: 8,
     riskLevel: "medium",
   },
   {
     key: "RESOLVER",
-    name: CapabilityNames[Capabilities.RESOLVER],
-    hash: Capabilities.RESOLVER,
+    name: CapabilityIdNames[CapabilityIds.RESOLVER],
+    id: CapabilityIds.RESOLVER,
+    hash: CapabilityHashes.RESOLVER,
     description: "Can resolve flagged assets",
     holders: 3,
     riskLevel: "high",
   },
   {
     key: "RECYCLER",
-    name: CapabilityNames[Capabilities.RECYCLER],
-    hash: Capabilities.RECYCLER,
+    name: CapabilityIdNames[CapabilityIds.RECYCLER],
+    id: CapabilityIds.RECYCLER,
+    hash: CapabilityHashes.RECYCLER,
     description: "Can recycle decommissioned assets",
     holders: 5,
     riskLevel: "medium",
@@ -163,9 +172,9 @@ function GrantRevokeModal({ capability, mode, onClose }: GrantRevokeModalProps) 
     try {
       const normalizedAddress = getAddress(address);
       if (mode === "grant") {
-        grantCapability(normalizedAddress, capability.hash);
+        grantCapability(normalizedAddress, capability.id);
       } else {
-        revokeCapability(normalizedAddress, capability.hash);
+        revokeCapability(normalizedAddress, capability.id);
       }
       setSuccess(true);
       setTimeout(() => {

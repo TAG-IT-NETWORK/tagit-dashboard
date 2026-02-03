@@ -15,12 +15,20 @@ export {
   type AssetStateType,
   type ResolutionType,
   type Asset,
-  // TAGITAccess types and constants
+  // TAGITAccess types and constants (bytes32 hashes for reading)
   Capabilities,
   CapabilityNames,
   CapabilityList,
   type CapabilityKey,
   type CapabilityHash,
+  // CapabilityBadge types and constants (numeric IDs for minting/burning)
+  CapabilityIds,
+  CapabilityIdNames,
+  CapabilityIdList,
+  CapabilityHashes,
+  HashToCapabilityId,
+  CapabilityIdToHash,
+  type CapabilityId,
   // IdentityBadge types and constants
   BadgeIds,
   BadgeIdNames,

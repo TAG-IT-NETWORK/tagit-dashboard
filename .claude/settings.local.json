@@ -13,7 +13,14 @@
       "Bash(curl:*)",
       "Bash(findstr:*)",
       "Bash(pnpm why:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(pnpm --filter @tagit/admin dev:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(npm run build:*)",
+      "Bash(taskkill /F /PID 54152)",
+      "Bash(powershell -Command \"Stop-Process -Id 54152 -Force\")",
+      "Bash(pnpm run dev:*)",
+      "Bash(powershell -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force\")"
     ]
   }
 }

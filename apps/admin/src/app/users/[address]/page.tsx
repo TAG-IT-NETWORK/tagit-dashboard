@@ -9,10 +9,13 @@ import {
   BadgeIds,
   BadgeIdNames,
   BadgeIdList,
-  CapabilityNames,
-  Capabilities,
-  CapabilityList,
+  CapabilityIdNames,
+  CapabilityIds,
+  CapabilityIdList,
+  CapabilityHashes,
+  HashToCapabilityId,
   type CapabilityHash,
+  type CapabilityId,
   useBadges,
   useCapabilities,
   useGrantBadge,
@@ -135,7 +138,8 @@ function getBadgeVariant(badgeId: number): "default" | "secondary" | "outline" |
 
 // Helper to get capability name from hash
 function getCapabilityName(hash: CapabilityHash): string {
-  return CapabilityNames[hash] ?? "Unknown";
+  const id = HashToCapabilityId[hash];
+  return id !== undefined ? CapabilityIdNames[id] : "Unknown";
 }
 
 // Simple skeleton for loading states
@@ -279,11 +283,11 @@ interface GrantCapabilityModalProps {
 }
 
 function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, onSuccess }: GrantCapabilityModalProps) {
-  const [selectedCapability, setSelectedCapability] = useState<CapabilityHash | null>(null);
+  const [selectedCapabilityId, setSelectedCapabilityId] = useState<CapabilityId | null>(null);
   const { grantCapability, hash, isPending, isConfirming, isSuccess, error } = useGrantCapability();
 
-  // Available capabilities (not already granted)
-  const availableCapabilities = CapabilityList.filter(
+  // Available capabilities (not already granted) - compare hashes since TAGITAccess returns bytes32
+  const availableCapabilities = CapabilityIdList.filter(
     (c) => !existingCapabilities.includes(c.hash)
   );
 
@@ -292,14 +296,14 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
       onSuccess();
       setTimeout(() => {
         onClose();
-        setSelectedCapability(null);
+        setSelectedCapabilityId(null);
       }, 1500);
     }
   }, [isSuccess, onClose, onSuccess]);
 
   const handleGrant = () => {
-    if (selectedCapability !== null) {
-      grantCapability(address, selectedCapability);
+    if (selectedCapabilityId !== null) {
+      grantCapability(address, selectedCapabilityId);
     }
   };
 
@@ -345,10 +349,10 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
                   {availableCapabilities.map((cap) => (
                     <button
                       key={cap.key}
-                      onClick={() => setSelectedCapability(cap.hash)}
+                      onClick={() => setSelectedCapabilityId(cap.id)}
                       disabled={isPending || isConfirming}
                       className={`p-3 rounded-lg border text-left transition-colors ${
-                        selectedCapability === cap.hash
+                        selectedCapabilityId === cap.id
                           ? "border-primary bg-primary/10"
                           : "border-border hover:bg-muted/50"
                       }`}
@@ -386,7 +390,7 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
           {!isSuccess && (
             <Button
               onClick={handleGrant}
-              disabled={selectedCapability === null || isPending || isConfirming}
+              disabled={selectedCapabilityId === null || isPending || isConfirming}
             >
               {isPending || isConfirming ? "Processing..." : "Grant Capability"}
             </Button>
@@ -481,8 +485,11 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
   };
 
   const handleRevokeCapability = (capHash: CapabilityHash) => {
-    setRevokingCapability(capHash);
-    revokeCapability(normalizedAddress, capHash);
+    const capabilityId = HashToCapabilityId[capHash];
+    if (capabilityId !== undefined) {
+      setRevokingCapability(capHash);
+      revokeCapability(normalizedAddress, capabilityId);
+    }
   };
 
   const isLoading = badgesLoading || capabilitiesLoading;

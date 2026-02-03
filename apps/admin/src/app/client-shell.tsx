@@ -4,6 +4,38 @@ import { type ReactNode, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 
+// Suppress MetaMask wallet detection errors in development
+// These occur when RainbowKit detects wallets before connection
+if (typeof window !== "undefined") {
+  const originalError = window.onerror;
+  window.onerror = (message, source, lineno, colno, error) => {
+    const msg = String(message).toLowerCase();
+    // Suppress common wallet detection errors
+    if (
+      msg.includes("metamask") ||
+      msg.includes("failed to connect") ||
+      (source && source.includes("chrome-extension"))
+    ) {
+      console.debug("[Wallet Detection]", message);
+      return true; // Prevent default error handling
+    }
+    return originalError ? originalError(message, source, lineno, colno, error) : false;
+  };
+
+  // Also handle unhandled promise rejections from wallet detection
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = String(event.reason?.message || event.reason || "").toLowerCase();
+    if (
+      reason.includes("metamask") ||
+      reason.includes("failed to connect") ||
+      reason.includes("user rejected")
+    ) {
+      console.debug("[Wallet Detection]", event.reason);
+      event.preventDefault();
+    }
+  });
+}
+
 // Loading screen component
 function LoadingScreen() {
   return (

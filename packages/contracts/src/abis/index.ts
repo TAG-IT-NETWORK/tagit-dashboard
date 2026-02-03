@@ -24,4 +24,15 @@ export {
   BadgeCategories,
   type BadgeId,
 } from "./IdentityBadge";
-export { CapabilityBadgeABI } from "./CapabilityBadge";
+export {
+  CapabilityBadgeABI,
+  CapabilityIds,
+  CapabilityIdNames,
+  CapabilityIdList,
+  CapabilityHashes,
+  HashToCapabilityId,
+  CapabilityIdToHash,
+  type CapabilityId,
+  type CapabilityKey as CapabilityBadgeKey,
+  type CapabilityHash as CapabilityBadgeHash,
+} from "./CapabilityBadge";
