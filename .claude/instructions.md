@@ -18,14 +18,27 @@ Multi-tenant dashboard for the TAG IT Network product authentication platform. B
     - `@tagit/auth` — BIDGES authentication logic
     - `@tagit/config` — Chain configs, wagmi setup
 
-## Smart Contracts (OP Sepolia)
+## Smart Contracts (OP Sepolia) — Updated Feb 5, 2026
 
+### Core Contracts
 | Contract | Address | Purpose |
 | --- | --- | --- |
-| TAGITCore | `0x6a58eE8f2d500981b1793868C55072789c58fba6` | Asset lifecycle (mint, bind, activate, claim, flag, resolve, recycle) |
-| TAGITAccess | `0xf7efefc59E81540408b4c9c2a09417Ddb10b4936` | Capability checks |
-| IdentityBadge | `0xb3f757fca307a7febA5CA210Cd7D840EC0999be8` | Soulbound identity (ERC-5192) |
-| CapabilityBadge | `0xfa7E212efc6E9214c5dE5bd29C9f1e4ef089486` | Role capabilities (ERC-1155) |
+| TAGITCore | `0x8B02b62FD388b2d7e3dF5Ec666D68Ac7c7ca02Fe` | Asset lifecycle (mint, bind, activate, claim, flag, resolve, recycle) |
+| TAGITAccess | `0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9` | Capability checks |
+| IdentityBadge | `0x26F2EBb84664EF1eF8554e15777EBEc6611256A6` | Soulbound identity (ERC-5192) |
+| CapabilityBadge | `0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505` | Role capabilities (ERC-1155) |
+
+### NIST Phase 3 Contracts
+| Contract | Address | Purpose |
+| --- | --- | --- |
+| TAGITRecovery | `0x6138a80c06A5e6a3CB6cc491A3a2c4DF4adD1600` | AIRP dispute resolution |
+| TAGITPaymaster | `0x4339c46D63231063250834D9b3fa4E51FdB8026e` | ERC-4337 gas sponsorship |
+| TAGITTreasury | `0xf6f5e2e03f6e28aE9Dc17bCc814a0cf758c887c9` | Protocol treasury |
+| TAGITPrograms | `0xe78DB7702FF5190DAc2F3E09213Ff84bF9efE32b` | Rewards & reputation |
+| TAGITStaking | `0x12EE464e32a683f813fDb478e6C8e68E3d63d781` | Token staking |
+| TAGITAccount | `0xC159FDec7a8fDc0d98571C89c342e28bB405e682` | ERC-4337 smart account |
+| TAGITAccountFactory | `0x8D27B612a9D3e45d51D2234B2f4e03dCC5ca844b` | Account factory |
+| CCIPAdapter | `0x8dA6D7ffCD4cc0F2c9FfD6411CeD7C9c573C9E88` | Cross-chain bridge |
 
 ## BIDGES Access Control
 
