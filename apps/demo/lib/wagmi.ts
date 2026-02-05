@@ -2,13 +2,16 @@
 
 import { http, createConfig } from "wagmi";
 import { optimismSepolia } from "wagmi/chains";
-import { injected, metaMask } from "wagmi/connectors";
+import { injected } from "wagmi/connectors";
 
+const rpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
+
+// Demo app uses MetaMask-only config (no WalletConnect/RainbowKit)
 export const config = createConfig({
   chains: [optimismSepolia],
-  connectors: [injected(), metaMask()],
+  connectors: [injected({ target: "metaMask" })],
   transports: {
-    [optimismSepolia.id]: http(),
+    [optimismSepolia.id]: http(rpcUrl),
   },
   ssr: true,
 });

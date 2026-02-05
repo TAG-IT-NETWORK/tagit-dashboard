@@ -52,7 +52,7 @@ interface CapabilityInfo {
 const capabilityInfoList: CapabilityInfo[] = [
   {
     key: "MINTER",
-    name: CapabilityIdNames[CapabilityIds.MINTER],
+    name: CapabilityIdNames.MINTER,
     id: CapabilityIds.MINTER,
     hash: CapabilityHashes.MINTER,
     description: "Can mint new asset tokens",
@@ -61,7 +61,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "BINDER",
-    name: CapabilityIdNames[CapabilityIds.BINDER],
+    name: CapabilityIdNames.BINDER,
     id: CapabilityIds.BINDER,
     hash: CapabilityHashes.BINDER,
     description: "Can bind assets to physical tags",
@@ -70,7 +70,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "ACTIVATOR",
-    name: CapabilityIdNames[CapabilityIds.ACTIVATOR],
+    name: CapabilityIdNames.ACTIVATOR,
     id: CapabilityIds.ACTIVATOR,
     hash: CapabilityHashes.ACTIVATOR,
     description: "Can activate bound assets",
@@ -79,7 +79,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "CLAIMER",
-    name: CapabilityIdNames[CapabilityIds.CLAIMER],
+    name: CapabilityIdNames.CLAIMER,
     id: CapabilityIds.CLAIMER,
     hash: CapabilityHashes.CLAIMER,
     description: "Can claim assets on behalf of users",
@@ -88,7 +88,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "FLAGGER",
-    name: CapabilityIdNames[CapabilityIds.FLAGGER],
+    name: CapabilityIdNames.FLAGGER,
     id: CapabilityIds.FLAGGER,
     hash: CapabilityHashes.FLAGGER,
     description: "Can flag assets for review",
@@ -97,7 +97,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "RESOLVER",
-    name: CapabilityIdNames[CapabilityIds.RESOLVER],
+    name: CapabilityIdNames.RESOLVER,
     id: CapabilityIds.RESOLVER,
     hash: CapabilityHashes.RESOLVER,
     description: "Can resolve flagged assets",
@@ -106,7 +106,7 @@ const capabilityInfoList: CapabilityInfo[] = [
   },
   {
     key: "RECYCLER",
-    name: CapabilityIdNames[CapabilityIds.RECYCLER],
+    name: CapabilityIdNames.RECYCLER,
     id: CapabilityIds.RECYCLER,
     hash: CapabilityHashes.RECYCLER,
     description: "Can recycle decommissioned assets",

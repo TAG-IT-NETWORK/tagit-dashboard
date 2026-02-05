@@ -21,13 +21,12 @@ export {
   CapabilityList,
   type CapabilityKey,
   type CapabilityHash,
-  // CapabilityBadge types and constants (numeric IDs for minting/burning)
+  // CapabilityBadge types and constants (keccak256 hashes as IDs)
   CapabilityIds,
   CapabilityIdNames,
   CapabilityIdList,
   CapabilityHashes,
-  HashToCapabilityId,
-  CapabilityIdToHash,
+  capabilityHashToBigInt,
   type CapabilityId,
   // IdentityBadge types and constants
   BadgeIds,

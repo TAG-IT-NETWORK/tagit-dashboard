@@ -4,6 +4,8 @@ import { injected } from "wagmi/connectors";
 import { optimismSepolia } from "viem/chains";
 import { supportedChains } from "./chains";
 
+const rpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
+
 export function createWagmiConfig(projectId: string) {
   // If no projectId is provided, create a basic config with injected wallets only
   if (!projectId) {
@@ -13,7 +15,7 @@ export function createWagmiConfig(projectId: string) {
         injected({ target: "metaMask" }),
       ],
       transports: {
-        [optimismSepolia.id]: http(),
+        [optimismSepolia.id]: http(rpcUrl),
       },
       ssr: true,
     });
@@ -24,7 +26,7 @@ export function createWagmiConfig(projectId: string) {
     projectId,
     chains: supportedChains,
     transports: {
-      [optimismSepolia.id]: http(),
+      [optimismSepolia.id]: http(rpcUrl),
     },
     ssr: true,
   });

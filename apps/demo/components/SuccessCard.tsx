@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { useReadContract } from "wagmi";
 import {
   CONTRACTS,
-  STATE_NAMES,
+  TAGITCoreABI,
+  AssetStateNames,
   shortenAddress,
   shortenHash,
   getBlockscoutTxUrl,
@@ -24,13 +25,17 @@ export function SuccessCard({
   onMintAnother,
 }: SuccessCardProps) {
   const { data: state } = useReadContract({
-    address: CONTRACTS.TAGITCore.address,
-    abi: CONTRACTS.TAGITCore.abi,
+    address: CONTRACTS.TAGITCore,
+    abi: TAGITCoreABI,
     functionName: "getState",
     args: [tokenId],
   });
 
-  const stateName = state !== undefined ? STATE_NAMES[Number(state)] : "MINTED";
+  const stateName =
+    state !== undefined
+      ? AssetStateNames[Number(state) as keyof typeof AssetStateNames] ??
+        "Unknown"
+      : "Minted";
 
   return (
     <motion.div

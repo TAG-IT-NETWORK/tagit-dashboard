@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useReadContracts } from "wagmi";
 import {
   CONTRACTS,
+  TAGITCoreABI,
   shortenAddress,
   getBlockscoutAddressUrl,
 } from "@/lib/contracts";
@@ -15,18 +16,18 @@ export function ContractInfoCard() {
   const { data, isLoading, isError } = useReadContracts({
     contracts: [
       {
-        address: CONTRACTS.TAGITCore.address,
-        abi: CONTRACTS.TAGITCore.abi,
+        address: CONTRACTS.TAGITCore,
+        abi: TAGITCoreABI,
         functionName: "name",
       },
       {
-        address: CONTRACTS.TAGITCore.address,
-        abi: CONTRACTS.TAGITCore.abi,
+        address: CONTRACTS.TAGITCore,
+        abi: TAGITCoreABI,
         functionName: "symbol",
       },
       {
-        address: CONTRACTS.TAGITCore.address,
-        abi: CONTRACTS.TAGITCore.abi,
+        address: CONTRACTS.TAGITCore,
+        abi: TAGITCoreABI,
         functionName: "totalSupply",
       },
     ],
@@ -37,7 +38,7 @@ export function ContractInfoCard() {
   const totalSupply = data?.[2]?.result as bigint | undefined;
 
   const copyAddress = async () => {
-    await navigator.clipboard.writeText(CONTRACTS.TAGITCore.address);
+    await navigator.clipboard.writeText(CONTRACTS.TAGITCore);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -104,7 +105,7 @@ export function ContractInfoCard() {
           className="w-full address-pill justify-between hover:border-accent-primary/50 transition-colors cursor-pointer"
         >
           <span className="truncate">
-            {shortenAddress(CONTRACTS.TAGITCore.address, 8)}
+            {shortenAddress(CONTRACTS.TAGITCore, 8)}
           </span>
           <span className="text-lg">{copied ? "✓" : "📋"}</span>
         </button>
@@ -112,7 +113,7 @@ export function ContractInfoCard() {
 
       <div className="mt-4">
         <a
-          href={getBlockscoutAddressUrl(CONTRACTS.TAGITCore.address)}
+          href={getBlockscoutAddressUrl(CONTRACTS.TAGITCore)}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-secondary w-full text-center block text-sm"

@@ -6,10 +6,9 @@ import {
   useAccount,
   useWriteContract,
   useWaitForTransactionReceipt,
-  useEstimateGas,
 } from "wagmi";
-import { parseEther, formatEther } from "viem";
-import { CONTRACTS } from "@/lib/contracts";
+import { keccak256, toBytes } from "viem";
+import { CONTRACTS, TAGITCoreABI } from "@/lib/contracts";
 
 interface MintCardProps {
   onSuccess: (tokenId: bigint, txHash: string) => void;
@@ -54,11 +53,14 @@ export function MintCard({ onSuccess }: MintCardProps) {
   const handleMint = () => {
     if (!address) return;
 
+    // Convert metadata string to bytes32 hash
+    const metadataHash = keccak256(toBytes(metadataURI));
+
     writeContract({
-      address: CONTRACTS.TAGITCore.address,
-      abi: CONTRACTS.TAGITCore.abi,
+      address: CONTRACTS.TAGITCore,
+      abi: TAGITCoreABI,
       functionName: "mint",
-      args: [address, metadataURI],
+      args: [address, metadataHash],
     });
   };
 

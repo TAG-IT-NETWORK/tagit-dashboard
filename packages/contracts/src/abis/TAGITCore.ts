@@ -114,7 +114,7 @@ export const TAGITCoreABI = [
   {
     inputs: [
       { type: "address", name: "to" },
-      { type: "string", name: "metadataURI" },
+      { type: "bytes32", name: "metadata" },
     ],
     name: "mint",
     outputs: [{ type: "uint256", name: "" }],

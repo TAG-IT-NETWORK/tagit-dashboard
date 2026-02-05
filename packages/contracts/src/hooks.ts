@@ -1,4 +1,5 @@
 import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { keccak256, toBytes } from "viem";
 import { CONTRACTS, CHAIN_ID } from "./addresses";
 import {
   TAGITCoreABI,
@@ -16,7 +17,6 @@ import {
   CapabilityIdNames,
   CapabilityIdList,
   CapabilityHashes,
-  HashToCapabilityId,
   type CapabilityId,
 } from "./abis/CapabilityBadge";
 
@@ -289,11 +289,14 @@ export function useMint() {
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const mint = (to: `0x${string}`, metadataURI: string) => {
+    // Convert metadata string to bytes32 hash (contract expects bytes32)
+    const metadataHash = keccak256(toBytes(metadataURI));
+
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "mint",
-      args: [to, metadataURI],
+      args: [to, metadataHash],
       chainId: CHAIN_ID,
     });
   };
@@ -471,8 +474,8 @@ export function useGrantCapability() {
     writeContract({
       address: CONTRACTS.CapabilityBadge as `0x${string}`,
       abi: CapabilityBadgeABI,
-      functionName: "mint",
-      args: [user, BigInt(capabilityId), 1n, "0x"],
+      functionName: "grantCapability",
+      args: [user, BigInt(capabilityId)],
       chainId: CHAIN_ID,
     });
   };
@@ -488,8 +491,8 @@ export function useRevokeCapability() {
     writeContract({
       address: CONTRACTS.CapabilityBadge as `0x${string}`,
       abi: CapabilityBadgeABI,
-      functionName: "burn",
-      args: [user, BigInt(capabilityId), 1n],
+      functionName: "revokeCapability",
+      args: [user, BigInt(capabilityId)],
       chainId: CHAIN_ID,
     });
   };
@@ -522,7 +525,7 @@ export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: numbe
   const balance = result.data as bigint | undefined;
 
   return {
-    hasBadge: balance !== undefined && balance > 0n,
+    hasBadge: balance !== undefined && balance > BigInt(0),
     balance,
     isLoading: result.isLoading,
     error: result.error,
@@ -627,6 +630,5 @@ export {
   CapabilityIdNames,
   CapabilityIdList,
   CapabilityHashes,
-  HashToCapabilityId,
 };
 export type { Asset, AssetStateType, ResolutionType, CapabilityHash, BadgeId, CapabilityId };

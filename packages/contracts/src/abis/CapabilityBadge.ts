@@ -1,30 +1,16 @@
 import { keccak256, toBytes } from "viem";
 
-// Capability Badge IDs (ERC-1155 token IDs for capabilities)
-export const CapabilityIds = {
-  MINTER: 100,
-  BINDER: 101,
-  ACTIVATOR: 102,
-  CLAIMER: 103,
-  FLAGGER: 104,
-  RESOLVER: 105,
-  RECYCLER: 106,
-} as const;
+// Capability names
+export type CapabilityKey =
+  | "MINTER"
+  | "BINDER"
+  | "ACTIVATOR"
+  | "CLAIMER"
+  | "FLAGGER"
+  | "RESOLVER"
+  | "RECYCLER";
 
-export type CapabilityId = (typeof CapabilityIds)[keyof typeof CapabilityIds];
-export type CapabilityKey = keyof typeof CapabilityIds;
-
-export const CapabilityIdNames: Record<CapabilityId, string> = {
-  [CapabilityIds.MINTER]: "Minter",
-  [CapabilityIds.BINDER]: "Binder",
-  [CapabilityIds.ACTIVATOR]: "Activator",
-  [CapabilityIds.CLAIMER]: "Claimer",
-  [CapabilityIds.FLAGGER]: "Flagger",
-  [CapabilityIds.RESOLVER]: "Resolver",
-  [CapabilityIds.RECYCLER]: "Recycler",
-};
-
-// Mapping from capability key to bytes32 hash (for TAGITAccess compatibility)
+// Capability hashes (keccak256) - these are what TAGITCore expects
 export const CapabilityHashes = {
   MINTER: keccak256(toBytes("MINTER")),
   BINDER: keccak256(toBytes("BINDER")),
@@ -37,33 +23,39 @@ export const CapabilityHashes = {
 
 export type CapabilityHash = (typeof CapabilityHashes)[CapabilityKey];
 
-// Mapping from bytes32 hash to numeric ID
-export const HashToCapabilityId: Record<CapabilityHash, CapabilityId> = {
-  [CapabilityHashes.MINTER]: CapabilityIds.MINTER,
-  [CapabilityHashes.BINDER]: CapabilityIds.BINDER,
-  [CapabilityHashes.ACTIVATOR]: CapabilityIds.ACTIVATOR,
-  [CapabilityHashes.CLAIMER]: CapabilityIds.CLAIMER,
-  [CapabilityHashes.FLAGGER]: CapabilityIds.FLAGGER,
-  [CapabilityHashes.RESOLVER]: CapabilityIds.RESOLVER,
-  [CapabilityHashes.RECYCLER]: CapabilityIds.RECYCLER,
+// Convert hash to bigint for contract calls
+export function capabilityHashToBigInt(hash: CapabilityHash): bigint {
+  return BigInt(hash);
+}
+
+// Capability IDs as bigint (for contract calls) - TAGITCore expects these values
+export const CapabilityIds = {
+  MINTER: BigInt(CapabilityHashes.MINTER),
+  BINDER: BigInt(CapabilityHashes.BINDER),
+  ACTIVATOR: BigInt(CapabilityHashes.ACTIVATOR),
+  CLAIMER: BigInt(CapabilityHashes.CLAIMER),
+  FLAGGER: BigInt(CapabilityHashes.FLAGGER),
+  RESOLVER: BigInt(CapabilityHashes.RESOLVER),
+  RECYCLER: BigInt(CapabilityHashes.RECYCLER),
+} as const;
+
+export type CapabilityId = (typeof CapabilityIds)[CapabilityKey];
+
+export const CapabilityIdNames: Record<CapabilityKey, string> = {
+  MINTER: "Minter",
+  BINDER: "Binder",
+  ACTIVATOR: "Activator",
+  CLAIMER: "Claimer",
+  FLAGGER: "Flagger",
+  RESOLVER: "Resolver",
+  RECYCLER: "Recycler",
 };
 
-// Mapping from numeric ID to bytes32 hash
-export const CapabilityIdToHash: Record<CapabilityId, CapabilityHash> = {
-  [CapabilityIds.MINTER]: CapabilityHashes.MINTER,
-  [CapabilityIds.BINDER]: CapabilityHashes.BINDER,
-  [CapabilityIds.ACTIVATOR]: CapabilityHashes.ACTIVATOR,
-  [CapabilityIds.CLAIMER]: CapabilityHashes.CLAIMER,
-  [CapabilityIds.FLAGGER]: CapabilityHashes.FLAGGER,
-  [CapabilityIds.RESOLVER]: CapabilityHashes.RESOLVER,
-  [CapabilityIds.RECYCLER]: CapabilityHashes.RECYCLER,
-};
-
-export const CapabilityIdList = Object.entries(CapabilityIds).map(([key, id]) => ({
-  key: key as CapabilityKey,
-  id: id as CapabilityId,
-  name: CapabilityIdNames[id as CapabilityId],
-  hash: CapabilityHashes[key as CapabilityKey],
+export const CapabilityIdList = (Object.keys(CapabilityHashes) as CapabilityKey[]).map((key) => ({
+  key,
+  id: CapabilityIds[key],
+  hash: CapabilityHashes[key],
+  name: CapabilityIdNames[key],
 }));
 
 export const CapabilityBadgeABI = [
@@ -95,28 +87,35 @@ export const CapabilityBadgeABI = [
     stateMutability: "view",
     type: "function",
   },
-  // Capability Badge mint/burn (matching deployed contract)
+  // Capability Badge grant/revoke (owner only)
   {
     inputs: [
-      { type: "address", name: "to" },
-      { type: "uint256", name: "id" },
-      { type: "uint256", name: "amount" },
-      { type: "bytes", name: "data" },
+      { type: "address", name: "account" },
+      { type: "uint256", name: "capabilityId" },
     ],
-    name: "mint",
+    name: "grantCapability",
+    outputs: [{ type: "uint256", name: "amount" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { type: "address", name: "account" },
+      { type: "uint256", name: "capabilityId" },
+    ],
+    name: "revokeCapability",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
-      { type: "address", name: "from" },
-      { type: "uint256", name: "id" },
-      { type: "uint256", name: "amount" },
+      { type: "address", name: "account" },
+      { type: "uint256", name: "capabilityId" },
     ],
-    name: "burn",
-    outputs: [],
-    stateMutability: "nonpayable",
+    name: "hasCapability",
+    outputs: [{ type: "bool", name: "" }],
+    stateMutability: "view",
     type: "function",
   },
   // Events

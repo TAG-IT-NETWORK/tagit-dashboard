@@ -1,4 +1,4 @@
-export const CHAIN_ID = 11155420; // OP Sepolia
+export const CHAIN_ID = 11155420 as const; // OP Sepolia
 
 // NIST CSF 2.0 Deployment - Jan 6, 2026
 // All contracts include CircuitBreaker + RateLimiter compliance

@@ -2,14 +2,15 @@
 
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider, type Config } from "wagmi";
+import { WagmiProvider } from "wagmi";
 import { useState, type ReactNode } from "react";
 
 import "@rainbow-me/rainbowkit/styles.css";
 
 interface ProvidersProps {
   children: ReactNode;
-  wagmiConfig: Config;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  wagmiConfig: any;
 }
 
 export function Providers({ children, wagmiConfig }: ProvidersProps) {
