@@ -34,6 +34,30 @@ export {
   BadgeIdList,
   BadgeCategories,
   type BadgeId,
+  // NIST Phase 3 ABIs
+  TAGITStakingABI,
+  TAGITTreasuryABI,
+  TAGITRecoveryABI,
+  TAGITProgramsABI,
+  // TAGITTreasury types
+  WithdrawalStatus,
+  WithdrawalStatusNames,
+  type WithdrawalStatusType,
+  type Allocation,
+  type PendingWithdrawal,
+  // TAGITRecovery types
+  CaseStatus,
+  CaseStatusNames,
+  type CaseStatusType,
+  type RecoveryCase,
+  type Vote,
+  // TAGITPrograms types
+  ReputationTier,
+  ReputationTierNames,
+  ReputationTierMultipliers,
+  type ReputationTierType,
+  type Program,
+  type UserReputation,
 } from "./abis";
 
 // Hooks
