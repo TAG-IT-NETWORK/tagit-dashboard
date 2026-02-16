@@ -24,6 +24,7 @@ import {
   useResolve,
   useRecycle,
   useAsset,
+  useTagByToken,
   useAccount,
 } from "@tagit/contracts";
 import {
@@ -45,7 +46,6 @@ import {
 import { BindTagModal } from "@/components/bind-tag-modal";
 import {
   LIFECYCLE_STEPS,
-  RESOLUTION_OPTIONS,
   generateTestMetadataURI,
   getBlockscoutTxUrl,
 } from "@/lib/test-utils";
@@ -80,8 +80,8 @@ export function LifecycleContent() {
   // Form inputs
   const [metadataURI, setMetadataURI] = useState("");
   const [tagUID, setTagUID] = useState("");
-  const [flagReason, setFlagReason] = useState("Test flag for lifecycle verification");
-  const [selectedResolution, setSelectedResolution] = useState(0);
+  const [claimAddress, setClaimAddress] = useState("");
+  const [resolveAddress, setResolveAddress] = useState("");
 
   // Contract hooks
   const { mint, hash: mintHash, isPending: mintPending, isConfirming: mintConfirming, isSuccess: mintSuccess, error: mintError } = useMint();
@@ -94,6 +94,7 @@ export function LifecycleContent() {
 
   // Fetch asset data
   const { asset, refetch: refetchAsset } = useAsset(tokenId ?? 0n);
+  const { data: tagHash } = useTagByToken(tokenId ?? 0n);
 
   // Initialize metadata URI
   useEffect(() => {
@@ -221,18 +222,20 @@ export function LifecycleContent() {
   };
 
   const handleClaim = () => {
-    if (!tokenId) return;
-    claim(tokenId);
+    if (!tokenId || !claimAddress) return;
+    const checksumAddr = getAddress(claimAddress) as `0x${string}`;
+    claim(tokenId, checksumAddr);
   };
 
   const handleFlag = () => {
     if (!tokenId) return;
-    flag(tokenId, flagReason);
+    flag(tokenId);
   };
 
   const handleResolve = () => {
-    if (!tokenId) return;
-    resolve(tokenId, selectedResolution as 0 | 1 | 2);
+    if (!tokenId || !resolveAddress) return;
+    const checksumAddr = getAddress(resolveAddress) as `0x${string}`;
+    resolve(tokenId, checksumAddr);
   };
 
   const handleRecycle = () => {
@@ -245,8 +248,8 @@ export function LifecycleContent() {
     setCurrentStep(0);
     setStepStates({});
     setTagUID("");
-    setFlagReason("Test flag for lifecycle verification");
-    setSelectedResolution(0);
+    setClaimAddress("");
+    setResolveAddress("");
     setMetadataURI(generateTestMetadataURI());
   };
 
@@ -364,10 +367,10 @@ export function LifecycleContent() {
                       <p className="text-sm text-muted-foreground">Owner</p>
                       <AddressBadge address={asset.owner} truncate />
                     </div>
-                    {asset.tagId && asset.tagId !== "0x0000000000000000000000000000000000000000000000000000000000000000" && (
+                    {tagHash && tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" && (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">Tag ID</p>
-                        <code className="text-xs break-all">{truncateTagId(asset.tagId)}</code>
+                        <code className="text-xs break-all">{truncateTagId(tagHash)}</code>
                       </div>
                     )}
                   </>
@@ -530,39 +533,57 @@ export function LifecycleContent() {
 
             {/* Step 4: Claim */}
             {currentStep === 3 && tokenId && (
-              <Button
-                onClick={handleClaim}
-                disabled={claimPending || claimConfirming}
-                className="w-full"
-              >
-                {claimPending || claimConfirming ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Claiming...
-                  </>
-                ) : (
-                  <>
-                    <UserCheck className="h-4 w-4 mr-2" />
-                    Claim Ownership
-                  </>
-                )}
-              </Button>
+              <>
+                <div className="space-y-2">
+                  <Label>New Owner Address</Label>
+                  <Input
+                    value={claimAddress}
+                    onChange={(e) => setClaimAddress(e.target.value)}
+                    placeholder="0x..."
+                    className="font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => address && setClaimAddress(address)}
+                    >
+                      Use My Address
+                    </Button>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleClaim}
+                  disabled={!claimAddress || claimPending || claimConfirming}
+                  className="w-full"
+                >
+                  {claimPending || claimConfirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Claiming...
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      Claim Ownership
+                    </>
+                  )}
+                </Button>
+              </>
             )}
 
             {/* Step 5: Flag */}
             {currentStep === 4 && tokenId && (
               <>
-                <div className="space-y-2">
-                  <Label>Flag Reason</Label>
-                  <Input
-                    value={flagReason}
-                    onChange={(e) => setFlagReason(e.target.value)}
-                    placeholder="Reason for flagging..."
-                  />
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4">
+                  <p className="text-sm">
+                    Flagging marks an asset as lost, stolen, or subject to recall.
+                    This initiates the AIRP recovery protocol.
+                  </p>
                 </div>
                 <Button
                   onClick={handleFlag}
-                  disabled={!flagReason || flagPending || flagConfirming}
+                  disabled={flagPending || flagConfirming}
                   className="w-full"
                   variant="destructive"
                 >
@@ -584,25 +605,33 @@ export function LifecycleContent() {
             {/* Step 6: Resolve */}
             {currentStep === 5 && tokenId && (
               <>
+                <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 mb-4">
+                  <p className="text-sm">
+                    Resolving returns the asset to the rightful owner after AIRP recovery.
+                    Enter the address of the verified owner.
+                  </p>
+                </div>
                 <div className="space-y-2">
-                  <Label>Resolution</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {RESOLUTION_OPTIONS.map((option) => (
-                      <Button
-                        key={option.value}
-                        variant={selectedResolution === option.value ? "default" : "outline"}
-                        className="flex flex-col h-auto py-3"
-                        onClick={() => setSelectedResolution(option.value)}
-                      >
-                        <span className="font-medium">{option.name}</span>
-                        <span className="text-xs opacity-70">{option.description}</span>
-                      </Button>
-                    ))}
+                  <Label>Rightful Owner Address</Label>
+                  <Input
+                    value={resolveAddress}
+                    onChange={(e) => setResolveAddress(e.target.value)}
+                    placeholder="0x..."
+                    className="font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => address && setResolveAddress(address)}
+                    >
+                      Use My Address
+                    </Button>
                   </div>
                 </div>
                 <Button
                   onClick={handleResolve}
-                  disabled={resolvePending || resolveConfirming}
+                  disabled={!resolveAddress || resolvePending || resolveConfirming}
                   className="w-full"
                 >
                   {resolvePending || resolveConfirming ? (
@@ -613,7 +642,7 @@ export function LifecycleContent() {
                   ) : (
                     <>
                       <Scale className="h-4 w-4 mr-2" />
-                      Resolve with: {RESOLUTION_OPTIONS[selectedResolution].name}
+                      Resolve and Transfer to Owner
                     </>
                   )}
                 </Button>

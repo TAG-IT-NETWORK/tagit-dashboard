@@ -10,10 +10,7 @@ export {
   // TAGITCore types and constants
   AssetState,
   AssetStateNames,
-  Resolution,
-  ResolutionNames,
   type AssetStateType,
-  type ResolutionType,
   type Asset,
   // TAGITAccess types and constants (bytes32 hashes for reading)
   Capabilities,
@@ -69,6 +66,8 @@ export {
   useTotalSupply,
   useContractName,
   useContractSymbol,
+  useTagByToken,
+  useTokenByTag,
   useAllAssets,
   useAssetsByState,
   useFlaggedAssets,

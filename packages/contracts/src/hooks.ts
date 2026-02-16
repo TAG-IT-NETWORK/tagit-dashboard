@@ -7,7 +7,6 @@ import {
   AssetStateNames,
   type Asset,
   type AssetStateType,
-  type ResolutionType,
 } from "./abis/TAGITCore";
 import { TAGITAccessABI, Capabilities, CapabilityNames, type CapabilityHash } from "./abis/TAGITAccess";
 import { IdentityBadgeABI, BadgeIds, BadgeIdNames, type BadgeId } from "./abis/IdentityBadge";
@@ -26,6 +25,7 @@ import {
 
 /**
  * Fetches asset data by token ID
+ * Contract returns: (address assetOwner, uint64 timestamp, State state, uint8 flags, uint16 reserved)
  * @param tokenId - The asset token ID
  * @returns Asset data with loading and error states
  */
@@ -38,28 +38,18 @@ export function useAsset(tokenId: bigint) {
     chainId: CHAIN_ID,
   });
 
-  // The ABI returns a tuple that wagmi types as an object with named properties
+  // Contract returns multiple values as an array: [owner, timestamp, state, flags, reserved]
   const data = result.data as
-    | {
-        id: bigint;
-        owner: `0x${string}`;
-        state: number;
-        tagId: `0x${string}`;
-        metadataURI: string;
-        createdAt: bigint;
-        updatedAt: bigint;
-      }
+    | readonly [`0x${string}`, bigint, number, number, number]
     | undefined;
 
   const asset: Asset | undefined = data
     ? {
-        id: data.id,
-        owner: data.owner,
-        state: data.state as AssetStateType,
-        tagId: data.tagId,
-        metadataURI: data.metadataURI,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
+        owner: data[0],
+        timestamp: data[1],
+        state: data[2] as AssetStateType,
+        flags: data[3],
+        reserved: data[4],
       }
     : undefined;
 
@@ -73,27 +63,22 @@ export function useAsset(tokenId: bigint) {
 
 /**
  * Fetches asset state by token ID with human-readable state name
+ * Uses getAsset since there's no separate getState function
  * @param tokenId - The asset token ID
  * @returns State value and name with loading and error states
  */
 export function useAssetState(tokenId: bigint) {
-  const result = useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
-    abi: TAGITCoreABI,
-    functionName: "getState",
-    args: [tokenId],
-    chainId: CHAIN_ID,
-  });
+  const { asset, isLoading, error, refetch } = useAsset(tokenId);
 
-  const state = result.data as AssetStateType | undefined;
+  const state = asset?.state;
   const stateName = state !== undefined ? AssetStateNames[state] : undefined;
 
   return {
     state,
     stateName,
-    isLoading: result.isLoading,
-    error: result.error,
-    refetch: result.refetch,
+    isLoading,
+    error,
+    refetch,
   };
 }
 
@@ -130,6 +115,34 @@ export function useContractSymbol() {
     address: CONTRACTS.TAGITCore as `0x${string}`,
     abi: TAGITCoreABI,
     functionName: "symbol",
+    chainId: CHAIN_ID,
+  });
+}
+
+/**
+ * Get the tag hash bound to a token
+ * @param tokenId - The token ID
+ */
+export function useTagByToken(tokenId: bigint) {
+  return useReadContract({
+    address: CONTRACTS.TAGITCore as `0x${string}`,
+    abi: TAGITCoreABI,
+    functionName: "getTagByToken",
+    args: [tokenId],
+    chainId: CHAIN_ID,
+  });
+}
+
+/**
+ * Get the token ID for a given tag hash
+ * @param tagHash - The tag hash (keccak256 of NFC UID)
+ */
+export function useTokenByTag(tagHash: `0x${string}`) {
+  return useReadContract({
+    address: CONTRACTS.TAGITCore as `0x${string}`,
+    abi: TAGITCoreABI,
+    functionName: "getTokenByTag",
+    args: [tagHash],
     chainId: CHAIN_ID,
   });
 }
@@ -200,31 +213,23 @@ export function useAllAssets(options?: {
   });
 
   // Transform raw contract data into typed Asset objects
-  const assets: Asset[] = (assetsData ?? [])
-    .map((result) => {
+  // Contract returns: [owner, timestamp, state, flags, reserved]
+  const assets: (Asset & { tokenId: bigint })[] = (assetsData ?? [])
+    .map((result, index) => {
       if (result.status === "success" && result.result) {
-        const data = result.result as {
-          id: bigint;
-          owner: `0x${string}`;
-          state: number;
-          tagId: `0x${string}`;
-          metadataURI: string;
-          createdAt: bigint;
-          updatedAt: bigint;
-        };
+        const data = result.result as readonly [`0x${string}`, bigint, number, number, number];
         return {
-          id: data.id,
-          owner: data.owner,
-          state: data.state as AssetStateType,
-          tagId: data.tagId,
-          metadataURI: data.metadataURI,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
+          tokenId: BigInt(startId + index),
+          owner: data[0],
+          timestamp: data[1],
+          state: data[2] as AssetStateType,
+          flags: data[3],
+          reserved: data[4],
         };
       }
       return null;
     })
-    .filter((asset): asset is Asset => asset !== null);
+    .filter((asset): asset is Asset & { tokenId: bigint } => asset !== null);
 
   return {
     assets,
@@ -308,12 +313,12 @@ export function useBindTag() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const bindTag = (assetId: bigint, tagId: `0x${string}`) => {
+  const bindTag = (tokenId: bigint, tagHash: `0x${string}`) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "bindTag",
-      args: [assetId, tagId],
+      args: [tokenId, tagHash],
       chainId: CHAIN_ID,
     });
   };
@@ -325,12 +330,12 @@ export function useActivate() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const activate = (assetId: bigint) => {
+  const activate = (tokenId: bigint) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "activate",
-      args: [assetId],
+      args: [tokenId],
       chainId: CHAIN_ID,
     });
   };
@@ -338,16 +343,21 @@ export function useActivate() {
   return { activate, hash, isPending, isConfirming, isSuccess, error };
 }
 
+/**
+ * Claim an activated asset and transfer to new owner
+ * @param tokenId - The asset token ID
+ * @param newOwner - The address of the new owner
+ */
 export function useClaim() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const claim = (assetId: bigint) => {
+  const claim = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "claim",
-      args: [assetId],
+      args: [tokenId, newOwner],
       chainId: CHAIN_ID,
     });
   };
@@ -355,16 +365,20 @@ export function useClaim() {
   return { claim, hash, isPending, isConfirming, isSuccess, error };
 }
 
+/**
+ * Flag a claimed asset as lost/stolen/recall
+ * @param tokenId - The asset token ID to flag
+ */
 export function useFlag() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const flag = (assetId: bigint, reason: string) => {
+  const flag = (tokenId: bigint) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "flag",
-      args: [assetId, reason],
+      args: [tokenId],
       chainId: CHAIN_ID,
     });
   };
@@ -373,19 +387,20 @@ export function useFlag() {
 }
 
 /**
- * Resolves a flagged asset with a resolution type
- * Resolution: 0=CLEAR, 1=QUARANTINE, 2=DECOMMISSION
+ * Resolve a flagged asset and transfer to rightful owner
+ * @param tokenId - The asset token ID
+ * @param newOwner - The address of the rightful owner
  */
 export function useResolve() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const resolve = (assetId: bigint, resolution: ResolutionType) => {
+  const resolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "resolve",
-      args: [assetId, resolution],
+      args: [tokenId, newOwner],
       chainId: CHAIN_ID,
     });
   };
@@ -397,12 +412,12 @@ export function useRecycle() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const recycle = (assetId: bigint) => {
+  const recycle = (tokenId: bigint) => {
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "recycle",
-      args: [assetId],
+      args: [tokenId],
       chainId: CHAIN_ID,
     });
   };
@@ -631,4 +646,4 @@ export {
   CapabilityIdList,
   CapabilityHashes,
 };
-export type { Asset, AssetStateType, ResolutionType, CapabilityHash, BadgeId, CapabilityId };
+export type { Asset, AssetStateType, CapabilityHash, BadgeId, CapabilityId };

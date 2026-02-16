@@ -1,16 +1,19 @@
-// Asset lifecycle states
+// Asset lifecycle states (matches Solidity enum)
+// Contract: State { NONE, MINTED, BOUND, ACTIVATED, CLAIMED, FLAGGED, RECYCLED }
 export const AssetState = {
-  MINTED: 0,
-  BOUND: 1,
-  ACTIVATED: 2,
-  CLAIMED: 3,
-  FLAGGED: 4,
-  RECYCLED: 5,
+  NONE: 0,
+  MINTED: 1,
+  BOUND: 2,
+  ACTIVATED: 3,
+  CLAIMED: 4,
+  FLAGGED: 5,
+  RECYCLED: 6,
 } as const;
 
 export type AssetStateType = (typeof AssetState)[keyof typeof AssetState];
 
 export const AssetStateNames: Record<AssetStateType, string> = {
+  [AssetState.NONE]: "None",
   [AssetState.MINTED]: "Minted",
   [AssetState.BOUND]: "Bound",
   [AssetState.ACTIVATED]: "Activated",
@@ -19,30 +22,13 @@ export const AssetStateNames: Record<AssetStateType, string> = {
   [AssetState.RECYCLED]: "Recycled",
 };
 
-// Resolution types for flagged assets
-export const Resolution = {
-  CLEAR: 0,
-  QUARANTINE: 1,
-  DECOMMISSION: 2,
-} as const;
-
-export type ResolutionType = (typeof Resolution)[keyof typeof Resolution];
-
-export const ResolutionNames: Record<ResolutionType, string> = {
-  [Resolution.CLEAR]: "Clear",
-  [Resolution.QUARANTINE]: "Quarantine",
-  [Resolution.DECOMMISSION]: "Decommission",
-};
-
-// Asset struct type
+// Asset struct type (matches contract getAsset return)
 export interface Asset {
-  id: bigint;
   owner: `0x${string}`;
+  timestamp: bigint;
   state: AssetStateType;
-  tagId: `0x${string}`;
-  metadataURI: string;
-  createdAt: bigint;
-  updatedAt: bigint;
+  flags: number;
+  reserved: number;
 }
 
 export const TAGITCoreABI = [
@@ -82,31 +68,90 @@ export const TAGITCoreABI = [
     stateMutability: "view",
     type: "function",
   },
+  // getAsset returns multiple values, not a tuple struct
   {
-    inputs: [{ type: "uint256", name: "assetId" }],
+    inputs: [{ type: "uint256", name: "tokenId" }],
     name: "getAsset",
     outputs: [
-      {
-        type: "tuple",
-        name: "",
-        components: [
-          { type: "uint256", name: "id" },
-          { type: "address", name: "owner" },
-          { type: "uint8", name: "state" },
-          { type: "bytes32", name: "tagId" },
-          { type: "string", name: "metadataURI" },
-          { type: "uint256", name: "createdAt" },
-          { type: "uint256", name: "updatedAt" },
-        ],
-      },
+      { type: "address", name: "assetOwner" },
+      { type: "uint64", name: "timestamp" },
+      { type: "uint8", name: "state" },
+      { type: "uint8", name: "flags" },
+      { type: "uint16", name: "reserved" },
     ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // Tag lookup functions
+  {
+    inputs: [{ type: "bytes32", name: "tagHash" }],
+    name: "getTokenByTag",
+    outputs: [{ type: "uint256", name: "" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ type: "uint256", name: "tokenId" }],
-    name: "getState",
-    outputs: [{ type: "uint8", name: "" }],
+    name: "getTagByToken",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // Access controller
+  {
+    inputs: [],
+    name: "accessController",
+    outputs: [{ type: "address", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // Capability constants
+  {
+    inputs: [],
+    name: "MINTER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "BINDER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "ACTIVATOR_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "CLAIMER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "FLAGGER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "RESOLVER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "RECYCLER_CAPABILITY",
+    outputs: [{ type: "bytes32", name: "" }],
     stateMutability: "view",
     type: "function",
   },
@@ -117,14 +162,14 @@ export const TAGITCoreABI = [
       { type: "bytes32", name: "metadata" },
     ],
     name: "mint",
-    outputs: [{ type: "uint256", name: "" }],
+    outputs: [{ type: "uint256", name: "tokenId" }],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
-      { type: "uint256", name: "assetId" },
-      { type: "bytes32", name: "tagId" },
+      { type: "uint256", name: "tokenId" },
+      { type: "bytes32", name: "tagHash" },
     ],
     name: "bindTag",
     outputs: [],
@@ -132,24 +177,24 @@ export const TAGITCoreABI = [
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "assetId" }],
+    inputs: [{ type: "uint256", name: "tokenId" }],
     name: "activate",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "assetId" }],
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "address", name: "newOwner" },
+    ],
     name: "claim",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [
-      { type: "uint256", name: "assetId" },
-      { type: "string", name: "reason" },
-    ],
+    inputs: [{ type: "uint256", name: "tokenId" }],
     name: "flag",
     outputs: [],
     stateMutability: "nonpayable",
@@ -157,8 +202,8 @@ export const TAGITCoreABI = [
   },
   {
     inputs: [
-      { type: "uint256", name: "assetId" },
-      { type: "uint8", name: "resolution" },
+      { type: "uint256", name: "tokenId" },
+      { type: "address", name: "newOwner" },
     ],
     name: "resolve",
     outputs: [],
@@ -166,8 +211,16 @@ export const TAGITCoreABI = [
     type: "function",
   },
   {
-    inputs: [{ type: "uint256", name: "assetId" }],
+    inputs: [{ type: "uint256", name: "tokenId" }],
     name: "recycle",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // Admin functions
+  {
+    inputs: [{ type: "address", name: "controller" }],
+    name: "setAccessController",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -186,11 +239,91 @@ export const TAGITCoreABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, name: "assetId", type: "uint256" },
-      { indexed: false, name: "oldState", type: "uint8" },
-      { indexed: false, name: "newState", type: "uint8" },
+      { indexed: true, name: "tokenId", type: "uint256" },
+      { indexed: true, name: "to", type: "address" },
+      { indexed: false, name: "metadata", type: "bytes32" },
+    ],
+    name: "AssetMinted",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "tokenId", type: "uint256" },
+      { indexed: false, name: "from", type: "uint8" },
+      { indexed: false, name: "to", type: "uint8" },
+      { indexed: false, name: "actor", type: "address" },
     ],
     name: "StateChanged",
     type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "tokenId", type: "uint256" },
+      { indexed: true, name: "tagHash", type: "bytes32" },
+    ],
+    name: "TagBound",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "previousController", type: "address" },
+      { indexed: true, name: "newController", type: "address" },
+    ],
+    name: "AccessControllerUpdated",
+    type: "event",
+  },
+  // Errors
+  {
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    name: "TokenNotFound",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "uint8", name: "current" },
+      { type: "uint8", name: "required" },
+    ],
+    name: "InvalidState",
+    type: "error",
+  },
+  {
+    inputs: [{ type: "bytes32", name: "tagHash" }],
+    name: "TagAlreadyBound",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "address", name: "caller" },
+      { type: "uint256", name: "requiredCapability" },
+    ],
+    name: "Unauthorized",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "ZeroAddress",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint8", name: "from" },
+      { type: "uint8", name: "to" },
+    ],
+    name: "InvalidTransition",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidTokenId",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidTagHash",
+    type: "error",
   },
 ] as const;

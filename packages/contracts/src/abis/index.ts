@@ -2,10 +2,7 @@ export {
   TAGITCoreABI,
   AssetState,
   AssetStateNames,
-  Resolution,
-  ResolutionNames,
   type AssetStateType,
-  type ResolutionType,
   type Asset,
 } from "./TAGITCore";
 export {
