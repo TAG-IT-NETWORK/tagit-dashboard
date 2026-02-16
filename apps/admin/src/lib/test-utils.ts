@@ -4,6 +4,7 @@ import { AssetState, type AssetStateType } from "@tagit/contracts";
  * State names for display
  */
 export const STATE_NAMES: Record<AssetStateType, string> = {
+  [AssetState.NONE]: "None",
   [AssetState.MINTED]: "Minted",
   [AssetState.BOUND]: "Bound",
   [AssetState.ACTIVATED]: "Activated",
@@ -16,6 +17,7 @@ export const STATE_NAMES: Record<AssetStateType, string> = {
  * State colors for UI
  */
 export const STATE_COLORS: Record<AssetStateType, string> = {
+  [AssetState.NONE]: "gray",
   [AssetState.MINTED]: "gray",
   [AssetState.BOUND]: "blue",
   [AssetState.ACTIVATED]: "green",
@@ -115,30 +117,6 @@ export function generateTestMetadataURI(): string {
   // In production, upload to IPFS and return ipfs:// URI
   return `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
 }
-
-/**
- * Resolution types for flagged assets
- */
-export const RESOLUTION_OPTIONS = [
-  {
-    value: 0,
-    name: "Clear",
-    description: "Asset is legitimate, remove flag",
-    color: "green",
-  },
-  {
-    value: 1,
-    name: "Quarantine",
-    description: "Suspicious, restrict transactions",
-    color: "yellow",
-  },
-  {
-    value: 2,
-    name: "Decommission",
-    description: "Confirmed counterfeit, disable permanently",
-    color: "red",
-  },
-] as const;
 
 /**
  * Format block explorer URL for transaction

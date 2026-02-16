@@ -10,8 +10,7 @@ import {
   AssetStateNames,
   useAsset,
   useResolve,
-  Resolution,
-  type ResolutionType,
+  useTagByToken,
   getBlockscoutTxUrl,
 } from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
@@ -26,7 +25,6 @@ import {
   Input,
   StateBadge,
   AddressBadge,
-  ResolutionBadge,
   PriorityBadge,
   calculatePriority,
   formatTimeOpen,
@@ -120,63 +118,27 @@ const mockVerificationAttempts = [
 ];
 
 interface ResolutionModalProps {
-  type: "CLEAR" | "QUARANTINE" | "DECOMMISSION";
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (notes: string) => void;
+  onConfirm: (newOwner: string, notes: string) => void;
   tokenId: string;
 }
 
 function ResolutionModal({
-  type,
   isOpen,
   onClose,
   onConfirm,
   tokenId,
 }: ResolutionModalProps) {
+  const [newOwner, setNewOwner] = useState("");
   const [notes, setNotes] = useState("");
-  const [confirmChecked, setConfirmChecked] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const config = {
-    CLEAR: {
-      title: "Clear Asset",
-      description: "Asset verified authentic. Return to previous state.",
-      buttonClass: "bg-green-600 hover:bg-green-700 text-white",
-      icon: CheckCircle,
-      iconColor: "text-green-600",
-      requireConfirm: false,
-    },
-    QUARANTINE: {
-      title: "Quarantine Asset",
-      description: "Temporary hold. Asset remains flagged for extended investigation.",
-      buttonClass: "bg-yellow-600 hover:bg-yellow-700 text-white",
-      icon: AlertTriangle,
-      iconColor: "text-yellow-600",
-      requireConfirm: false,
-    },
-    DECOMMISSION: {
-      title: "Decommission Asset",
-      description: "Permanently recycle. Asset is fraudulent or compromised.",
-      buttonClass: "bg-red-600 hover:bg-red-700 text-white",
-      icon: XCircle,
-      iconColor: "text-red-600",
-      requireConfirm: true,
-    },
-  };
+  const isValidAddress = /^0x[0-9a-fA-F]{40}$/.test(newOwner);
+  const canSubmit = isValidAddress && notes.length >= 10;
 
-  const c = config[type];
-  const Icon = c.icon;
-  const canSubmit =
-    notes.length >= 20 && (!c.requireConfirm || confirmChecked);
-
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!canSubmit) return;
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    onConfirm(notes);
-    setIsSubmitting(false);
+    onConfirm(newOwner, notes);
     onClose();
   };
 
@@ -187,10 +149,12 @@ function ResolutionModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Icon className={`h-5 w-5 ${c.iconColor}`} />
-            {c.title}
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            Resolve & Transfer
           </DialogTitle>
-          <DialogDescription>{c.description}</DialogDescription>
+          <DialogDescription>
+            Resolve flagged asset by transferring to a new owner address.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -200,35 +164,30 @@ function ResolutionModal({
           </div>
 
           <div className="space-y-2">
+            <label className="text-sm font-medium">New Owner Address</label>
+            <Input
+              value={newOwner}
+              onChange={(e) => setNewOwner(e.target.value)}
+              placeholder="0x..."
+              className="font-mono"
+            />
+            {newOwner && !isValidAddress && (
+              <p className="text-xs text-destructive">Invalid Ethereum address</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium">
-              Resolution Notes{" "}
-              <span className="text-muted-foreground">(min 20 characters)</span>
+              Notes{" "}
+              <span className="text-muted-foreground">(min 10 characters)</span>
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Provide detailed notes about this resolution..."
-              className="w-full min-h-[100px] p-3 rounded-md border bg-background resize-none"
+              placeholder="Resolution notes..."
+              className="w-full min-h-[80px] p-3 rounded-md border bg-background resize-none"
             />
-            <div className="text-xs text-muted-foreground text-right">
-              {notes.length} / 20 characters minimum
-            </div>
           </div>
-
-          {c.requireConfirm && (
-            <label className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-              <input
-                type="checkbox"
-                checked={confirmChecked}
-                onChange={(e) => setConfirmChecked(e.target.checked)}
-                className="mt-1 rounded"
-              />
-              <span className="text-sm text-red-600">
-                I confirm this action is irreversible. The asset will be
-                permanently decommissioned and cannot be recovered.
-              </span>
-            </label>
-          )}
         </div>
 
         <DialogFooter>
@@ -237,10 +196,10 @@ function ResolutionModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!canSubmit || isSubmitting}
-            className={c.buttonClass}
+            disabled={!canSubmit}
+            className="bg-green-600 hover:bg-green-700 text-white"
           >
-            {isSubmitting ? "Processing..." : `Confirm ${type}`}
+            Resolve & Transfer
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -273,7 +232,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     related: false,
     similar: false,
   });
-  const [activeModal, setActiveModal] = useState<"CLEAR" | "QUARANTINE" | "DECOMMISSION" | null>(null);
+  const [showResolveModal, setShowResolveModal] = useState(false);
   const [txSuccess, setTxSuccess] = useState(false);
 
   // Fetch live asset data
@@ -294,8 +253,11 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     error: resolveError,
   } = useResolve();
 
-  // Calculate priority from updatedAt (when it was flagged)
-  const flaggedAt = contractAsset ? Number(contractAsset.updatedAt) * 1000 : Date.now();
+  // Tag hash for display
+  const { data: tagHash } = useTagByToken(BigInt(tokenId));
+
+  // Calculate priority from timestamp (when it was flagged)
+  const flaggedAt = contractAsset ? Number(contractAsset.timestamp) * 1000 : Date.now();
   const priority = calculatePriority(flaggedAt);
 
   // Check if asset is actually flagged
@@ -312,21 +274,8 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     }
   }, [isSuccess, txSuccess, refetchAsset]);
 
-  // Map UI resolution type to contract Resolution enum
-  const resolveTypeToContract = (type: "CLEAR" | "QUARANTINE" | "DECOMMISSION"): ResolutionType => {
-    switch (type) {
-      case "CLEAR":
-        return Resolution.CLEAR as ResolutionType;
-      case "QUARANTINE":
-        return Resolution.QUARANTINE as ResolutionType;
-      case "DECOMMISSION":
-        return Resolution.DECOMMISSION as ResolutionType;
-    }
-  };
-
-  const handleResolve = (type: "CLEAR" | "QUARANTINE" | "DECOMMISSION", _notes: string) => {
-    const resolution = resolveTypeToContract(type);
-    resolve(BigInt(tokenId), resolution);
+  const handleResolve = (newOwner: string, _notes: string) => {
+    resolve(BigInt(tokenId), newOwner as `0x${string}`);
   };
 
   // Mock data for investigation panels (requires indexer)
@@ -435,10 +384,10 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
   const asset = {
     tokenId,
     owner: contractAsset.owner,
-    tagId: contractAsset.tagId === "0x0000000000000000000000000000000000000000000000000000000000000000"
-      ? null
-      : contractAsset.tagId,
-    metadataURI: contractAsset.metadataURI,
+    tagId: tagHash &&
+      tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ? (tagHash as string)
+      : null,
     previousState: AssetState.ACTIVATED, // We don't have previous state without indexer
     flaggedBy: contractAsset.owner, // Placeholder - requires indexer
     flaggedAt,
@@ -555,16 +504,8 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <div className="text-sm text-muted-foreground mb-1">Metadata URI</div>
-                  <a
-                    href={asset.metadataURI}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
-                  >
-                    {asset.metadataURI}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  <div className="text-sm text-muted-foreground mb-1">Metadata</div>
+                  <span className="text-sm text-muted-foreground">Requires indexer</span>
                 </div>
               </div>
             </CardContent>
@@ -725,7 +666,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                       {assetResolutions.map((record, i) => (
                         <tr key={i} className="border-b last:border-0">
                           <td className="px-4 py-3">
-                            <ResolutionBadge resolution={record.resolution} />
+                            <Badge variant="outline">Resolved</Badge>
                           </td>
                           <td className="px-4 py-3">
                             <AddressBadge
@@ -805,44 +746,16 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                 </div>
               )}
 
-              {/* CLEAR */}
               <Button
-                onClick={() => setActiveModal("CLEAR")}
+                onClick={() => setShowResolveModal(true)}
                 className="w-full bg-green-600 hover:bg-green-700 text-white"
                 disabled={isPending || isConfirming || !isFlagged}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Clear
+                Resolve
               </Button>
               <p className="text-xs text-muted-foreground">
-                Asset verified authentic. Return to previous state.
-              </p>
-
-              {/* QUARANTINE */}
-              <Button
-                onClick={() => setActiveModal("QUARANTINE")}
-                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
-                disabled={isPending || isConfirming || !isFlagged}
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Quarantine
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Temporary hold for extended investigation.
-              </p>
-
-              {/* DECOMMISSION */}
-              <Button
-                onClick={() => setActiveModal("DECOMMISSION")}
-                variant="destructive"
-                className="w-full"
-                disabled={isPending || isConfirming || !isFlagged}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Decommission
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Permanently recycle. This action is irreversible.
+                Resolve this flagged asset by transferring to a new owner.
               </p>
             </CardContent>
           </Card>
@@ -874,16 +787,13 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
         </div>
       </div>
 
-      {/* Resolution Modals */}
-      {activeModal && (
-        <ResolutionModal
-          type={activeModal}
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          onConfirm={(notes) => handleResolve(activeModal, notes)}
-          tokenId={tokenId}
-        />
-      )}
+      {/* Resolution Modal */}
+      <ResolutionModal
+        isOpen={showResolveModal}
+        onClose={() => setShowResolveModal(false)}
+        onConfirm={handleResolve}
+        tokenId={tokenId}
+      />
     </div>
   );
 }

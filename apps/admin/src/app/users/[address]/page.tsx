@@ -13,7 +13,7 @@ import {
   CapabilityIds,
   CapabilityIdList,
   CapabilityHashes,
-  HashToCapabilityId,
+  CapabilityNames,
   type CapabilityHash,
   type CapabilityId,
   useBadges,
@@ -138,8 +138,7 @@ function getBadgeVariant(badgeId: number): "default" | "secondary" | "outline" |
 
 // Helper to get capability name from hash
 function getCapabilityName(hash: CapabilityHash): string {
-  const id = HashToCapabilityId[hash];
-  return id !== undefined ? CapabilityIdNames[id] : "Unknown";
+  return CapabilityNames[hash as keyof typeof CapabilityNames] ?? "Unknown";
 }
 
 // Simple skeleton for loading states
@@ -485,10 +484,10 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
   };
 
   const handleRevokeCapability = (capHash: CapabilityHash) => {
-    const capabilityId = HashToCapabilityId[capHash];
-    if (capabilityId !== undefined) {
+    const cap = CapabilityIdList.find((c) => c.hash === capHash);
+    if (cap) {
       setRevokingCapability(capHash);
-      revokeCapability(normalizedAddress, capabilityId);
+      revokeCapability(normalizedAddress, cap.id);
     }
   };
 

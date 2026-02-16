@@ -56,8 +56,7 @@ import { WagmiGuard } from "@/components/wagmi-guard";
 interface FlaggedAssetRow {
   tokenId: string;
   owner: string;
-  tagId: string | null;
-  flaggedAt: number; // Using updatedAt as proxy for flaggedAt
+  flaggedAt: number; // Using timestamp as proxy for flaggedAt
   priority: Priority;
 }
 
@@ -80,13 +79,11 @@ function formatDuration(ms: number): string {
 }
 
 // Transform contract Asset to table row
-function toFlaggedRow(asset: Asset): FlaggedAssetRow {
-  const zeroTag = "0x0000000000000000000000000000000000000000000000000000000000000000";
-  const flaggedAt = Number(asset.updatedAt) * 1000; // Use updatedAt as proxy for when it was flagged
+function toFlaggedRow(asset: Asset & { tokenId: bigint }): FlaggedAssetRow {
+  const flaggedAt = Number(asset.timestamp) * 1000; // Use timestamp as proxy for when it was flagged
   return {
-    tokenId: asset.id.toString(),
+    tokenId: asset.tokenId.toString(),
     owner: asset.owner,
-    tagId: asset.tagId === zeroTag ? null : asset.tagId,
     flaggedAt,
     priority: calculatePriority(flaggedAt),
   };

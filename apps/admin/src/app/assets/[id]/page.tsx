@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAsset, useAssetState, AssetState, AssetStateNames } from "@tagit/contracts";
+import { useAsset, useAssetState, useTagByToken, AssetState, AssetStateNames } from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
@@ -114,13 +114,13 @@ function AssetDetailContent({ id }: { id: string }) {
 
   const { asset, isLoading: assetLoading, error: assetError, refetch } = useAsset(tokenId);
   const { state, stateName, isLoading: stateLoading } = useAssetState(tokenId);
+  const { data: tagHash } = useTagByToken(tokenId);
 
   const isLoading = assetLoading || stateLoading;
   const hasAsset = asset && asset.owner !== "0x0000000000000000000000000000000000000000";
 
   // Convert blockchain timestamp (seconds) to milliseconds for display
-  const createdAtMs = asset ? Number(asset.createdAt) * 1000 : 0;
-  const updatedAtMs = asset ? Number(asset.updatedAt) * 1000 : 0;
+  const timestampMs = asset ? Number(asset.timestamp) * 1000 : 0;
 
   // Actions based on state
   const getActions = () => {
@@ -286,39 +286,21 @@ function AssetDetailContent({ id }: { id: string }) {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Tag ID</div>
-                  {asset!.tagId &&
-                  asset!.tagId !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
-                    <code className="text-sm break-all">{asset!.tagId}</code>
+                  {tagHash &&
+                  tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
+                    <code className="text-sm break-all">{tagHash}</code>
                   ) : (
                     <span className="text-muted-foreground">Not bound</span>
                   )}
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Metadata URI</div>
-                  {asset!.metadataURI ? (
-                    <a
-                      href={asset!.metadataURI}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
-                    >
-                      {asset!.metadataURI.length > 30 ? `${asset!.metadataURI.slice(0, 30)}...` : asset!.metadataURI}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">Not set</span>
-                  )}
+                  <div className="text-sm text-muted-foreground mb-1">Metadata</div>
+                  <span className="text-muted-foreground text-sm">Requires indexer</span>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Created</div>
+                  <div className="text-sm text-muted-foreground mb-1">Timestamp</div>
                   <div className="text-sm">
-                    {createdAtMs > 0 ? formatDate(createdAtMs) : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground mb-1">Last Updated</div>
-                  <div className="text-sm">
-                    {updatedAtMs > 0 ? formatDate(updatedAtMs) : "—"}
+                    {timestampMs > 0 ? formatDate(timestampMs) : "—"}
                   </div>
                 </div>
               </div>
