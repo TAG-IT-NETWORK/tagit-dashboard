@@ -72,15 +72,14 @@ function truncateHex(hex: string, chars = 6): string {
 }
 
 // Transform contract Asset to table row format
-function toAssetRow(asset: ContractAsset): AssetRow {
-  const zeroTag = "0x0000000000000000000000000000000000000000000000000000000000000000";
+function toAssetRow(asset: ContractAsset & { tokenId: bigint }): AssetRow {
   return {
-    tokenId: asset.id.toString(),
+    tokenId: asset.tokenId.toString(),
     state: asset.state,
     owner: asset.owner,
-    tagId: asset.tagId === zeroTag ? null : asset.tagId,
-    createdAt: Number(asset.createdAt) * 1000, // Convert from seconds to ms
-    updatedAt: Number(asset.updatedAt) * 1000,
+    tagId: null, // Tag lookup requires separate per-asset contract call
+    createdAt: Number(asset.timestamp) * 1000, // Convert from seconds to ms
+    updatedAt: Number(asset.timestamp) * 1000,
   };
 }
 
