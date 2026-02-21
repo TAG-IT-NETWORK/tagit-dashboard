@@ -17,6 +17,7 @@ import {
   FlaskConical,
   Bot,
   Megaphone,
+  Play,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -31,6 +32,7 @@ const navigation = [
   { name: "Treasury", href: "/treasury", icon: Wallet },
   { name: "BD Agent", href: "/adagent", icon: Bot },
   { name: "Influencer", href: "/influencer", icon: Megaphone },
+  { name: "Demo", href: "/demo", icon: Play },
 ];
 
 // Testing section - only visible in development

@@ -380,4 +380,22 @@ export const servicesApi = {
     request<EngagementData[]>(
       `/api/v1/influencer/content/${id}/engagement`
     ),
+
+  // Demo
+  getDemoEventsUrl: () => `${BASE}/api/v1/adagent/demo/events`,
+
+  runDemoPipeline: (limit?: number) =>
+    request<{
+      campaignId: number;
+      mode: string;
+      pitched: number;
+      accepted: number;
+      demosRun: number;
+      onboarded: number;
+      declined: number;
+      errors: number;
+    }>("/api/v1/adagent/run", {
+      method: "POST",
+      body: JSON.stringify(limit ? { limit } : {}),
+    }),
 };
