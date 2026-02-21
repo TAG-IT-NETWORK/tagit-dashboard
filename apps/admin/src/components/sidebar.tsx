@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FlaskConical,
+  Bot,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +29,8 @@ const navigation = [
   { name: "Resolve", href: "/resolve", icon: AlertTriangle },
   { name: "Governance", href: "/governance", icon: Vote },
   { name: "Treasury", href: "/treasury", icon: Wallet },
+  { name: "BD Agent", href: "/adagent", icon: Bot },
+  { name: "Influencer", href: "/influencer", icon: Megaphone },
 ];
 
 // Testing section - only visible in development
