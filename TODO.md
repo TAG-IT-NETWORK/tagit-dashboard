@@ -142,11 +142,11 @@
 ## Quick Reference
 
 ### Deployed Contracts (OP Sepolia) — NIST CSF 2.0 Deployment
-*Updated: Jan 6, 2026 — All contracts include CircuitBreaker + RateLimiter*
+*Updated: Feb 24, 2026 — TAGITCore upgraded to UUPS proxy (T20)*
 
 | Contract | Address | Start Block |
 |----------|---------|-------------|
-| TAGITCore | 0x8B02b62FD388b2d7e3dF5Ec666D68Ac7c7ca02Fe | 37959312 |
+| TAGITCore | 0x8bde22da889306d422802728cb98b6da42ed8e1a | 40045836 |
 | TAGITAccess | 0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9 | 37959312 |
 | IdentityBadge | 0x26F2EBb84664EF1eF8554e15777EBEc6611256A6 | 37959311 |
 | CapabilityBadge | 0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505 | 37959312 |

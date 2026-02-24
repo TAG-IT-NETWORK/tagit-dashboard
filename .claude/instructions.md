@@ -18,12 +18,12 @@ Multi-tenant dashboard for the TAG IT Network product authentication platform. B
     - `@tagit/auth` — BIDGES authentication logic
     - `@tagit/config` — Chain configs, wagmi setup
 
-## Smart Contracts (OP Sepolia) — Updated Feb 5, 2026
+## Smart Contracts (OP Sepolia) — Updated Feb 24, 2026
 
 ### Core Contracts
 | Contract | Address | Purpose |
 | --- | --- | --- |
-| TAGITCore | `0x8B02b62FD388b2d7e3dF5Ec666D68Ac7c7ca02Fe` | Asset lifecycle (mint, bind, activate, claim, flag, resolve, recycle) |
+| TAGITCore | `0x8bde22da889306d422802728cb98b6da42ed8e1a` | Asset lifecycle — UUPS proxy (upgradeable via TimelockController) |
 | TAGITAccess | `0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9` | Capability checks |
 | IdentityBadge | `0x26F2EBb84664EF1eF8554e15777EBEc6611256A6` | Soulbound identity (ERC-5192) |
 | CapabilityBadge | `0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505` | Role capabilities (ERC-1155) |

@@ -225,6 +225,32 @@ export const TAGITCoreABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // UUPS Proxy — initialize (replaces constructor)
+  {
+    inputs: [{ type: "address", name: "initialOwner" }],
+    name: "initialize",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // UUPS Proxy — upgrade authorization
+  {
+    inputs: [],
+    name: "proxiableUUID",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { type: "address", name: "newImplementation" },
+      { type: "bytes", name: "data" },
+    ],
+    name: "upgradeToAndCall",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
   // Events
   {
     anonymous: false,
@@ -273,6 +299,21 @@ export const TAGITCoreABI = [
       { indexed: true, name: "newController", type: "address" },
     ],
     name: "AccessControllerUpdated",
+    type: "event",
+  },
+  // UUPS Proxy events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "implementation", type: "address" },
+    ],
+    name: "Upgraded",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: false, name: "version", type: "uint64" }],
+    name: "Initialized",
     type: "event",
   },
   // Errors
