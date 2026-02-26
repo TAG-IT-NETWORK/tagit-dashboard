@@ -170,6 +170,8 @@ export const TAGITCoreABI = [
     inputs: [
       { type: "uint256", name: "tokenId" },
       { type: "bytes32", name: "tagHash" },
+      { type: "bytes", name: "challengeResponse" },
+      { type: "bytes", name: "oracleSignature" },
     ],
     name: "bindTag",
     outputs: [],
@@ -365,6 +367,16 @@ export const TAGITCoreABI = [
   {
     inputs: [],
     name: "InvalidTagHash",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "OracleNotSet",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidOracleSignature",
     type: "error",
   },
 ] as const;

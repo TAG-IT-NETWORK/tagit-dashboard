@@ -97,9 +97,9 @@ export function BindTagModal({ open, onOpenChange, tokenId, onSuccess }: BindTag
     setAbortController(null);
   }, [abortController]);
 
-  const handleBind = () => {
+  const handleBind = async () => {
     if (!computedTagId) return;
-    bindTag(tokenId, computedTagId);
+    await bindTag(tokenId, computedTagId);
   };
 
   const handleGenerateTestUID = () => {

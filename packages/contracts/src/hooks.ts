@@ -1,5 +1,5 @@
-import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { keccak256, toBytes } from "viem";
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient } from "wagmi";
+import { keccak256, toBytes, encodePacked, toHex } from "viem";
 import { CONTRACTS, CHAIN_ID } from "./addresses";
 import {
   TAGITCoreABI,
@@ -312,13 +312,32 @@ export function useMint() {
 export function useBindTag() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { data: walletClient } = useWalletClient();
 
-  const bindTag = (tokenId: bigint, tagHash: `0x${string}`) => {
+  const bindTag = async (tokenId: bigint, tagHash: `0x${string}`) => {
+    if (!walletClient) return;
+
+    // Generate challenge response (PATCH-06: oracle ECDSA verification)
+    const challengeResponse = toHex(toBytes(`challenge${tokenId.toString()}`));
+
+    // Build the message hash: keccak256(abi.encodePacked(tokenId, tagHash, challengeResponse))
+    const messageHash = keccak256(
+      encodePacked(
+        ["uint256", "bytes32", "bytes"],
+        [tokenId, tagHash, challengeResponse]
+      )
+    );
+
+    // Sign with connected wallet (on testnet, connected wallet = trusted oracle)
+    const oracleSignature = await walletClient.signMessage({
+      message: { raw: toBytes(messageHash) },
+    });
+
     writeContract({
       address: CONTRACTS.TAGITCore as `0x${string}`,
       abi: TAGITCoreABI,
       functionName: "bindTag",
-      args: [tokenId, tagHash],
+      args: [tokenId, tagHash, challengeResponse, oracleSignature],
       chainId: CHAIN_ID,
     });
   };

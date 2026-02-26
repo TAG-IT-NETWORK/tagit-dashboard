@@ -210,10 +210,10 @@ export function LifecycleContent() {
     setBindModalOpen(true);
   };
 
-  const handleBindDirect = () => {
+  const handleBindDirect = async () => {
     if (!tokenId || !tagUID) return;
     const tagId = uidToTagId(formatUID(tagUID));
-    bindTag(tokenId, tagId);
+    await bindTag(tokenId, tagId);
   };
 
   const handleActivate = () => {
