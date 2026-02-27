@@ -77,6 +77,7 @@ export {
   useActivate,
   useClaim,
   useFlag,
+  useApproveResolve,
   useResolve,
   useRecycle,
   // TAGITAccess

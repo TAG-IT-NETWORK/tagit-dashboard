@@ -207,6 +207,16 @@ export const TAGITCoreABI = [
       { type: "uint256", name: "tokenId" },
       { type: "address", name: "newOwner" },
     ],
+    name: "approveResolve",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "address", name: "newOwner" },
+    ],
     name: "resolve",
     outputs: [],
     stateMutability: "nonpayable",

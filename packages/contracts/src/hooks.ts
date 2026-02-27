@@ -406,7 +406,31 @@ export function useFlag() {
 }
 
 /**
+ * Approve resolution of a flagged asset (quorum step)
+ * Must be called before resolve() can execute.
+ * @param tokenId - The asset token ID
+ * @param newOwner - The proposed rightful owner
+ */
+export function useApproveResolve() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const approveResolve = (tokenId: bigint, newOwner: `0x${string}`) => {
+    writeContract({
+      address: CONTRACTS.TAGITCore as `0x${string}`,
+      abi: TAGITCoreABI,
+      functionName: "approveResolve",
+      args: [tokenId, newOwner],
+      chainId: CHAIN_ID,
+    });
+  };
+
+  return { approveResolve, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/**
  * Resolve a flagged asset and transfer to rightful owner
+ * Requires quorum approval via approveResolve() first.
  * @param tokenId - The asset token ID
  * @param newOwner - The address of the rightful owner
  */

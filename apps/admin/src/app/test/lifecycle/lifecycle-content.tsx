@@ -21,6 +21,7 @@ import {
   useActivate,
   useClaim,
   useFlag,
+  useApproveResolve,
   useResolve,
   useRecycle,
   useAsset,
@@ -89,6 +90,7 @@ export function LifecycleContent() {
   const { activate, hash: activateHash, isPending: activatePending, isConfirming: activateConfirming, isSuccess: activateSuccess, error: activateError } = useActivate();
   const { claim, hash: claimHash, isPending: claimPending, isConfirming: claimConfirming, isSuccess: claimSuccess, error: claimError } = useClaim();
   const { flag, hash: flagHash, isPending: flagPending, isConfirming: flagConfirming, isSuccess: flagSuccess, error: flagError } = useFlag();
+  const { approveResolve, hash: approveResolveHash, isPending: approveResolvePending, isConfirming: approveResolveConfirming, isSuccess: approveResolveSuccess, error: approveResolveError } = useApproveResolve();
   const { resolve, hash: resolveHash, isPending: resolvePending, isConfirming: resolveConfirming, isSuccess: resolveSuccess, error: resolveError } = useResolve();
   const { recycle, hash: recycleHash, isPending: recyclePending, isConfirming: recycleConfirming, isSuccess: recycleSuccess, error: recycleError } = useRecycle();
 
@@ -156,6 +158,14 @@ export function LifecycleContent() {
     }
   }, [flagSuccess, flagHash, refetchAsset]);
 
+  // After approval succeeds, auto-trigger resolve
+  useEffect(() => {
+    if (approveResolveSuccess && approveResolveHash && tokenId && resolveAddress) {
+      const checksumAddr = getAddress(resolveAddress) as `0x${string}`;
+      resolve(tokenId, checksumAddr);
+    }
+  }, [approveResolveSuccess, approveResolveHash, tokenId, resolveAddress, resolve]);
+
   useEffect(() => {
     if (resolveSuccess && resolveHash) {
       setStepStates((prev) => ({
@@ -185,7 +195,7 @@ export function LifecycleContent() {
       { step: "activate", error: activateError },
       { step: "claim", error: claimError },
       { step: "flag", error: flagError },
-      { step: "resolve", error: resolveError },
+      { step: "resolve", error: approveResolveError || resolveError },
       { step: "recycle", error: recycleError },
     ];
 
@@ -235,7 +245,7 @@ export function LifecycleContent() {
   const handleResolve = () => {
     if (!tokenId || !resolveAddress) return;
     const checksumAddr = getAddress(resolveAddress) as `0x${string}`;
-    resolve(tokenId, checksumAddr);
+    approveResolve(tokenId, checksumAddr);
   };
 
   const handleRecycle = () => {
@@ -608,6 +618,7 @@ export function LifecycleContent() {
                 <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 mb-4">
                   <p className="text-sm">
                     Resolving returns the asset to the rightful owner after AIRP recovery.
+                    This requires two wallet confirmations: approval + execution.
                     Enter the address of the verified owner.
                   </p>
                 </div>
@@ -631,10 +642,25 @@ export function LifecycleContent() {
                 </div>
                 <Button
                   onClick={handleResolve}
-                  disabled={!resolveAddress || resolvePending || resolveConfirming}
+                  disabled={!resolveAddress || approveResolvePending || approveResolveConfirming || resolvePending || resolveConfirming}
                   className="w-full"
                 >
-                  {resolvePending || resolveConfirming ? (
+                  {approveResolvePending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Approve in wallet...
+                    </>
+                  ) : approveResolveConfirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Approval confirming...
+                    </>
+                  ) : resolvePending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Confirm resolve in wallet...
+                    </>
+                  ) : resolveConfirming ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Resolving...
@@ -642,7 +668,7 @@ export function LifecycleContent() {
                   ) : (
                     <>
                       <Scale className="h-4 w-4 mr-2" />
-                      Resolve and Transfer to Owner
+                      Approve &amp; Resolve
                     </>
                   )}
                 </Button>
