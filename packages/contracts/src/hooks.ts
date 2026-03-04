@@ -1,6 +1,6 @@
-import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient } from "wagmi";
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient, useChainId } from "wagmi";
 import { keccak256, toBytes, encodePacked, toHex } from "viem";
-import { CONTRACTS, CHAIN_ID } from "./addresses";
+import { getContractsForChain } from "./addresses";
 import {
   TAGITCoreABI,
   AssetState,
@@ -30,12 +30,15 @@ import {
  * @returns Asset data with loading and error states
  */
 export function useAsset(tokenId: bigint) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   const result = useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "getAsset",
     args: [tokenId],
-    chainId: CHAIN_ID,
+    chainId,
   });
 
   // Contract returns multiple values as an array: [owner, timestamp, state, flags, reserved]
@@ -83,39 +86,51 @@ export function useAssetState(tokenId: bigint) {
 }
 
 export function useAssetOwner(assetId: bigint) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "ownerOf",
     args: [assetId],
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
 export function useTotalSupply() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "totalSupply",
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
 export function useContractName() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "name",
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
 export function useContractSymbol() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "symbol",
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
@@ -124,12 +139,15 @@ export function useContractSymbol() {
  * @param tokenId - The token ID
  */
 export function useTagByToken(tokenId: bigint) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "getTagByToken",
     args: [tokenId],
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
@@ -138,12 +156,15 @@ export function useTagByToken(tokenId: bigint) {
  * @param tagHash - The tag hash (keccak256 of NFC UID)
  */
 export function useTokenByTag(tagHash: `0x${string}`) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: contracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "getTokenByTag",
     args: [tagHash],
-    chainId: CHAIN_ID,
+    chainId,
   });
 }
 
@@ -159,6 +180,9 @@ export function useAllAssets(options?: {
   pageSize?: number;
   refetchInterval?: number;
 }) {
+  const chainId = useChainId();
+  const chainContracts = getContractsForChain(chainId);
+
   const page = options?.page ?? 0;
   const pageSize = options?.pageSize ?? 25;
   const refetchInterval = options?.refetchInterval ?? 0;
@@ -169,10 +193,10 @@ export function useAllAssets(options?: {
     isLoading: supplyLoading,
     error: supplyError,
   } = useReadContract({
-    address: CONTRACTS.TAGITCore as `0x${string}`,
+    address: chainContracts.TAGITCore,
     abi: TAGITCoreABI,
     functionName: "totalSupply",
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       refetchInterval: refetchInterval > 0 ? refetchInterval : undefined,
     },
@@ -190,11 +214,11 @@ export function useAllAssets(options?: {
   const contracts =
     total > 0 && startId <= total
       ? Array.from({ length: endId - startId + 1 }, (_, i) => ({
-          address: CONTRACTS.TAGITCore as `0x${string}`,
+          address: chainContracts.TAGITCore as `0x${string}`,
           abi: TAGITCoreABI,
           functionName: "getAsset" as const,
           args: [BigInt(startId + i)],
-          chainId: CHAIN_ID,
+          chainId,
         }))
       : [];
 
@@ -290,6 +314,8 @@ export function useFlaggedAssets(options?: { pageSize?: number; refetchInterval?
 // ============================================================================
 
 export function useMint() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
@@ -298,11 +324,11 @@ export function useMint() {
     const metadataHash = keccak256(toBytes(metadataURI));
 
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "mint",
       args: [to, metadataHash],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -310,6 +336,8 @@ export function useMint() {
 }
 
 export function useBindTag() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
   const { data: walletClient } = useWalletClient();
@@ -334,11 +362,11 @@ export function useBindTag() {
     });
 
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "bindTag",
       args: [tokenId, tagHash, challengeResponse, oracleSignature],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -346,16 +374,18 @@ export function useBindTag() {
 }
 
 export function useActivate() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const activate = (tokenId: bigint) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "activate",
       args: [tokenId],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -368,16 +398,18 @@ export function useActivate() {
  * @param newOwner - The address of the new owner
  */
 export function useClaim() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const claim = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "claim",
       args: [tokenId, newOwner],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -389,16 +421,18 @@ export function useClaim() {
  * @param tokenId - The asset token ID to flag
  */
 export function useFlag() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const flag = (tokenId: bigint) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "flag",
       args: [tokenId],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -412,16 +446,18 @@ export function useFlag() {
  * @param newOwner - The proposed rightful owner
  */
 export function useApproveResolve() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const approveResolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "approveResolve",
       args: [tokenId, newOwner],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -435,16 +471,18 @@ export function useApproveResolve() {
  * @param newOwner - The address of the rightful owner
  */
 export function useResolve() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const resolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "resolve",
       args: [tokenId, newOwner],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -452,16 +490,18 @@ export function useResolve() {
 }
 
 export function useRecycle() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const recycle = (tokenId: bigint) => {
     writeContract({
-      address: CONTRACTS.TAGITCore as `0x${string}`,
+      address: contracts.TAGITCore,
       abi: TAGITCoreABI,
       functionName: "recycle",
       args: [tokenId],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -481,12 +521,15 @@ export function useCapabilityGate(
   address: `0x${string}` | undefined,
   capability: CapabilityHash
 ) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   const result = useReadContract({
-    address: CONTRACTS.TAGITAccess as `0x${string}`,
+    address: contracts.TAGITAccess,
     abi: TAGITAccessABI,
     functionName: "hasCapability",
     args: address ? [address, capability] : undefined,
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       enabled: !!address,
     },
@@ -505,12 +548,15 @@ export function useCapabilityGate(
  * @param address - The address to check
  */
 export function useCapabilities(address: `0x${string}` | undefined) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   const result = useReadContract({
-    address: CONTRACTS.TAGITAccess as `0x${string}`,
+    address: contracts.TAGITAccess,
     abi: TAGITAccessABI,
     functionName: "getCapabilities",
     args: address ? [address] : undefined,
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       enabled: !!address,
     },
@@ -525,16 +571,18 @@ export function useCapabilities(address: `0x${string}` | undefined) {
 }
 
 export function useGrantCapability() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const grantCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
-      address: CONTRACTS.CapabilityBadge as `0x${string}`,
+      address: contracts.CapabilityBadge,
       abi: CapabilityBadgeABI,
       functionName: "grantCapability",
       args: [user, BigInt(capabilityId)],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -542,16 +590,18 @@ export function useGrantCapability() {
 }
 
 export function useRevokeCapability() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const revokeCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
-      address: CONTRACTS.CapabilityBadge as `0x${string}`,
+      address: contracts.CapabilityBadge,
       abi: CapabilityBadgeABI,
       functionName: "revokeCapability",
       args: [user, BigInt(capabilityId)],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -569,12 +619,15 @@ export function useRevokeCapability() {
  * @returns hasBadge boolean with loading state
  */
 export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: number) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   const result = useReadContract({
-    address: CONTRACTS.IdentityBadge as `0x${string}`,
+    address: contracts.IdentityBadge,
     abi: IdentityBadgeABI,
     functionName: "balanceOf",
     args: address ? [address, BigInt(badgeId)] : undefined,
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       enabled: !!address,
     },
@@ -596,12 +649,15 @@ export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: numbe
  * @param address - The address to check
  */
 export function useBadges(address: `0x${string}` | undefined) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   const result = useReadContract({
-    address: CONTRACTS.IdentityBadge as `0x${string}`,
+    address: contracts.IdentityBadge,
     abi: IdentityBadgeABI,
     functionName: "getBadges",
     args: address ? [address] : undefined,
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       enabled: !!address,
     },
@@ -623,16 +679,18 @@ export function useBadges(address: `0x${string}` | undefined) {
 }
 
 export function useGrantBadge() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const grantBadge = (to: `0x${string}`, badgeId: number) => {
     writeContract({
-      address: CONTRACTS.IdentityBadge as `0x${string}`,
+      address: contracts.IdentityBadge,
       abi: IdentityBadgeABI,
       functionName: "grantIdentity",
       args: [to, BigInt(badgeId)],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -640,16 +698,18 @@ export function useGrantBadge() {
 }
 
 export function useRevokeBadge() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const revokeBadge = (from: `0x${string}`, badgeId: number) => {
     writeContract({
-      address: CONTRACTS.IdentityBadge as `0x${string}`,
+      address: contracts.IdentityBadge,
       abi: IdentityBadgeABI,
       functionName: "revokeIdentity",
       args: [from, BigInt(badgeId)],
-      chainId: CHAIN_ID,
+      chainId,
     });
   };
 
@@ -664,12 +724,15 @@ export function useCapabilityBadgeBalance(
   address: `0x${string}` | undefined,
   capabilityId: number
 ) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
   return useReadContract({
-    address: CONTRACTS.CapabilityBadge as `0x${string}`,
+    address: contracts.CapabilityBadge,
     abi: CapabilityBadgeABI,
     functionName: "balanceOf",
     args: address ? [address, BigInt(capabilityId)] : undefined,
-    chainId: CHAIN_ID,
+    chainId,
     query: {
       enabled: !!address,
     },

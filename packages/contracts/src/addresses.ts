@@ -29,10 +29,10 @@ const OP_SEPOLIA_CONTRACTS = {
 export const ARBITRUM_SEPOLIA_CHAIN_ID = 421614 as const;
 
 const ARBITRUM_SEPOLIA_CONTRACTS = {
-  TAGITCore: "0x0000000000000000000000000000000000000000" as `0x${string}`, // TODO: update after deploy
-  TAGITAccess: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  IdentityBadge: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  CapabilityBadge: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITCore: "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f" as `0x${string}`,
+  TAGITAccess: "0x676f593c451E4dF2345026af891Acc92c4344455" as `0x${string}`,
+  IdentityBadge: "0xEd6a36beB559A8047121B6300fF0060b0E64b5C7" as `0x${string}`,
+  CapabilityBadge: "0xa8BbC7f95f5D979e8E9208bc627194384b257c24" as `0x${string}`,
   TAGITRecovery: "0x0000000000000000000000000000000000000000" as `0x${string}`,
   TAGITPaymaster: "0xBbB9f7dB1C38Af7998b511d8026042755Eb4F4C4" as `0x${string}`,
   TAGITTreasury: "0x0000000000000000000000000000000000000000" as `0x${string}`,
@@ -89,3 +89,18 @@ export const START_BLOCKS = {
   TAGITAccountFactory: 37959312,
   CCIPAdapter: 37959312,
 } as const;
+
+// Arbitrum Sepolia start blocks — will be updated after deploy
+export const ARBITRUM_START_BLOCKS = {
+  TAGITCore: 246_901_619,
+  TAGITAccess: 246_901_619,
+  IdentityBadge: 246_901_619,
+  CapabilityBadge: 246_901_619,
+  TAGITPaymaster: 115_000_000, // deployed earlier
+} as const;
+
+/** Get start blocks for a given chain ID */
+export const startBlocksByChain: Record<number, Record<string, number>> = {
+  [OP_SEPOLIA_CHAIN_ID]: START_BLOCKS,
+  [ARBITRUM_SEPOLIA_CHAIN_ID]: ARBITRUM_START_BLOCKS,
+};
