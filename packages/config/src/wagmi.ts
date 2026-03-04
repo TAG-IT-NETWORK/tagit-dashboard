@@ -1,5 +1,5 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { http, createConfig } from "wagmi";
+import { http, fallback, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { optimismSepolia } from "viem/chains";
 import { supportedChains, arbitrumSepolia } from "./chains";
@@ -7,9 +7,14 @@ import { supportedChains, arbitrumSepolia } from "./chains";
 const opRpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
 const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || process.env.NEXT_PUBLIC_ALCHEMY_ARBITRUM_SEPOLIA_URL;
 
+// Public fallback RPCs for when Alchemy is unavailable or misconfigured
+const ARB_SEPOLIA_PUBLIC_RPC = "https://sepolia-rollup.arbitrum.io/rpc";
+
 export function createWagmiConfig(projectId: string) {
   const transports = {
-    [arbitrumSepolia.id]: http(arbRpcUrl),
+    [arbitrumSepolia.id]: arbRpcUrl
+      ? fallback([http(arbRpcUrl), http(ARB_SEPOLIA_PUBLIC_RPC)])
+      : http(ARB_SEPOLIA_PUBLIC_RPC),
     [optimismSepolia.id]: http(opRpcUrl),
   };
 
