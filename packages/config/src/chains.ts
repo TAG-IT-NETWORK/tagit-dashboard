@@ -6,8 +6,8 @@ import { optimismSepolia, arbitrumSepolia as _arbitrumSepolia } from "viem/chain
 export const arbitrumSepolia = defineChain({
   ..._arbitrumSepolia,
   fees: {
-    baseFeeMultiplier: 1.25,
-    defaultPriorityFee: 100_000n,
+    baseFeeMultiplier: 1.5,
+    defaultPriorityFee: 1_000_000n,
   },
 });
 
