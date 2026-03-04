@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 
@@ -58,11 +59,17 @@ const ClientShellContent = dynamic(
 );
 
 export function ClientShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Login page renders standalone — never load wagmi/RainbowKit bundle
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
 
   // Don't render until we're definitely on the client
   if (!mounted) {
