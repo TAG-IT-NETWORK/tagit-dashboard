@@ -87,7 +87,7 @@ export function LifecycleContent() {
   const [resolveAddress, setResolveAddress] = useState("");
 
   // Contract hooks
-  const { mint, hash: mintHash, isPending: mintPending, isConfirming: mintConfirming, isSuccess: mintSuccess, error: mintError } = useMint();
+  const { mint, hash: mintHash, isPending: mintPending, isConfirming: mintConfirming, isSuccess: mintSuccess, error: mintError, tokenId: mintedTokenId } = useMint();
   const { bindTag, hash: bindHash, isPending: bindPending, isConfirming: bindConfirming, isSuccess: bindSuccess, error: bindError } = useBindTag();
   const { activate, hash: activateHash, isPending: activatePending, isConfirming: activateConfirming, isSuccess: activateSuccess, error: activateError } = useActivate();
   const { claim, hash: claimHash, isPending: claimPending, isConfirming: claimConfirming, isSuccess: claimSuccess, error: claimError } = useClaim();
@@ -112,9 +112,12 @@ export function LifecycleContent() {
         ...prev,
         mint: { completed: true, txHash: mintHash },
       }));
+      if (mintedTokenId) {
+        setTokenId(mintedTokenId);
+      }
       setCurrentStep(1);
     }
-  }, [mintSuccess, mintHash]);
+  }, [mintSuccess, mintHash, mintedTokenId]);
 
   useEffect(() => {
     if (bindSuccess && bindHash) {
@@ -397,19 +400,8 @@ export function LifecycleContent() {
             ) : stepStates.mint?.completed ? (
               <div className="space-y-4">
                 <div className="text-center py-2">
-                  <Check className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  <p className="text-sm font-medium">Mint Successful!</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Enter Token ID from transaction</Label>
-                  <Input
-                    type="number"
-                    placeholder="Token ID (e.g., 42)"
-                    onChange={(e) => setTokenId(BigInt(e.target.value || 0))}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Click "Mint" in Transaction History, then find the tokenId in the Transfer event logs
-                  </p>
+                  <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
+                  <p className="text-sm font-medium">Extracting Token ID...</p>
                 </div>
               </div>
             ) : (
@@ -463,16 +455,10 @@ export function LifecycleContent() {
                     </>
                   )}
                 </Button>
-                {stepStates.mint?.completed && (
-                  <div className="space-y-2">
-                    <Label>Enter Token ID from transaction</Label>
-                    <Input
-                      type="number"
-                      placeholder="Token ID"
-                      onChange={(e) => setTokenId(BigInt(e.target.value || 0))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Check the transaction on Blockscout to find the minted token ID
+                {stepStates.mint?.completed && mintedTokenId && (
+                  <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3">
+                    <p className="text-sm font-medium text-green-700">
+                      Token #{mintedTokenId.toString()} minted successfully
                     </p>
                   </div>
                 )}

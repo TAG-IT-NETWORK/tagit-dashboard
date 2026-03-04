@@ -1,4 +1,5 @@
 import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient, useChainId } from "wagmi";
+import { useMemo } from "react";
 import { keccak256, toBytes, encodePacked, toHex } from "viem";
 import { getContractsForChain } from "./addresses";
 import {
@@ -317,7 +318,22 @@ export function useMint() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+    hash,
+    confirmations: 1,
+  });
+
+  // Extract tokenId from Transfer event in receipt
+  const tokenId = useMemo(() => {
+    if (!receipt?.logs) return null;
+    const transferTopic = keccak256(toBytes("Transfer(address,address,uint256)"));
+    for (const log of receipt.logs) {
+      if (log.topics[0] === transferTopic && log.topics[3]) {
+        return BigInt(log.topics[3]);
+      }
+    }
+    return null;
+  }, [receipt]);
 
   const mint = (to: `0x${string}`, metadataURI: string) => {
     // Convert metadata string to bytes32 hash (contract expects bytes32)
@@ -332,14 +348,14 @@ export function useMint() {
     });
   };
 
-  return { mint, hash, isPending, isConfirming, isSuccess, error };
+  return { mint, hash, isPending, isConfirming, isSuccess, error, tokenId };
 }
 
 export function useBindTag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
   const { data: walletClient } = useWalletClient();
 
   const bindTag = async (tokenId: bigint, tagHash: `0x${string}`) => {
@@ -377,7 +393,7 @@ export function useActivate() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const activate = (tokenId: bigint) => {
     writeContract({
@@ -401,7 +417,7 @@ export function useClaim() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const claim = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -424,7 +440,7 @@ export function useFlag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const flag = (tokenId: bigint) => {
     writeContract({
@@ -449,7 +465,7 @@ export function useApproveResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const approveResolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -474,7 +490,7 @@ export function useResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const resolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -493,7 +509,7 @@ export function useRecycle() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const recycle = (tokenId: bigint) => {
     writeContract({
@@ -574,7 +590,7 @@ export function useGrantCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const grantCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -593,7 +609,7 @@ export function useRevokeCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const revokeCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -682,7 +698,7 @@ export function useGrantBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const grantBadge = (to: `0x${string}`, badgeId: number) => {
     writeContract({
@@ -701,7 +717,7 @@ export function useRevokeBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
 
   const revokeBadge = (from: `0x${string}`, badgeId: number) => {
     writeContract({

@@ -13,6 +13,8 @@ export function createWagmiConfig(projectId: string) {
     [optimismSepolia.id]: http(opRpcUrl),
   };
 
+  const pollingInterval = 4_000; // 4s — improves receipt detection on testnets
+
   // If no projectId is provided, create a basic config with injected wallets only
   if (!projectId) {
     return createConfig({
@@ -21,6 +23,7 @@ export function createWagmiConfig(projectId: string) {
         injected({ target: "metaMask" }),
       ],
       transports,
+      pollingInterval,
       ssr: true,
     });
   }
@@ -30,6 +33,7 @@ export function createWagmiConfig(projectId: string) {
     projectId,
     chains: supportedChains,
     transports,
+    pollingInterval,
     ssr: true,
   });
 }
