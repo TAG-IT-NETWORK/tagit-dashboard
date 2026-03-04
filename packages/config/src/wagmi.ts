@@ -1,8 +1,8 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { http, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { optimismSepolia, arbitrumSepolia } from "viem/chains";
-import { supportedChains } from "./chains";
+import { optimismSepolia } from "viem/chains";
+import { supportedChains, arbitrumSepolia } from "./chains";
 
 const opRpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
 const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || process.env.NEXT_PUBLIC_ALCHEMY_ARBITRUM_SEPOLIA_URL;

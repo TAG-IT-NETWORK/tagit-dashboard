@@ -1,4 +1,15 @@
-import { optimismSepolia, arbitrumSepolia } from "viem/chains";
+import { defineChain } from "viem";
+import { optimismSepolia, arbitrumSepolia as _arbitrumSepolia } from "viem/chains";
+
+// Override Arbitrum Sepolia with a higher base fee multiplier to prevent
+// "maxFeePerGas < baseFee" errors from tight gas estimation
+export const arbitrumSepolia = defineChain({
+  ..._arbitrumSepolia,
+  fees: {
+    baseFeeMultiplier: 1.25,
+    defaultPriorityFee: 100_000n,
+  },
+});
 
 export const supportedChains = [arbitrumSepolia, optimismSepolia] as const;
 export const defaultChain = arbitrumSepolia;
@@ -45,4 +56,4 @@ export function isMultiChainEnabled(): boolean {
   return env !== "false";
 }
 
-export { optimismSepolia, arbitrumSepolia };
+export { optimismSepolia };
