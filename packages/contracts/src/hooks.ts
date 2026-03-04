@@ -320,7 +320,9 @@ export function useMint() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
+    chainId,
     confirmations: 1,
+    pollingInterval: 4_000,
   });
 
   // Extract tokenId from Transfer event in receipt
@@ -355,7 +357,7 @@ export function useBindTag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
   const { data: walletClient } = useWalletClient();
 
   const bindTag = async (tokenId: bigint, tagHash: `0x${string}`) => {
@@ -393,7 +395,7 @@ export function useActivate() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const activate = (tokenId: bigint) => {
     writeContract({
@@ -417,7 +419,7 @@ export function useClaim() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const claim = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -440,7 +442,7 @@ export function useFlag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const flag = (tokenId: bigint) => {
     writeContract({
@@ -465,7 +467,7 @@ export function useApproveResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const approveResolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -490,7 +492,7 @@ export function useResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const resolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -509,7 +511,7 @@ export function useRecycle() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const recycle = (tokenId: bigint) => {
     writeContract({
@@ -590,7 +592,7 @@ export function useGrantCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const grantCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -609,7 +611,7 @@ export function useRevokeCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const revokeCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -698,7 +700,7 @@ export function useGrantBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const grantBadge = (to: `0x${string}`, badgeId: number) => {
     writeContract({
@@ -717,7 +719,7 @@ export function useRevokeBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, confirmations: 1 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
   const revokeBadge = (from: `0x${string}`, badgeId: number) => {
     writeContract({
