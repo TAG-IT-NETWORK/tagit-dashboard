@@ -5,7 +5,7 @@ import { optimismSepolia, arbitrumSepolia } from "viem/chains";
 import { supportedChains } from "./chains";
 
 const opRpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
-const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC;
+const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || process.env.NEXT_PUBLIC_ALCHEMY_ARBITRUM_SEPOLIA_URL;
 
 export function createWagmiConfig(projectId: string) {
   const transports = {
