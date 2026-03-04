@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { parseContractError, getBlockscoutTxUrl } from "@tagit/contracts";
+import { parseContractError, getExplorerTxUrl } from "@tagit/contracts";
 import { Card, CardContent, Button } from "@tagit/ui";
 import { Loader2, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from "lucide-react";
 
@@ -16,6 +16,8 @@ interface TransactionStatusProps {
   error?: Error | null;
   /** Transaction hash if available */
   hash?: string;
+  /** Chain ID for explorer links (default: 11155420 / OP Sepolia) */
+  chainId?: number;
   /** Action being performed (for error messages) */
   action?: string;
   /** Called when transaction succeeds */
@@ -40,6 +42,7 @@ export function TransactionStatus({
   isSuccess,
   error,
   hash,
+  chainId = 11155420,
   action,
   onSuccess,
   onError,
@@ -95,7 +98,7 @@ export function TransactionStatus({
           Success
           {hash && (
             <a
-              href={getBlockscoutTxUrl(hash)}
+              href={getExplorerTxUrl(chainId, hash)}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:underline"
@@ -151,7 +154,7 @@ export function TransactionStatus({
               </p>
               {hash && (
                 <a
-                  href={getBlockscoutTxUrl(hash)}
+                  href={getExplorerTxUrl(chainId, hash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-primary hover:underline text-sm mt-1"
@@ -178,7 +181,7 @@ export function TransactionStatus({
               <p className="text-sm text-muted-foreground">{successMessage}</p>
               {hash && (
                 <a
-                  href={getBlockscoutTxUrl(hash)}
+                  href={getExplorerTxUrl(chainId, hash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-primary hover:underline text-sm mt-1"

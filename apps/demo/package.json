@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tagit/config": "workspace:*",
     "@tagit/contracts": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "framer-motion": "^11.13.1",

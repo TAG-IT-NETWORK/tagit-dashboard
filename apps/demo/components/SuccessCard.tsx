@@ -24,16 +24,18 @@ export function SuccessCard({
   ownerAddress,
   onMintAnother,
 }: SuccessCardProps) {
-  const { data: state } = useReadContract({
+  const { data: asset } = useReadContract({
     address: CONTRACTS.TAGITCore,
     abi: TAGITCoreABI,
-    functionName: "getState",
+    functionName: "getAsset",
     args: [tokenId],
   });
 
+  // getAsset returns [owner, timestamp, state, flags, reserved]
+  const stateValue = asset ? (asset as readonly [string, bigint, number, number, number])[2] : undefined;
   const stateName =
-    state !== undefined
-      ? AssetStateNames[Number(state) as keyof typeof AssetStateNames] ??
+    stateValue !== undefined
+      ? AssetStateNames[stateValue as keyof typeof AssetStateNames] ??
         "Unknown"
       : "Minted";
 

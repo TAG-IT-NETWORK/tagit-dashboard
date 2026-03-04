@@ -1,12 +1,18 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { http, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { optimismSepolia } from "viem/chains";
+import { optimismSepolia, arbitrumSepolia } from "viem/chains";
 import { supportedChains } from "./chains";
 
-const rpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
+const opRpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
+const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC;
 
 export function createWagmiConfig(projectId: string) {
+  const transports = {
+    [arbitrumSepolia.id]: http(arbRpcUrl),
+    [optimismSepolia.id]: http(opRpcUrl),
+  };
+
   // If no projectId is provided, create a basic config with injected wallets only
   if (!projectId) {
     return createConfig({
@@ -14,9 +20,7 @@ export function createWagmiConfig(projectId: string) {
       connectors: [
         injected({ target: "metaMask" }),
       ],
-      transports: {
-        [optimismSepolia.id]: http(rpcUrl),
-      },
+      transports,
       ssr: true,
     });
   }
@@ -25,9 +29,7 @@ export function createWagmiConfig(projectId: string) {
     appName: "TAG IT Dashboard",
     projectId,
     chains: supportedChains,
-    transports: {
-      [optimismSepolia.id]: http(rpcUrl),
-    },
+    transports,
     ssr: true,
   });
 }

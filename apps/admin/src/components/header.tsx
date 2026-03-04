@@ -3,6 +3,7 @@
 import { ConnectButton, Badge } from "@tagit/ui";
 import { useCurrentUser } from "@tagit/auth";
 import { Bell } from "lucide-react";
+import { ChainSelector } from "./chain-selector";
 
 export function Header() {
   const { badges, isConnected, isLoading } = useCurrentUser();
@@ -11,6 +12,7 @@ export function Header() {
     <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-card">
       <div className="flex items-center gap-4">
         <h2 className="text-lg font-semibold text-foreground">Admin Console</h2>
+        <ChainSelector />
       </div>
 
       <div className="flex items-center gap-4">

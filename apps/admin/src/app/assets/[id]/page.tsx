@@ -1,8 +1,26 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAsset, useAssetState, useTagByToken, AssetState, AssetStateNames } from "@tagit/contracts";
+import {
+  useAsset,
+  useAssetState,
+  useTagByToken,
+  useAssetHistory,
+  useActivate,
+  useFlag,
+  useRecycle,
+  AssetState,
+  AssetStateNames,
+  getExplorerTxUrl,
+  getContractsForChain,
+  shortenAddress,
+} from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
+import { BindTagModal } from "@/components/bind-tag-modal";
+import { TransferModal } from "@/components/transfer-modal";
+import { TransactionStatus } from "@/components/transaction-status";
 import {
   Card,
   CardContent,
@@ -24,57 +42,10 @@ import {
   Clock,
   User,
   Hash,
-  FileText,
   CheckCircle,
+  ArrowRightLeft,
+  Loader2,
 } from "lucide-react";
-
-// Mock data for timeline - in production, fetch from events
-interface TimelineEvent {
-  state: number;
-  stateName: string;
-  timestamp: number;
-  txHash: string;
-  actor: string;
-}
-
-const mockTimeline: TimelineEvent[] = [
-  {
-    state: 0,
-    stateName: "Minted",
-    timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000,
-    txHash: "0x1234...abcd",
-    actor: "0xManufacturer...1234",
-  },
-  {
-    state: 1,
-    stateName: "Bound",
-    timestamp: Date.now() - 5 * 24 * 60 * 60 * 1000,
-    txHash: "0x5678...efgh",
-    actor: "0xManufacturer...1234",
-  },
-  {
-    state: 2,
-    stateName: "Activated",
-    timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    txHash: "0x9abc...ijkl",
-    actor: "0xRetailer...5678",
-  },
-];
-
-const mockTransfers = [
-  {
-    from: "0x0000...0000",
-    to: "0xManufacturer...1234",
-    timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000,
-    txHash: "0x1234...abcd",
-  },
-  {
-    from: "0xManufacturer...1234",
-    to: "0xRetailer...5678",
-    timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    txHash: "0x9abc...ijkl",
-  },
-];
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("en-US", {
@@ -97,6 +68,14 @@ function formatRelativeTime(timestamp: number): string {
   return `${days}d ago`;
 }
 
+function computeAgeText(timestampMs: number): string {
+  if (timestampMs <= 0) return "—";
+  const days = Math.floor((Date.now() - timestampMs) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "< 1 day";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
 interface AssetDetailPageProps {
   params: { id: string };
 }
@@ -110,11 +89,27 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
 }
 
 function AssetDetailContent({ id }: { id: string }) {
+  const chainId = useChainId();
   const tokenId = BigInt(id);
 
   const { asset, isLoading: assetLoading, error: assetError, refetch } = useAsset(tokenId);
   const { state, stateName, isLoading: stateLoading } = useAssetState(tokenId);
   const { data: tagHash } = useTagByToken(tokenId);
+  const {
+    stateChanges,
+    transfers,
+    isLoading: historyLoading,
+    refetch: refetchHistory,
+  } = useAssetHistory(chainId, tokenId);
+
+  // Write hooks
+  const activateHook = useActivate();
+  const flagHook = useFlag();
+  const recycleHook = useRecycle();
+
+  // Modal state
+  const [bindModalOpen, setBindModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
 
   const isLoading = assetLoading || stateLoading;
   const hasAsset = asset && asset.owner !== "0x0000000000000000000000000000000000000000";
@@ -122,42 +117,91 @@ function AssetDetailContent({ id }: { id: string }) {
   // Convert blockchain timestamp (seconds) to milliseconds for display
   const timestampMs = asset ? Number(asset.timestamp) * 1000 : 0;
 
-  // Actions based on state
-  const getActions = () => {
-    if (!hasAsset) return [];
-    switch (state) {
-      case AssetState.MINTED:
-        return [
-          { label: "Bind to Tag", icon: Link2, variant: "default" as const },
-          { label: "Flag", icon: Flag, variant: "destructive" as const },
-        ];
-      case AssetState.BOUND:
-        return [
-          { label: "Activate", icon: Zap, variant: "default" as const },
-          { label: "Flag", icon: Flag, variant: "destructive" as const },
-        ];
-      case AssetState.ACTIVATED:
-        return [{ label: "Flag", icon: Flag, variant: "destructive" as const }];
-      case AssetState.CLAIMED:
-        return [
-          { label: "Flag", icon: Flag, variant: "destructive" as const },
-          { label: "Recycle", icon: RotateCcw, variant: "outline" as const },
-        ];
-      case AssetState.FLAGGED:
-        return [
-          {
-            label: "Resolve",
-            icon: CheckCircle,
-            variant: "default" as const,
-            href: `/resolve/${id}`,
-          },
-        ];
-      default:
-        return [];
-    }
+  // Contract address from chain config
+  const coreAddress = getContractsForChain(chainId).TAGITCore;
+
+  // Refetch everything after a successful transaction
+  const handleTxSuccess = () => {
+    refetch();
+    refetchHistory();
   };
 
-  const actions = getActions();
+  // Refetch on successful activate/flag/recycle
+  useEffect(() => {
+    if (activateHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess) {
+      handleTxSuccess();
+    }
+  }, [activateHook.isSuccess, flagHook.isSuccess, recycleHook.isSuccess]);
+
+  // Determine which action buttons to show, with handlers
+  const renderActions = () => {
+    if (!hasAsset) return null;
+
+    const buttons: React.ReactNode[] = [];
+
+    switch (state) {
+      case AssetState.MINTED:
+        buttons.push(
+          <Button key="bind" onClick={() => setBindModalOpen(true)}>
+            <Link2 className="h-4 w-4 mr-2" />
+            Bind to Tag
+          </Button>,
+          <Button key="flag" variant="destructive" onClick={() => flagHook.flag(tokenId)}>
+            <Flag className="h-4 w-4 mr-2" />
+            Flag
+          </Button>,
+        );
+        break;
+      case AssetState.BOUND:
+        buttons.push(
+          <Button key="activate" onClick={() => activateHook.activate(tokenId)}>
+            <Zap className="h-4 w-4 mr-2" />
+            Activate
+          </Button>,
+          <Button key="flag" variant="destructive" onClick={() => flagHook.flag(tokenId)}>
+            <Flag className="h-4 w-4 mr-2" />
+            Flag
+          </Button>,
+        );
+        break;
+      case AssetState.ACTIVATED:
+        buttons.push(
+          <Button key="transfer" onClick={() => setTransferModalOpen(true)}>
+            <ArrowRightLeft className="h-4 w-4 mr-2" />
+            Transfer
+          </Button>,
+          <Button key="flag" variant="destructive" onClick={() => flagHook.flag(tokenId)}>
+            <Flag className="h-4 w-4 mr-2" />
+            Flag
+          </Button>,
+        );
+        break;
+      case AssetState.CLAIMED:
+        buttons.push(
+          <Button key="flag" variant="destructive" onClick={() => flagHook.flag(tokenId)}>
+            <Flag className="h-4 w-4 mr-2" />
+            Flag
+          </Button>,
+          <Button key="recycle" variant="outline" onClick={() => recycleHook.recycle(tokenId)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Recycle
+          </Button>,
+        );
+        break;
+      case AssetState.FLAGGED:
+        buttons.push(
+          <Button key="resolve" asChild>
+            <Link href={`/resolve/${id}`}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Resolve
+            </Link>
+          </Button>,
+        );
+        break;
+    }
+
+    return buttons;
+  };
 
   if (isLoading) {
     return (
@@ -244,27 +288,45 @@ function AssetDetailContent({ id }: { id: string }) {
           <div className="flex items-center gap-2 text-muted-foreground">
             <User className="h-4 w-4" />
             <span>Owned by</span>
-            <AddressBadge address={asset!.owner} />
+            <AddressBadge address={asset!.owner} chainId={chainId} />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {actions.map((action) =>
-            "href" in action ? (
-              <Button key={action.label} variant={action.variant} asChild>
-                <Link href={action.href!}>
-                  <action.icon className="h-4 w-4 mr-2" />
-                  {action.label}
-                </Link>
-              </Button>
-            ) : (
-              <Button key={action.label} variant={action.variant}>
-                <action.icon className="h-4 w-4 mr-2" />
-                {action.label}
-              </Button>
-            )
-          )}
+          {renderActions()}
         </div>
       </div>
+
+      {/* Transaction Status for inline actions (activate/flag/recycle) */}
+      <TransactionStatus
+        isPending={activateHook.isPending}
+        isConfirming={activateHook.isConfirming}
+        isSuccess={activateHook.isSuccess}
+        error={activateHook.error}
+        hash={activateHook.hash}
+        chainId={chainId}
+        action="Activate"
+        successMessage="Asset activated successfully!"
+      />
+      <TransactionStatus
+        isPending={flagHook.isPending}
+        isConfirming={flagHook.isConfirming}
+        isSuccess={flagHook.isSuccess}
+        error={flagHook.error}
+        hash={flagHook.hash}
+        chainId={chainId}
+        action="Flag"
+        successMessage="Asset flagged successfully!"
+      />
+      <TransactionStatus
+        isPending={recycleHook.isPending}
+        isConfirming={recycleHook.isConfirming}
+        isSuccess={recycleHook.isSuccess}
+        error={recycleHook.error}
+        hash={recycleHook.hash}
+        chainId={chainId}
+        action="Recycle"
+        successMessage="Asset recycled successfully!"
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
@@ -314,46 +376,64 @@ function AssetDetailContent({ id }: { id: string }) {
               <CardDescription>History of state transitions for this asset</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+              {historyLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading timeline...
+                </div>
+              ) : stateChanges.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  No state changes recorded yet.
+                </p>
+              ) : (
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
-                {/* Timeline events */}
-                <div className="space-y-6">
-                  {mockTimeline.map((event, i) => (
-                    <div key={i} className="relative flex gap-4 pl-10">
-                      {/* Timeline dot */}
-                      <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary border-2 border-background" />
+                  {/* Timeline events */}
+                  <div className="space-y-6">
+                    {stateChanges.map((event, i) => (
+                      <div key={`${event.txHash}-${i}`} className="relative flex gap-4 pl-10">
+                        {/* Timeline dot */}
+                        <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary border-2 border-background" />
 
-                      <div className="flex-1 bg-muted/50 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <StateBadge state={event.state} />
-                          <span className="text-sm text-muted-foreground">
-                            {formatRelativeTime(event.timestamp)}
-                          </span>
-                        </div>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-2">
-                            <User className="h-3 w-3" />
-                            <code>{event.actor}</code>
+                        <div className="flex-1 bg-muted/50 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <StateBadge state={event.oldState} />
+                              <span className="text-muted-foreground">&rarr;</span>
+                              <StateBadge state={event.newState} />
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {formatRelativeTime(event.timestamp)}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Hash className="h-3 w-3" />
-                            <a
-                              href={`https://optimism-sepolia.blockscout.com/tx/${event.txHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:text-primary"
-                            >
-                              {event.txHash}
-                            </a>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            {event.actor && (
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3" />
+                                <AddressBadge address={event.actor} chainId={chainId} />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Hash className="h-3 w-3" />
+                              <a
+                                href={getExplorerTxUrl(chainId, event.txHash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:text-primary flex items-center gap-1"
+                              >
+                                {shortenAddress(event.txHash, 8)}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -364,51 +444,62 @@ function AssetDetailContent({ id }: { id: string }) {
               <CardDescription>Transfer events for this token</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        From
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        To
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Time
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Tx
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockTransfers.map((transfer, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="px-4 py-3">
-                          <code className="text-sm">{transfer.from}</code>
-                        </td>
-                        <td className="px-4 py-3">
-                          <code className="text-sm">{transfer.to}</code>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {formatRelativeTime(transfer.timestamp)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <a
-                            href={`https://optimism-sepolia.blockscout.com/tx/${transfer.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </td>
+              {historyLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading transfers...
+                </div>
+              ) : transfers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  No transfers recorded yet.
+                </p>
+              ) : (
+                <div className="rounded-md border">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          From
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          To
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Time
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Tx
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {transfers.map((transfer, i) => (
+                        <tr key={`${transfer.txHash}-${i}`} className="border-b last:border-0">
+                          <td className="px-4 py-3">
+                            <AddressBadge address={transfer.from} chainId={chainId} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <AddressBadge address={transfer.to} chainId={chainId} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {formatRelativeTime(transfer.timestamp)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <a
+                              href={getExplorerTxUrl(chainId, transfer.txHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -423,15 +514,15 @@ function AssetDetailContent({ id }: { id: string }) {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Total Transfers</span>
-                <span className="font-medium">{mockTransfers.length}</span>
+                <span className="font-medium">{transfers.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">State Changes</span>
-                <span className="font-medium">{mockTimeline.length}</span>
+                <span className="font-medium">{stateChanges.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Age</span>
-                <span className="font-medium">7 days</span>
+                <span className="font-medium">{computeAgeText(timestampMs)}</span>
               </div>
             </CardContent>
           </Card>
@@ -445,7 +536,8 @@ function AssetDetailContent({ id }: { id: string }) {
               <div>
                 <div className="text-sm text-muted-foreground mb-1">TAGITCore</div>
                 <AddressBadge
-                  address="0x6a58eE8f2d500981b1793868C55072789c58fba6"
+                  address={coreAddress}
+                  chainId={chainId}
                   truncate
                 />
               </div>
@@ -457,6 +549,20 @@ function AssetDetailContent({ id }: { id: string }) {
           </Card>
         </div>
       </div>
+
+      {/* Modals */}
+      <BindTagModal
+        open={bindModalOpen}
+        onOpenChange={setBindModalOpen}
+        tokenId={tokenId}
+        onSuccess={() => handleTxSuccess()}
+      />
+      <TransferModal
+        open={transferModalOpen}
+        onOpenChange={setTransferModalOpen}
+        tokenId={tokenId}
+        onSuccess={handleTxSuccess}
+      />
     </div>
   );
 }

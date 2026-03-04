@@ -11,8 +11,9 @@ import {
   useAsset,
   useResolve,
   useTagByToken,
-  getBlockscoutTxUrl,
+  getExplorerTxUrl,
 } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
@@ -225,6 +226,7 @@ function AccessDenied() {
 }
 
 function ResolveDetailContent({ tokenId }: { tokenId: string }) {
+  const chainId = useChainId();
   const router = useRouter();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     ownership: true,
@@ -361,7 +363,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
             </p>
             {txHash && (
               <a
-                href={getBlockscoutTxUrl(txHash)}
+                href={getExplorerTxUrl(chainId, txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline inline-flex items-center gap-1"
@@ -454,12 +456,12 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Flagger</div>
-                  <AddressBadge address={asset.flaggedBy} />
+                  <AddressBadge address={asset.flaggedBy} chainId={chainId} />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Transaction</div>
                   <a
-                    href={`https://optimism-sepolia.blockscout.com/tx/${asset.txHash}`}
+                    href={getExplorerTxUrl(chainId, asset.txHash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-sm text-primary hover:underline"
@@ -493,7 +495,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Owner</div>
-                  <AddressBadge address={asset.owner} />
+                  <AddressBadge address={asset.owner} chainId={chainId} />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Tag ID</div>
@@ -716,7 +718,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                 )}
                 {txHash && !isSuccess && (
                   <a
-                    href={getBlockscoutTxUrl(txHash)}
+                    href={getExplorerTxUrl(chainId, txHash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"

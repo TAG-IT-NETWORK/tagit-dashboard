@@ -4,8 +4,16 @@ import { useState } from "react";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import { cn } from "../lib/utils";
 
+/** Inline explorer URL map — avoids importing @tagit/config into the UI package */
+const explorerUrls: Record<number, string> = {
+  421614: "https://sepolia.arbiscan.io",
+  11155420: "https://optimism-sepolia.blockscout.com",
+};
+
 export interface AddressBadgeProps {
   address: string;
+  /** Chain ID for explorer links (default: 11155420 / OP Sepolia) */
+  chainId?: number;
   showCopy?: boolean;
   showEtherscan?: boolean;
   truncate?: boolean;
@@ -19,6 +27,7 @@ function truncateAddress(address: string, chars = 4): string {
 
 export function AddressBadge({
   address,
+  chainId = 11155420,
   showCopy = true,
   showEtherscan = true,
   truncate = true,
@@ -32,7 +41,8 @@ export function AddressBadge({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const etherscanUrl = `https://optimism-sepolia.blockscout.com/address/${address}`;
+  const baseUrl = explorerUrls[chainId] ?? explorerUrls[11155420];
+  const etherscanUrl = `${baseUrl}/address/${address}`;
 
   return (
     <div className={cn("inline-flex items-center gap-1.5", className)}>

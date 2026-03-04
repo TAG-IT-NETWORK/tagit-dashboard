@@ -1,11 +1,13 @@
 // Subgraph client for TAGIT
 
-// Default subgraph URL - can be configured via SubgraphClientConfig
-// For Goldsky: https://api.goldsky.com/api/public/project_XXX/subgraphs/tagit/v1/gn
-// For The Graph: https://api.thegraph.com/subgraphs/name/tagit/tagit-core
+// Access env vars safely without @types/node (Next.js inlines NEXT_PUBLIC_ at build time)
+type EnvLike = { process?: { env?: Record<string, string | undefined> } };
+const _env = (globalThis as unknown as EnvLike).process?.env;
+
 const DEFAULT_SUBGRAPH_URL =
+  _env?.NEXT_PUBLIC_SUBGRAPH_URL ||
   (typeof window !== "undefined" && (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
-  "https://api.goldsky.com/api/public/project_placeholder/subgraphs/tagit/v1/gn";
+  "";
 
 export interface SubgraphClientConfig {
   url?: string;
@@ -54,8 +56,14 @@ export function getSubgraphClient(config?: SubgraphClientConfig): SubgraphClient
   return clientInstance;
 }
 
+/** True when a subgraph URL is configured (non-empty) */
+export function hasSubgraphUrl(): boolean {
+  return DEFAULT_SUBGRAPH_URL !== "";
+}
+
 // Check if subgraph is available/deployed
 export async function isSubgraphAvailable(): Promise<boolean> {
+  if (!hasSubgraphUrl()) return false;
   try {
     const client = getSubgraphClient();
     await client.query<{ _meta: { block: { number: number } } }>(`

@@ -1,5 +1,14 @@
 // Addresses
-export { CHAIN_ID, CONTRACTS, type ContractName } from "./addresses";
+export {
+  CHAIN_ID,
+  CONTRACTS,
+  OP_SEPOLIA_CHAIN_ID,
+  ARBITRUM_SEPOLIA_CHAIN_ID,
+  getContractsForChain,
+  getContractAddress,
+  type ContractName,
+  type ContractAddresses,
+} from "./addresses";
 
 // ABIs
 export {
@@ -103,20 +112,29 @@ export {
   useGlobalStats,
   useStateDistribution,
   useRecentActivity,
+  useRecentTransfers,
   useRecentFlags,
   useTopUsers,
   useDailyMints,
   useActiveUsers,
   useDashboardData,
+  useEventFeedWithFallback,
+  useAssetHistory,
   // Client
   getSubgraphClient,
   isSubgraphAvailable,
+  // RPC fallback
+  fetchRecentEvents,
   // Types
   type DashboardStats,
   type StateDistribution,
   type ActivityItem,
   type FlagItem,
   type TopUser,
+  type TransferItem,
+  type FeedEvent,
+  type EventSource,
+  type AssetTimelineEvent,
 } from "./subgraph";
 
 // Error handling utilities
@@ -137,13 +155,30 @@ export function shortenHash(hash: string, chars = 6): string {
   return `${hash.slice(0, chars + 2)}...${hash.slice(-chars)}`;
 }
 
-// Block explorer URLs
-const BLOCKSCOUT_URL = "https://optimism-sepolia.blockscout.com";
+// Block explorer URLs (chain-aware)
+const explorerBaseUrls: Record<number, string> = {
+  421614: "https://sepolia.arbiscan.io",
+  11155420: "https://optimism-sepolia.blockscout.com",
+};
 
-export function getBlockscoutTxUrl(hash: string): string {
-  return `${BLOCKSCOUT_URL}/tx/${hash}`;
+export function getExplorerUrl(chainId: number): string {
+  return explorerBaseUrls[chainId] ?? explorerBaseUrls[11155420];
 }
 
+export function getExplorerTxUrl(chainId: number, hash: string): string {
+  return `${getExplorerUrl(chainId)}/tx/${hash}`;
+}
+
+export function getExplorerAddressUrl(chainId: number, address: string): string {
+  return `${getExplorerUrl(chainId)}/address/${address}`;
+}
+
+/** @deprecated Use getExplorerTxUrl(chainId, hash) */
+export function getBlockscoutTxUrl(hash: string): string {
+  return `https://optimism-sepolia.blockscout.com/tx/${hash}`;
+}
+
+/** @deprecated Use getExplorerAddressUrl(chainId, address) */
 export function getBlockscoutAddressUrl(address: string): string {
-  return `${BLOCKSCOUT_URL}/address/${address}`;
+  return `https://optimism-sepolia.blockscout.com/address/${address}`;
 }

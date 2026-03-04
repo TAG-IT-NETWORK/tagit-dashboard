@@ -1,5 +1,5 @@
 // Subgraph exports
-export { SubgraphClient, getSubgraphClient, isSubgraphAvailable } from "./client";
+export { SubgraphClient, getSubgraphClient, isSubgraphAvailable, hasSubgraphUrl } from "./client";
 export type { SubgraphClientConfig } from "./client";
 
 export {
@@ -20,12 +20,23 @@ export {
   useGlobalStats,
   useStateDistribution,
   useRecentActivity,
+  useRecentTransfers,
   useRecentFlags,
   useTopUsers,
   useDailyMints,
   useActiveUsers,
   useDashboardData,
+  useEventFeedWithFallback,
+  useAssetHistory,
 } from "./hooks";
+
+export {
+  createRpcClient,
+  fetchRecentEvents,
+  fetchAssetStateChanges,
+  fetchAssetTransfers,
+  resolveEventChainId,
+} from "./rpc-fallback";
 
 export type {
   SubgraphAsset,
@@ -48,4 +59,9 @@ export type {
   ActivityItem,
   FlagItem,
   TopUser,
+  TransferItem,
+  FeedEvent,
+  AssetTimelineEvent,
+  FeedEventType,
+  EventSource,
 } from "./types";

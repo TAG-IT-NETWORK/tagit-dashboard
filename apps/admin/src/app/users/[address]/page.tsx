@@ -22,8 +22,10 @@ import {
   useRevokeBadge,
   useGrantCapability,
   useRevokeCapability,
-  getBlockscoutTxUrl,
+  getExplorerTxUrl,
+  getExplorerAddressUrl,
 } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import {
   Card,
@@ -156,6 +158,7 @@ interface GrantBadgeModalProps {
 }
 
 function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }: GrantBadgeModalProps) {
+  const chainId = useChainId();
   const [selectedBadge, setSelectedBadge] = useState<number | null>(null);
   const { grantBadge, hash, isPending, isConfirming, isSuccess, error } = useGrantBadge();
 
@@ -201,7 +204,7 @@ function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }
                 <p className="font-medium text-green-600">Badge Granted!</p>
                 {hash && (
                   <a
-                    href={getBlockscoutTxUrl(hash)}
+                    href={getExplorerTxUrl(chainId, hash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline"
@@ -282,6 +285,7 @@ interface GrantCapabilityModalProps {
 }
 
 function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, onSuccess }: GrantCapabilityModalProps) {
+  const chainId = useChainId();
   const [selectedCapabilityId, setSelectedCapabilityId] = useState<CapabilityId | null>(null);
   const { grantCapability, hash, isPending, isConfirming, isSuccess, error } = useGrantCapability();
 
@@ -329,7 +333,7 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
                 <p className="font-medium text-green-600">Capability Granted!</p>
                 {hash && (
                   <a
-                    href={getBlockscoutTxUrl(hash)}
+                    href={getExplorerTxUrl(chainId, hash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline"
@@ -409,6 +413,8 @@ export default function UserDetailPage({ params }: UserDetailPageProps) {
 }
 
 function UserDetailContent({ address: rawAddress }: { address: string }) {
+  const chainId = useChainId();
+
   // Normalize address to checksum format
   let normalizedAddress: `0x${string}`;
   try {
@@ -511,7 +517,7 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
             <h1 className="text-xl font-bold font-mono">{normalizedAddress}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <AddressBadge address={normalizedAddress} truncate={false} />
+            <AddressBadge address={normalizedAddress} chainId={chainId} truncate={false} />
             <Button
               variant="ghost"
               size="sm"
@@ -813,7 +819,7 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
                           <div className="flex items-center gap-2 mt-1">
                             <Hash className="h-3 w-3" />
                             <a
-                              href={`https://optimism-sepolia.blockscout.com/tx/${event.txHash}`}
+                              href={getExplorerTxUrl(chainId, event.txHash)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="hover:text-primary"
@@ -916,13 +922,13 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
             </CardHeader>
             <CardContent>
               <a
-                href={`https://optimism-sepolia.blockscout.com/address/${normalizedAddress}`}
+                href={getExplorerAddressUrl(chainId, normalizedAddress)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-4 w-4" />
-                View on Blockscout
+                View on Explorer
               </a>
             </CardContent>
           </Card>

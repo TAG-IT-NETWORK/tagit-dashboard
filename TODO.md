@@ -1,12 +1,14 @@
 # TODO.md — TAGIT Admin Dashboard
 # Live Blockchain Integration Roadmap
-# Updated: 2026-01-06
+# Updated: 2026-03-02
 
 ## Current Status
-- UI pages built with mock data
+- Dual-chain support: Arbitrum Sepolia (primary) + OP Sepolia (mirror)
+- All explorer URLs chain-aware via getExplorerTxUrl(chainId, hash)
 - Wagmi hooks available in @tagit/contracts
 - Lifecycle test page working (/test/lifecycle)
 - Contracts deployed on OP Sepolia (Chain ID: 11155420)
+- TAGITPaymaster deployed on Arbitrum Sepolia (0xBbB9f7dB1C38Af7998b511d8026042755Eb4F4C4)
 
 ---
 
@@ -130,6 +132,32 @@
 
 ---
 
+## PHASE 8: Dual-Chain Support (HACK-T19) ✅ COMPLETE
+**Goal:** Arbitrum Sepolia as primary chain, OP Sepolia as mirror, all explorer URLs chain-aware.
+
+- [x] Add env vars: NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC, NEXT_PUBLIC_PRIMARY_CHAIN, NEXT_PUBLIC_MULTI_CHAIN_ENABLED
+- [x] Add chain config helpers: getPrimaryChainId(), getMirrorChainId(), getChainRole(), isMultiChainEnabled()
+- [x] Fill Arbitrum Sepolia TAGITPaymaster address (0xBbB9f7dB1C38Af7998b511d8026042755Eb4F4C4)
+- [x] AddressBadge: add chainId prop with inline explorer URL map
+- [x] ChainSelector: Primary/Mirror labels, multi-chain toggle (hides mirror when disabled)
+- [x] TransactionStatus: add chainId prop, migrate 3x getBlockscoutTxUrl → getExplorerTxUrl
+- [x] bind-tag-modal: useChainId() + 2x URL migrated
+- [x] lifecycle-content: useChainId() + 1x URL migrated
+- [x] users/[address]/page: useChainId() in 3 components, 4x URLs migrated
+- [x] resolve/[id]/page: useChainId() + 3x URLs migrated
+- [x] treasury/page: FIXED etherscan.io mainnet bug, columns factory with useMemo
+- [x] assets/[id]/page: useChainId() + 2x URLs migrated
+- [x] Demo app: consolidated wagmi.ts to use @tagit/config supportedChains
+- [x] pnpm build --filter=@tagit/admin passes clean (19 pages, 0 type errors)
+
+**New Helpers (packages/config/src/chains.ts):**
+- `getPrimaryChainId()` — reads NEXT_PUBLIC_PRIMARY_CHAIN env var
+- `getMirrorChainId()` — returns the non-primary chain
+- `getChainRole(chainId)` — returns "primary" | "mirror"
+- `isMultiChainEnabled()` — reads NEXT_PUBLIC_MULTI_CHAIN_ENABLED (default: true)
+
+---
+
 ## Out of Scope (Future)
 - Governance (TAGITGovernor not deployed)
 - Treasury (TAGITTreasury not deployed)
@@ -150,6 +178,15 @@
 | TAGITAccess | 0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9 | 37959312 |
 | IdentityBadge | 0x26F2EBb84664EF1eF8554e15777EBEc6611256A6 | 37959311 |
 | CapabilityBadge | 0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505 | 37959312 |
+
+### Deployed Contracts (Arbitrum Sepolia) — Hackathon Deployment
+*Updated: Mar 2, 2026 — TAGITPaymaster deployed*
+
+| Contract | Address |
+|----------|---------|
+| TAGITPaymaster | 0xBbB9f7dB1C38Af7998b511d8026042755Eb4F4C4 |
+
+*Other Arbitrum Sepolia contracts pending deployment.*
 
 ### Available Hooks
 **Read:** useAsset, useAssetState, useTotalSupply, useAllAssets, useAssetsByState, useFlaggedAssets, useBadges, useCapabilities, useCapabilityGate, useBadgeCheck

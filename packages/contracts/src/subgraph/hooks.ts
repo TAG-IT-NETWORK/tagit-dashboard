@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getSubgraphClient } from "./client";
+import { hasSubgraphUrl } from "./client";
+import {
+  fetchRecentEvents,
+  fetchAssetStateChanges,
+  fetchAssetTransfers,
+  createRpcClient,
+  resolveEventChainId,
+} from "./rpc-fallback";
+import { getContractsForChain } from "../addresses";
 import {
   GLOBAL_STATS_QUERY,
   STATE_DISTRIBUTION_QUERY,
   RECENT_ACTIVITY_QUERY,
   RECENT_FLAGS_QUERY,
+  RECENT_TRANSFERS_QUERY,
   TOP_USERS_BY_ASSETS_QUERY,
   MINTS_TODAY_QUERY,
   ACTIVE_USERS_QUERY,
@@ -16,12 +26,17 @@ import type {
   StateDistributionResponse,
   RecentActivityResponse,
   RecentFlagsResponse,
+  RecentTransfersResponse,
   TopUsersResponse,
   DashboardStats,
   StateDistribution,
   ActivityItem,
   FlagItem,
   TopUser,
+  TransferItem,
+  FeedEvent,
+  EventSource,
+  AssetTimelineEvent,
 } from "./types";
 
 // State name mapping
@@ -139,7 +154,7 @@ export function useStateDistribution(options?: { pollingInterval?: number }) {
 // Hook for recent activity feed
 export function useRecentActivity(
   limit: number = 10,
-  options?: { pollingInterval?: number }
+  options?: { pollingInterval?: number; enabled?: boolean }
 ) {
   return useSubgraphQuery<RecentActivityResponse, ActivityItem[]>(
     RECENT_ACTIVITY_QUERY,
@@ -157,11 +172,32 @@ export function useRecentActivity(
   );
 }
 
+// Hook for recent transfers (ownership changes)
+export function useRecentTransfers(
+  limit: number = 10,
+  options?: { pollingInterval?: number; enabled?: boolean }
+) {
+  return useSubgraphQuery<RecentTransfersResponse, TransferItem[]>(
+    RECENT_TRANSFERS_QUERY,
+    { first: limit, skip: 0 },
+    (data) => {
+      return data.transfers.map((t) => ({
+        tokenId: t.asset.tokenId,
+        from: t.from.address,
+        to: t.to.address,
+        timestamp: parseInt(t.timestamp) * 1000,
+        txHash: t.txHash,
+      }));
+    },
+    options
+  );
+}
+
 // Hook for recent flags
 export function useRecentFlags(
   limit: number = 10,
   unresolvedOnly: boolean = false,
-  options?: { pollingInterval?: number }
+  options?: { pollingInterval?: number; enabled?: boolean }
 ) {
   return useSubgraphQuery<RecentFlagsResponse, FlagItem[]>(
     RECENT_FLAGS_QUERY,
@@ -222,6 +258,197 @@ export function useActiveUsers(options?: { pollingInterval?: number }) {
     (data) => data.users.length,
     options
   );
+}
+
+// Merge subgraph data into FeedEvent[]
+function mergeSubgraphEvents(
+  activity: ActivityItem[] | null,
+  transfers: TransferItem[] | null,
+  flags: FlagItem[] | null,
+  limit: number,
+): FeedEvent[] {
+  const all: FeedEvent[] = [];
+  if (activity) {
+    for (const a of activity) {
+      all.push({ type: "state_change", tokenId: a.tokenId, timestamp: a.timestamp, txHash: a.txHash, data: a });
+    }
+  }
+  if (transfers) {
+    for (const t of transfers) {
+      all.push({ type: "transfer", tokenId: t.tokenId, timestamp: t.timestamp, txHash: t.txHash, data: t });
+    }
+  }
+  if (flags) {
+    for (const f of flags) {
+      all.push({ type: "flag", tokenId: f.tokenId, timestamp: f.timestamp, txHash: f.txHash, data: f });
+    }
+  }
+  all.sort((a, b) => b.timestamp - a.timestamp);
+  return all.slice(0, limit);
+}
+
+/**
+ * Unified event feed hook with automatic fallback:
+ *  1. If NEXT_PUBLIC_SUBGRAPH_URL is set → subgraph hooks
+ *  2. Otherwise → RPC polling via viem getContractEvents
+ *  3. If both fail → empty (mock) state
+ *
+ * Returns `effectiveChainId` so the UI can build correct explorer links
+ * (e.g. when connected to Arbitrum but events come from OP Sepolia).
+ */
+export function useEventFeedWithFallback(
+  chainId: number,
+  limit: number = 15,
+  pollingInterval: number = 5000,
+) {
+  const subgraphEnabled = hasSubgraphUrl();
+
+  // --- Subgraph path (hooks must be called unconditionally) ---
+  const activityHook = useRecentActivity(limit, {
+    pollingInterval: 10000,
+    enabled: subgraphEnabled,
+  });
+  const transfersHook = useRecentTransfers(limit, {
+    pollingInterval: 10000,
+    enabled: subgraphEnabled,
+  });
+  const flagsHook = useRecentFlags(5, false, {
+    pollingInterval: 10000,
+    enabled: subgraphEnabled,
+  });
+
+  const subgraphLoading = subgraphEnabled && (activityHook.isLoading || transfersHook.isLoading || flagsHook.isLoading);
+  const subgraphHasData =
+    (activityHook.data?.length ?? 0) > 0 ||
+    (transfersHook.data?.length ?? 0) > 0 ||
+    (flagsHook.data?.length ?? 0) > 0;
+
+  // --- RPC fallback path ---
+  const [rpcEvents, setRpcEvents] = useState<FeedEvent[]>([]);
+  const [rpcLoading, setRpcLoading] = useState(false);
+  const [rpcError, setRpcError] = useState<Error | null>(null);
+  const [effectiveChainId, setEffectiveChainId] = useState(chainId);
+  const rpcEnabled = !subgraphEnabled;
+
+  useEffect(() => {
+    if (!rpcEnabled) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      setRpcLoading(true);
+      try {
+        const result = await fetchRecentEvents(chainId, limit);
+        if (!cancelled) {
+          setRpcEvents(result.events);
+          setEffectiveChainId(result.effectiveChainId);
+          setRpcError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setRpcError(err instanceof Error ? err : new Error("RPC fetch failed"));
+        }
+      } finally {
+        if (!cancelled) setRpcLoading(false);
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, pollingInterval);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [rpcEnabled, chainId, limit, pollingInterval]);
+
+  // --- Pick source ---
+  const result = useMemo((): {
+    events: FeedEvent[];
+    isLoading: boolean;
+    error: Error | null;
+    source: EventSource;
+    effectiveChainId: number;
+  } => {
+    if (subgraphEnabled && subgraphHasData) {
+      return {
+        events: mergeSubgraphEvents(activityHook.data, transfersHook.data, flagsHook.data, limit),
+        isLoading: false,
+        error: null,
+        source: "subgraph",
+        effectiveChainId: chainId,
+      };
+    }
+    if (subgraphEnabled && subgraphLoading) {
+      return { events: [], isLoading: true, error: null, source: "subgraph", effectiveChainId: chainId };
+    }
+    if (rpcEnabled) {
+      return {
+        events: rpcEvents,
+        isLoading: rpcLoading,
+        error: rpcError,
+        source: rpcEvents.length > 0 ? "rpc" : "mock",
+        effectiveChainId,
+      };
+    }
+    // Subgraph configured but returned no data
+    return { events: [], isLoading: false, error: null, source: "mock", effectiveChainId: chainId };
+  }, [
+    subgraphEnabled, subgraphHasData, subgraphLoading,
+    activityHook.data, transfersHook.data, flagsHook.data,
+    rpcEnabled, rpcEvents, rpcLoading, rpcError,
+    effectiveChainId, chainId, limit,
+  ]);
+
+  return result;
+}
+
+/**
+ * Fetches on-chain state changes and transfers for a single asset.
+ * Uses RPC directly (no subgraph required). Sorts oldest-first for timeline display.
+ */
+export function useAssetHistory(chainId: number, tokenId: bigint) {
+  const [stateChanges, setStateChanges] = useState<AssetTimelineEvent[]>([]);
+  const [transfers, setTransfers] = useState<TransferItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const effectiveChainId = resolveEventChainId(chainId);
+      const client = createRpcClient(effectiveChainId);
+      if (!client) {
+        setStateChanges([]);
+        setTransfers([]);
+        return;
+      }
+
+      const coreAddr = getContractsForChain(effectiveChainId).TAGITCore;
+      const [sc, tx] = await Promise.all([
+        fetchAssetStateChanges(client, coreAddr, tokenId),
+        fetchAssetTransfers(client, coreAddr, tokenId),
+      ]);
+
+      // Sort oldest-first for timeline display
+      sc.sort((a, b) => a.timestamp - b.timestamp);
+      tx.sort((a, b) => a.timestamp - b.timestamp);
+
+      setStateChanges(sc);
+      setTransfers(tx);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch asset history"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chainId, tokenId]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  return { stateChanges, transfers, isLoading, error, refetch: fetchHistory };
 }
 
 // Combined hook for all dashboard data with unified polling

@@ -45,6 +45,8 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { getExplorerTxUrl } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import {
   mockTreasuryReserves,
   mockTreasuryTransactions,
@@ -80,7 +82,8 @@ function formatRelativeTime(timestamp: number): string {
   return `${days}d ago`;
 }
 
-const transactionColumns: ColumnDef<TreasuryTransaction>[] = [
+function getTransactionColumns(chainId: number): ColumnDef<TreasuryTransaction>[] {
+  return [
   {
     accessorKey: "type",
     header: "Type",
@@ -206,7 +209,7 @@ const transactionColumns: ColumnDef<TreasuryTransaction>[] = [
     cell: ({ row }) => (
       <Button variant="ghost" size="sm" asChild>
         <a
-          href={`https://etherscan.io/tx/${row.original.txHash}`}
+          href={getExplorerTxUrl(chainId, row.original.txHash)}
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -215,7 +218,8 @@ const transactionColumns: ColumnDef<TreasuryTransaction>[] = [
       </Button>
     ),
   },
-];
+  ];
+}
 
 const typeFilters: { value: string; label: string }[] = [
   { value: "ALL", label: "All" },
@@ -291,6 +295,7 @@ function ReserveBreakdown() {
 }
 
 export default function TreasuryPage() {
+  const chainId = useChainId();
   const [sorting, setSorting] = useState<SortingState>([
     { id: "timestamp", desc: true },
   ]);
@@ -298,6 +303,8 @@ export default function TreasuryPage() {
   const [typeFilter, setTypeFilter] = useState("ALL");
 
   const stats = getTreasuryStats();
+
+  const transactionColumns = useMemo(() => getTransactionColumns(chainId), [chainId]);
 
   const filteredTransactions = useMemo(() => {
     if (typeFilter === "ALL") return mockTreasuryTransactions;

@@ -8,12 +8,15 @@ import {
   useTotalSupply,
   useDashboardData,
   shortenAddress,
-  getBlockscoutTxUrl,
+  getExplorerTxUrl,
   type StateDistribution,
   type ActivityItem,
   type TopUser,
 } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
+import { EventFeed } from "@/components/event-feed";
+import { StatsBar } from "@/components/stats-bar";
 import {
   Card,
   CardHeader,
@@ -125,6 +128,7 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
+  const chainId = useChainId();
   const { data: totalSupply, isLoading: supplyLoading } = useTotalSupply();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -252,6 +256,9 @@ function DashboardContent() {
         />
       </div>
 
+      {/* Lifecycle Distribution Bar */}
+      <StatsBar distribution={displayStateDistribution} loading={subgraphLoading} />
+
       {/* NFC Lifecycle Test Card */}
       {process.env.NODE_ENV === "development" && (
         <Card className="border-dashed border-primary/50 bg-primary/5">
@@ -374,7 +381,7 @@ function DashboardContent() {
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span>{formatRelativeTime(activity.timestamp)}</span>
                       <a
-                        href={getBlockscoutTxUrl(activity.txHash)}
+                        href={getExplorerTxUrl(chainId, activity.txHash)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-foreground transition-colors"
@@ -394,6 +401,9 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Event Feed */}
+      <EventFeed />
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -484,7 +494,7 @@ function DashboardContent() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Network</span>
-                <span className="text-sm">OP Sepolia</span>
+                <span className="text-sm">{chainId === 421614 ? "Arbitrum Sepolia" : "OP Sepolia"}</span>
               </div>
             </div>
           </CardContent>

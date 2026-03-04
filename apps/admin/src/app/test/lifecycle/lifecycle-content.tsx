@@ -27,7 +27,9 @@ import {
   useAsset,
   useTagByToken,
   useAccount,
+  getExplorerTxUrl,
 } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import {
   ArrowLeft,
   Check,
@@ -48,7 +50,6 @@ import { BindTagModal } from "@/components/bind-tag-modal";
 import {
   LIFECYCLE_STEPS,
   generateTestMetadataURI,
-  getBlockscoutTxUrl,
 } from "@/lib/test-utils";
 import { generateTestUID, uidToTagId, formatUID, truncateTagId } from "@/lib/tag-utils";
 
@@ -71,6 +72,7 @@ const stepIcons: Record<string, React.ReactNode> = {
 
 export function LifecycleContent() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
 
   // Test session state
   const [tokenId, setTokenId] = useState<bigint | null>(null);
@@ -375,7 +377,7 @@ export function LifecycleContent() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Owner</p>
-                      <AddressBadge address={asset.owner} truncate />
+                      <AddressBadge address={asset.owner} chainId={chainId} truncate />
                     </div>
                     {tagHash && tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" && (
                       <div className="space-y-2">
@@ -714,7 +716,7 @@ export function LifecycleContent() {
                   .map(([stepId, state]) => (
                     <a
                       key={stepId}
-                      href={getBlockscoutTxUrl(state.txHash!)}
+                      href={getExplorerTxUrl(chainId, state.txHash!)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-sm text-primary hover:underline"

@@ -196,3 +196,27 @@ export interface TopUser {
   address: string;
   assetCount: number;
 }
+
+export interface TransferItem {
+  tokenId: string;
+  from: string;
+  to: string;
+  timestamp: number;
+  txHash: string;
+}
+
+export type FeedEventType = "state_change" | "transfer" | "flag";
+
+export interface FeedEvent {
+  type: FeedEventType;
+  tokenId: string;
+  timestamp: number;
+  txHash: string;
+  data: ActivityItem | TransferItem | FlagItem;
+}
+
+export interface AssetTimelineEvent extends ActivityItem {
+  actor: string;
+}
+
+export type EventSource = "subgraph" | "rpc" | "mock";

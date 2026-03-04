@@ -13,11 +13,11 @@ import {
   Label,
   Badge,
 } from "@tagit/ui";
-import { useBindTag } from "@tagit/contracts";
+import { useBindTag, getExplorerTxUrl } from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { Loader2, Nfc, Keyboard, Check, AlertCircle, ExternalLink, Smartphone } from "lucide-react";
 import { isNFCSupported, getNFCSupportStatus, readNFCTag, type NFCTagInfo } from "@/lib/nfc";
 import { uidToTagId, isValidUID, formatUID, generateTestUID, truncateTagId } from "@/lib/tag-utils";
-import { getBlockscoutTxUrl } from "@/lib/test-utils";
 
 interface BindTagModalProps {
   open: boolean;
@@ -29,6 +29,7 @@ interface BindTagModalProps {
 type InputMode = "manual" | "nfc";
 
 export function BindTagModal({ open, onOpenChange, tokenId, onSuccess }: BindTagModalProps) {
+  const chainId = useChainId();
   const [mode, setMode] = useState<InputMode>("manual");
   const [uidInput, setUidInput] = useState("");
   const [uidError, setUidError] = useState<string | null>(null);
@@ -285,7 +286,7 @@ export function BindTagModal({ open, onOpenChange, tokenId, onSuccess }: BindTag
                   </p>
                   {hash && (
                     <a
-                      href={getBlockscoutTxUrl(hash)}
+                      href={getExplorerTxUrl(chainId, hash)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
@@ -307,7 +308,7 @@ export function BindTagModal({ open, onOpenChange, tokenId, onSuccess }: BindTag
                   <p className="font-medium text-green-500">Tag Bound Successfully!</p>
                   {hash && (
                     <a
-                      href={getBlockscoutTxUrl(hash)}
+                      href={getExplorerTxUrl(chainId, hash)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-green-500 hover:underline flex items-center gap-1 mt-1"
