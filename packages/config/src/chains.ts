@@ -1,13 +1,33 @@
 import { defineChain } from "viem";
 import { optimismSepolia, arbitrumSepolia as _arbitrumSepolia } from "viem/chains";
 
-// Override Arbitrum Sepolia with a higher base fee multiplier to prevent
-// "maxFeePerGas < baseFee" errors from tight gas estimation
+// Custom fee estimator for Arbitrum Sepolia.
+// MetaMask and wagmi's internal simulation ignore baseFeeMultiplier,
+// so we override estimateFeesPerGas to fetch the real baseFee and apply
+// a 3x buffer. This is called by viem before any gas estimation or
+// transaction simulation, ensuring the values reach the node.
 export const arbitrumSepolia = defineChain({
   ..._arbitrumSepolia,
   fees: {
-    baseFeeMultiplier: 1.5,
-    defaultPriorityFee: 1_000_000n,
+    async estimateFeesPerGas({ client }) {
+      try {
+        const block = await (client as any).request({
+          method: "eth_getBlockByNumber",
+          params: ["latest", false],
+        });
+        const baseFee = BigInt(block.baseFeePerGas || "0x1312D00");
+        return {
+          maxFeePerGas: baseFee * 3n,
+          maxPriorityFeePerGas: 1_000_000n,
+        };
+      } catch {
+        // Fallback: 0.5 gwei — 25x typical Arb Sepolia baseFee
+        return {
+          maxFeePerGas: 500_000_000n,
+          maxPriorityFeePerGas: 1_000_000n,
+        };
+      }
+    },
   },
 });
 

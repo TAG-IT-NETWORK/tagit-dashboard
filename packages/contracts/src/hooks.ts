@@ -1,25 +1,7 @@
 import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient, useChainId } from "wagmi";
 import { useMemo } from "react";
-import { keccak256, toBytes, encodePacked, toHex, parseGwei } from "viem";
+import { keccak256, toBytes, encodePacked, toHex } from "viem";
 import { getContractsForChain } from "./addresses";
-
-// Arbitrum Sepolia chain ID
-const ARBITRUM_SEPOLIA_ID = 421614;
-
-/**
- * Returns gas fee overrides for Arbitrum Sepolia to prevent
- * "maxFeePerGas < baseFee" errors from tight MetaMask estimation.
- * On Arbitrum Sepolia, baseFee is ~0.02 gwei so 0.5 gwei is 25x headroom
- * and costs essentially nothing extra.
- */
-function useGasOverrides() {
-  const chainId = useChainId();
-  if (chainId !== ARBITRUM_SEPOLIA_ID) return {};
-  return {
-    maxFeePerGas: parseGwei("0.5"),
-    maxPriorityFeePerGas: parseGwei("0.01"),
-  };
-}
 import {
   TAGITCoreABI,
   AssetState,
@@ -335,7 +317,7 @@ export function useFlaggedAssets(options?: { pageSize?: number; refetchInterval?
 export function useMint() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
     hash,
@@ -364,7 +346,7 @@ export function useMint() {
       functionName: "mint",
       args: [to, metadataHash],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -374,7 +356,7 @@ export function useMint() {
 export function useBindTag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
   const { data: walletClient } = useWalletClient();
@@ -399,7 +381,7 @@ export function useBindTag() {
       functionName: "bindTag",
       args: [tokenId, tagHash, challengeResponse, oracleSignature],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -409,7 +391,7 @@ export function useBindTag() {
 export function useActivate() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -420,7 +402,7 @@ export function useActivate() {
       functionName: "activate",
       args: [tokenId],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -435,7 +417,7 @@ export function useActivate() {
 export function useClaim() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -446,7 +428,7 @@ export function useClaim() {
       functionName: "claim",
       args: [tokenId, newOwner],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -460,7 +442,7 @@ export function useClaim() {
 export function useFlag() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -471,7 +453,7 @@ export function useFlag() {
       functionName: "flag",
       args: [tokenId],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -487,7 +469,7 @@ export function useFlag() {
 export function useApproveResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -498,7 +480,7 @@ export function useApproveResolve() {
       functionName: "approveResolve",
       args: [tokenId, newOwner],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -514,7 +496,7 @@ export function useApproveResolve() {
 export function useResolve() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -525,7 +507,7 @@ export function useResolve() {
       functionName: "resolve",
       args: [tokenId, newOwner],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -535,7 +517,7 @@ export function useResolve() {
 export function useRecycle() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -546,7 +528,7 @@ export function useRecycle() {
       functionName: "recycle",
       args: [tokenId],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -618,7 +600,7 @@ export function useCapabilities(address: `0x${string}` | undefined) {
 export function useGrantCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -629,7 +611,7 @@ export function useGrantCapability() {
       functionName: "grantCapability",
       args: [user, BigInt(capabilityId)],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -639,7 +621,7 @@ export function useGrantCapability() {
 export function useRevokeCapability() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -650,7 +632,7 @@ export function useRevokeCapability() {
       functionName: "revokeCapability",
       args: [user, BigInt(capabilityId)],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -730,7 +712,7 @@ export function useBadges(address: `0x${string}` | undefined) {
 export function useGrantBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -741,7 +723,7 @@ export function useGrantBadge() {
       functionName: "grantIdentity",
       args: [to, BigInt(badgeId)],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
@@ -751,7 +733,7 @@ export function useGrantBadge() {
 export function useRevokeBadge() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
-  const gasOverrides = useGasOverrides();
+
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
 
@@ -762,7 +744,7 @@ export function useRevokeBadge() {
       functionName: "revokeIdentity",
       args: [from, BigInt(badgeId)],
       chainId,
-      ...gasOverrides,
+
     });
   };
 
