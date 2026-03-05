@@ -2,6 +2,21 @@ import { useReadContract, useReadContracts, useWriteContract, useWaitForTransact
 import { useMemo } from "react";
 import { keccak256, toBytes, encodePacked, toHex } from "viem";
 import { getContractsForChain } from "./addresses";
+
+/**
+ * Gas fee overrides for Arbitrum Sepolia (chain 421614).
+ * Arbitrum's node validates gas prices even during eth_call simulation,
+ * so we must pass explicit maxFeePerGas to avoid "maxFeePerGas < baseFee"
+ * errors. 0.5 gwei gives 25x headroom over typical 0.02 gwei baseFee.
+ */
+const ARB_SEPOLIA_GAS = {
+  maxFeePerGas: 500_000_000n,       // 0.5 gwei
+  maxPriorityFeePerGas: 10_000_000n, // 0.01 gwei
+} as const;
+
+function gasFor(chainId: number) {
+  return chainId === 421614 ? ARB_SEPOLIA_GAS : {};
+}
 import {
   TAGITCoreABI,
   AssetState,
@@ -346,7 +361,7 @@ export function useMint() {
       functionName: "mint",
       args: [to, metadataHash],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -381,7 +396,7 @@ export function useBindTag() {
       functionName: "bindTag",
       args: [tokenId, tagHash, challengeResponse, oracleSignature],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -402,7 +417,7 @@ export function useActivate() {
       functionName: "activate",
       args: [tokenId],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -428,7 +443,7 @@ export function useClaim() {
       functionName: "claim",
       args: [tokenId, newOwner],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -453,7 +468,7 @@ export function useFlag() {
       functionName: "flag",
       args: [tokenId],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -480,7 +495,7 @@ export function useApproveResolve() {
       functionName: "approveResolve",
       args: [tokenId, newOwner],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -507,7 +522,7 @@ export function useResolve() {
       functionName: "resolve",
       args: [tokenId, newOwner],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -528,7 +543,7 @@ export function useRecycle() {
       functionName: "recycle",
       args: [tokenId],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -611,7 +626,7 @@ export function useGrantCapability() {
       functionName: "grantCapability",
       args: [user, BigInt(capabilityId)],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -632,7 +647,7 @@ export function useRevokeCapability() {
       functionName: "revokeCapability",
       args: [user, BigInt(capabilityId)],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -723,7 +738,7 @@ export function useGrantBadge() {
       functionName: "grantIdentity",
       args: [to, BigInt(badgeId)],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
@@ -744,7 +759,7 @@ export function useRevokeBadge() {
       functionName: "revokeIdentity",
       args: [from, BigInt(badgeId)],
       chainId,
-
+      ...gasFor(chainId),
     });
   };
 
