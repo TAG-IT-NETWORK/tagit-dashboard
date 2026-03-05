@@ -154,25 +154,32 @@ export async function readNFCTag(signal?: AbortSignal): Promise<NFCTagInfo> {
  */
 export async function writeNFCTag(
   tokenId: bigint,
-  verifyUrl: string = "https://verify.tagit.network"
+  options?: { chainId?: number; contractAddress?: string; verifyUrl?: string }
 ): Promise<void> {
   if (!isNFCSupported()) {
     throw new Error("Web NFC is not supported on this device/browser");
   }
+
+  const verifyUrl = options?.verifyUrl ?? "https://verify.tagit.network";
+  const chainId = options?.chainId ?? 421614;
+  const contract = options?.contractAddress ?? "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f";
+
+  const chainName = chainId === 421614 ? "arbitrum-sepolia" : "optimism-sepolia";
 
   const ndef = new NDEFReader();
   await ndef.write({
     records: [
       {
         recordType: "url",
-        data: `${verifyUrl}/${tokenId.toString()}`,
+        data: `${verifyUrl}/${tokenId.toString()}?chain=${chainId}`,
       },
       {
         recordType: "text",
         data: JSON.stringify({
           tokenId: tokenId.toString(),
-          chain: "optimism-sepolia",
-          contract: "0x6a58eE8f2d500981b1793868C55072789c58fba6",
+          chain: chainName,
+          chainId,
+          contract,
         }),
       },
     ],

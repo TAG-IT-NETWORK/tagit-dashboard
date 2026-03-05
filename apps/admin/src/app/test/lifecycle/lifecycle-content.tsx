@@ -28,6 +28,7 @@ import {
   useTagByToken,
   useAccount,
   getExplorerTxUrl,
+  AssetState,
 } from "@tagit/contracts";
 import { useChainId } from "wagmi";
 import {
@@ -45,6 +46,7 @@ import {
   Flag,
   Scale,
   RefreshCw,
+  Search,
 } from "lucide-react";
 import { BindTagModal } from "@/components/bind-tag-modal";
 import {
@@ -80,6 +82,9 @@ export function LifecycleContent() {
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const [bindModalOpen, setBindModalOpen] = useState(false);
 
+  // Resume existing token
+  const [resumeInput, setResumeInput] = useState("");
+
   // Form inputs
   const [metadataURI, setMetadataURI] = useState("");
   const [tagUID, setTagUID] = useState("");
@@ -104,6 +109,38 @@ export function LifecycleContent() {
   useEffect(() => {
     setMetadataURI(generateTestMetadataURI());
   }, []);
+
+  // Map on-chain asset state to the next lifecycle step
+  const stateToStep: Record<number, number> = {
+    [AssetState.MINTED]: 1,    // next: bind
+    [AssetState.BOUND]: 2,     // next: activate
+    [AssetState.ACTIVATED]: 3, // next: claim
+    [AssetState.CLAIMED]: 4,   // next: flag
+    [AssetState.FLAGGED]: 5,   // next: resolve
+    [AssetState.RECYCLED]: 6,  // done
+  };
+
+  // When loading an existing token, sync step from on-chain state
+  useEffect(() => {
+    if (tokenId && asset && !mintSuccess) {
+      const step = stateToStep[asset.state] ?? 0;
+      setCurrentStep(step);
+      // Mark prior steps as completed
+      const stepIds = LIFECYCLE_STEPS.map((s) => s.id);
+      const newStates: Record<string, StepState> = {};
+      for (let i = 0; i < step; i++) {
+        newStates[stepIds[i]] = { completed: true };
+      }
+      setStepStates(newStates);
+    }
+  }, [tokenId, asset?.state]);
+
+  const handleResumeToken = () => {
+    const id = parseInt(resumeInput);
+    if (!id || id <= 0) return;
+    setTokenId(BigInt(id));
+    setResumeInput("");
+  };
 
   // Track step completions
   useEffect(() => {
@@ -391,7 +428,7 @@ export function LifecycleContent() {
                   </>
                 )}
                 <Button variant="outline" size="sm" className="w-full" asChild>
-                  <Link href={`/assets/${tokenId}`}>
+                  <Link href={`/assets/${tokenId!.toString()}`}>
                     View Asset Details
                     <ExternalLink className="h-3 w-3 ml-2" />
                   </Link>
@@ -405,10 +442,35 @@ export function LifecycleContent() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
-                <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No asset created yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Start with Step 1: Mint</p>
+              <div className="space-y-4">
+                <div className="text-center py-2">
+                  <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No asset selected</p>
+                </div>
+                <div className="border-t pt-4 space-y-2">
+                  <Label>Resume Existing Token</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      value={resumeInput}
+                      onChange={(e) => setResumeInput(e.target.value)}
+                      placeholder="Token ID (e.g., 9)"
+                      className="font-mono"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResumeToken}
+                      disabled={!resumeInput}
+                    >
+                      <Search className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter an existing token ID to continue its lifecycle
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>
