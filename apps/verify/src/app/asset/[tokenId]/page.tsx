@@ -1,6 +1,9 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
-import { notFound } from "next/navigation";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -14,23 +17,68 @@ function formatTimestamp(ts: bigint) {
   });
 }
 
-export default async function AssetVerifyPage({
-  params,
-}: {
-  params: { tokenId: string };
-}) {
-  const tokenId = BigInt(params.tokenId);
-  let asset: Awaited<ReturnType<typeof getAsset>>;
+interface AssetData {
+  name: string;
+  state: number;
+  owner: string;
+  mintedAt: bigint;
+  lastUpdated: bigint;
+}
 
-  try {
-    asset = await getAsset(tokenId);
-  } catch {
-    notFound();
+export default function AssetVerifyPage() {
+  const params = useParams<{ tokenId: string }>();
+  const [asset, setAsset] = useState<AssetData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const tokenId = BigInt(params.tokenId);
+        const result = await getAsset(tokenId);
+        setAsset({
+          name: result.name,
+          state: Number(result.state),
+          owner: result.owner,
+          mintedAt: result.mintedAt,
+          lastUpdated: result.lastUpdated,
+        });
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [params.tokenId]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#0a0a0a]">
+        <div className="w-full max-w-sm animate-pulse">
+          <div className="text-center mb-8">
+            <div className="h-4 w-24 bg-white/10 rounded mx-auto mb-2" />
+            <div className="h-3 w-20 bg-white/5 rounded mx-auto" />
+          </div>
+          <div className="h-8 w-48 bg-white/10 rounded mx-auto mb-2" />
+          <div className="h-4 w-16 bg-white/5 rounded mx-auto mb-6" />
+          <div className="flex justify-center mb-8">
+            <div className="h-12 w-36 bg-white/10 rounded-full" />
+          </div>
+          <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex justify-between">
+                <div className="h-4 w-16 bg-white/10 rounded" />
+                <div className="h-4 w-24 bg-white/10 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    );
   }
 
-  const stateNum = Number(asset.state);
-
-  if (stateNum === 0) {
+  if (error || !asset || asset.state === 0) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#0a0a0a]">
         <div className="text-center">
@@ -39,10 +87,7 @@ export default async function AssetVerifyPage({
           <p className="text-gray-400 mb-6">
             Token #{params.tokenId} does not exist on-chain.
           </p>
-          <a
-            href="/"
-            className="text-[#D4AF37] hover:underline text-sm"
-          >
+          <a href="/" className="text-[#D4AF37] hover:underline text-sm">
             Back to TAG IT Verify
           </a>
         </div>
@@ -50,8 +95,8 @@ export default async function AssetVerifyPage({
     );
   }
 
-  const state = STATES[stateNum] || STATES[0];
-  const description = STATE_DESCRIPTIONS[stateNum] || "";
+  const state = STATES[asset.state] || STATES[0];
+  const description = STATE_DESCRIPTIONS[asset.state] || "";
   const arbiscanUrl = `https://sepolia.arbiscan.io/address/${CONTRACT_ADDRESS}`;
 
   return (
