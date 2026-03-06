@@ -9,13 +9,16 @@ const arbRpcUrl = process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC || process.env.NE
 
 // Public fallback RPCs for when Alchemy is unavailable or misconfigured
 const ARB_SEPOLIA_PUBLIC_RPC = "https://sepolia-rollup.arbitrum.io/rpc";
+const OP_SEPOLIA_PUBLIC_RPC = "https://sepolia.optimism.io";
 
 export function createWagmiConfig(projectId: string) {
   const transports = {
     [arbitrumSepolia.id]: arbRpcUrl
       ? fallback([http(arbRpcUrl), http(ARB_SEPOLIA_PUBLIC_RPC)])
       : http(ARB_SEPOLIA_PUBLIC_RPC),
-    [optimismSepolia.id]: http(opRpcUrl),
+    [optimismSepolia.id]: opRpcUrl
+      ? fallback([http(opRpcUrl), http(OP_SEPOLIA_PUBLIC_RPC)])
+      : http(OP_SEPOLIA_PUBLIC_RPC),
   };
 
   const pollingInterval = 4_000; // 4s — improves receipt detection on testnets
