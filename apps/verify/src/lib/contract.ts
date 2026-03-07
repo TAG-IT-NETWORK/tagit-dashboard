@@ -20,7 +20,7 @@ export const publicClient = createPublicClient({
 const ASSET_METADATA: Record<string, { productName?: string; msrp?: string }> = {
   "18": { productName: "TAG IT Sneaker", msrp: "$199.99" },
   "19": { productName: "Nike Air Max 90", msrp: "$149.99" },
-  "20": { productName: "Rolex Submariner", msrp: "$8,100" },
+  "20": { productName: "DI0R Eye Cream", msrp: "$77.73" },
 };
 
 export function getMetadataForToken(tokenId: string): { productName?: string; msrp?: string } {
