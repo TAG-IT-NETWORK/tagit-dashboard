@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { getAsset, getTagByToken, getMetadataForToken, CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -21,7 +21,6 @@ interface AssetData {
   state: number;
   owner: string;
   timestamp: bigint;
-  tagHash: string | null;
   productName?: string;
   msrp?: string;
 }
@@ -39,24 +38,14 @@ export default function AssetVerifyPage() {
         const tokenId = BigInt(params.tokenId);
         const result = await getAsset(tokenId);
 
-        let tagHash: string | null = null;
-        try {
-          const tag = await getTagByToken(tokenId);
-          if (tag && tag !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
-            tagHash = tag as string;
-          }
-        } catch {}
-
-        // Priority: URL params > static metadata > fallback
-        const meta = getMetadataForToken(params.tokenId);
-        const productName = searchParams.get("name") || meta.productName;
-        const msrp = searchParams.get("msrp") || meta.msrp;
+        // URL params override on-chain metadata
+        const productName = searchParams.get("name") || result.productName || undefined;
+        const msrp = searchParams.get("msrp") || result.msrp || undefined;
 
         setAsset({
           state: result.state,
           owner: result.owner,
           timestamp: result.timestamp,
-          tagHash,
           productName,
           msrp,
         });

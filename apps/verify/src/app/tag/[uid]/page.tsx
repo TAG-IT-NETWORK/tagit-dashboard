@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getAsset, getTokenByTag, getMetadataForToken, uidToTagHash, CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -27,7 +27,6 @@ interface AssetData {
   state: number;
   owner: string;
   timestamp: bigint;
-  tagHash: string;
   productName?: string;
   msrp?: string;
 }
@@ -41,25 +40,23 @@ export default function TagVerifyPage() {
   useEffect(() => {
     async function load() {
       try {
-        const tagHash = uidToTagHash(params.uid);
-        const tokenId = await getTokenByTag(tagHash) as bigint;
+        // For the hackathon demo, NFC chips are programmed with /asset/{id} URLs.
+        // This /tag/{uid} route is a fallback — try parsing the UID as a token ID.
+        const tokenId = BigInt(params.uid);
+        const result = await getAsset(tokenId);
 
-        if (!tokenId || tokenId === 0n) {
-          setError("No asset is bound to this NFC tag.");
+        if (result.state === 0) {
+          setError("No asset found for this NFC tag.");
           return;
         }
-
-        const result = await getAsset(tokenId);
-        const meta = getMetadataForToken(tokenId.toString());
 
         setAsset({
           tokenId,
           state: result.state,
           owner: result.owner,
           timestamp: result.timestamp,
-          tagHash,
-          productName: meta.productName,
-          msrp: meta.msrp,
+          productName: result.productName,
+          msrp: result.msrp,
         });
       } catch {
         setError("Could not look up this NFC tag on-chain.");
@@ -87,7 +84,7 @@ export default function TagVerifyPage() {
             <div className="h-8 w-32 bg-white/10 rounded mx-auto mb-2" />
             <div className="h-4 w-48 bg-white/5 rounded mx-auto mb-6" />
             <div className="bg-white/5 rounded-2xl p-5 space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex justify-between">
                   <div className="h-4 w-16 bg-white/10 rounded" />
                   <div className="h-4 w-24 bg-white/10 rounded" />
@@ -119,7 +116,7 @@ export default function TagVerifyPage() {
   }
 
   const state = STATES[asset.state] || STATES[0];
-  const isAuthentic = asset.state >= 2 && asset.state <= 4;
+  const isAuthentic = asset.state >= 1 && asset.state <= 4;
   const arbiscanUrl = `https://sepolia.arbiscan.io/address/${CONTRACT_ADDRESS}`;
   const displayName = asset.productName || `Token #${asset.tokenId.toString()}`;
 
@@ -183,7 +180,6 @@ export default function TagVerifyPage() {
           className="rounded-2xl border border-white/10 p-5 space-y-0 mb-5 animate-fadeUp"
           style={{ background: "rgba(255,255,255,0.03)", animationDelay: "0.35s" }}
         >
-          {/* Product */}
           <div className="flex justify-between items-center py-3">
             <span className="text-gray-500 text-sm">Product</span>
             <span className="font-mono text-sm font-semibold" style={{ color: "#F0A500" }}>
@@ -193,7 +189,6 @@ export default function TagVerifyPage() {
 
           <div className="border-t border-white/5" />
 
-          {/* Owner */}
           <div className="flex justify-between items-center py-3">
             <span className="text-gray-500 text-sm">Owner</span>
             <span className="text-white text-sm font-mono">
@@ -201,7 +196,6 @@ export default function TagVerifyPage() {
             </span>
           </div>
 
-          {/* MSRP (conditional) */}
           {asset.msrp && (
             <>
               <div className="border-t border-white/5" />
@@ -216,7 +210,6 @@ export default function TagVerifyPage() {
 
           <div className="border-t border-white/5" />
 
-          {/* Registered */}
           <div className="flex justify-between items-center py-3">
             <span className="text-gray-500 text-sm">Registered</span>
             <span className="text-white text-sm">
@@ -226,7 +219,6 @@ export default function TagVerifyPage() {
 
           <div className="border-t border-white/5" />
 
-          {/* Chain */}
           <div className="flex justify-between items-center py-3">
             <span className="text-gray-500 text-sm">Chain</span>
             <span className="text-white text-sm inline-flex items-center gap-1.5">
