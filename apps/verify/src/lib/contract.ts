@@ -1,9 +1,9 @@
-import { createPublicClient, http, keccak256, toHex } from "viem";
+import { createPublicClient, http, keccak256 } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import { TAGITCoreABI } from "./abi";
 
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_TAGIT_CORE_ADDRESS ||
-  "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f") as `0x${string}`;
+  "0x62A81066Cc868cDe6115b87F1d585c891BFfCcC3") as `0x${string}`;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
@@ -14,16 +14,34 @@ export const publicClient = createPublicClient({
   transport: http(RPC_URL),
 });
 
-export async function getAsset(tokenId: bigint) {
-  const [owner, timestamp, state, flags, reserved] =
-    (await publicClient.readContract({
-      address: CONTRACT_ADDRESS,
-      abi: TAGITCoreABI,
-      functionName: "getAsset",
-      args: [tokenId],
-    })) as [string, bigint, number, number, number];
+/** Parse the on-chain name field which may be JSON with {name, msrp} */
+function parseNameField(raw: string): { productName: string; msrp?: string } {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.name === "string") {
+      return { productName: parsed.name, msrp: parsed.msrp };
+    }
+  } catch {}
+  return { productName: raw };
+}
 
-  return { owner, timestamp, state, flags, reserved };
+export async function getAsset(tokenId: bigint) {
+  const result = (await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: TAGITCoreABI,
+    functionName: "getAsset",
+    args: [tokenId],
+  })) as { name: string; state: number; owner: string; mintedAt: bigint; lastUpdated: bigint };
+
+  const { productName, msrp } = parseNameField(result.name);
+
+  return {
+    owner: result.owner,
+    timestamp: result.mintedAt,
+    state: result.state,
+    productName,
+    msrp,
+  };
 }
 
 export async function getTokenByTag(tagHash: `0x${string}`) {

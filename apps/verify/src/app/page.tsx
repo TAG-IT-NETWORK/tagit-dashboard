@@ -21,7 +21,7 @@ export default function VerifyHome() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#0a0a0a]">
+    <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#000" }}>
       <div className="w-full max-w-sm text-center">
         <div className="inline-flex items-center gap-2 mb-1">
           <div className="w-2 h-2 rounded-full bg-[#D4AF37]" />

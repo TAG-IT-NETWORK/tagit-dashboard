@@ -41,6 +41,16 @@ function truncateAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+function parseAssetName(raw: string): { name: string; msrp?: string } {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.name === "string") {
+      return { name: parsed.name, msrp: parsed.msrp };
+    }
+  } catch {}
+  return { name: raw };
+}
+
 function formatTs(ts: bigint) {
   if (ts === 0n) return "--";
   return new Date(Number(ts) * 1000).toLocaleTimeString();
@@ -56,6 +66,7 @@ export default function LifecyclePage() {
   // Mint form state
   const [mintTokenId, setMintTokenId] = useState("");
   const [mintName, setMintName] = useState("");
+  const [mintMsrp, setMintMsrp] = useState("");
 
   // Read token IDs
   const {
@@ -123,6 +134,7 @@ export default function LifecyclePage() {
       resetMint();
       setMintTokenId("");
       setMintName("");
+      setMintMsrp("");
     }
   }, [mintConfirmed, refetchTokenIds, refetchAssets, resetMint]);
 
@@ -173,11 +185,15 @@ export default function LifecyclePage() {
 
   function handleMint() {
     const id = BigInt(mintTokenId);
+    // Encode name + msrp as JSON so verify page can parse both fields
+    const metadata = mintMsrp
+      ? JSON.stringify({ name: mintName, msrp: mintMsrp })
+      : mintName;
     writeMint({
       address: DEMO_CONTRACT_ADDRESS,
       abi: TAGITCoreDemoABI,
       functionName: "mint",
-      args: [id, mintName],
+      args: [id, metadata],
     });
   }
 
@@ -245,13 +261,23 @@ export default function LifecyclePage() {
               />
             </div>
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">Asset Name</label>
+              <label className="text-xs text-gray-500 block mb-1">Product Name</label>
               <input
                 type="text"
                 value={mintName}
                 onChange={(e) => setMintName(e.target.value)}
-                placeholder="Product name..."
+                placeholder="Nike Air Max 90"
                 className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/50"
+              />
+            </div>
+            <div className="flex-shrink-0">
+              <label className="text-xs text-gray-500 block mb-1">MSRP</label>
+              <input
+                type="text"
+                value={mintMsrp}
+                onChange={(e) => setMintMsrp(e.target.value)}
+                placeholder="$149.99"
+                className="w-28 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/50"
               />
             </div>
             <button
@@ -282,7 +308,10 @@ export default function LifecyclePage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-gray-500">#{asset.tokenId.toString()}</p>
-                    <p className="text-lg font-semibold text-white">{asset.name}</p>
+                    <p className="text-lg font-semibold text-white">{parseAssetName(asset.name).name}</p>
+                    {parseAssetName(asset.name).msrp && (
+                      <p className="text-xs text-teal-400">{parseAssetName(asset.name).msrp}</p>
+                    )}
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full border text-xs font-bold ${stateColor}`}

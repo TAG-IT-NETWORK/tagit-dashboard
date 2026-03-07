@@ -1,16 +1,22 @@
 export const TAGITCoreABI = [
   {
-    inputs: [{ type: "uint256", name: "tokenId" }],
+    type: "function",
     name: "getAsset",
+    inputs: [{ type: "uint256", name: "tokenId" }],
     outputs: [
-      { type: "address", name: "assetOwner" },
-      { type: "uint64", name: "timestamp" },
-      { type: "uint8", name: "state" },
-      { type: "uint8", name: "flags" },
-      { type: "uint16", name: "reserved" },
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "name", type: "string" },
+          { name: "state", type: "uint8" },
+          { name: "owner", type: "address" },
+          { name: "mintedAt", type: "uint256" },
+          { name: "lastUpdated", type: "uint256" },
+        ],
+      },
     ],
     stateMutability: "view",
-    type: "function",
   },
   {
     inputs: [{ type: "bytes32", name: "tagHash" }],
