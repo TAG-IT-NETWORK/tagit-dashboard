@@ -3,7 +3,7 @@ import { arbitrumSepolia } from "viem/chains";
 import { TAGITCoreABI } from "./abi";
 
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_TAGIT_CORE_ADDRESS ||
-  "0x62A81066Cc868cDe6115b87F1d585c891BFfCcC3") as `0x${string}`;
+  "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f") as `0x${string}`;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
@@ -14,34 +14,27 @@ export const publicClient = createPublicClient({
   transport: http(RPC_URL),
 });
 
-/** Parse the on-chain name field which may be JSON with {name, msrp} */
-function parseNameField(raw: string): { productName: string; msrp?: string } {
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.name === "string") {
-      return { productName: parsed.name, msrp: parsed.msrp };
-    }
-  } catch {}
-  return { productName: raw };
+/** Static metadata for known tokens (set via admin mint or NFC URL params) */
+const ASSET_METADATA: Record<string, { productName?: string; msrp?: string }> = {
+  "18": { productName: "TAG IT Sneaker", msrp: "$199.99" },
+  "19": { productName: "Nike Air Max 90", msrp: "$149.99" },
+  "20": { productName: "Rolex Submariner", msrp: "$8,100" },
+};
+
+export function getMetadataForToken(tokenId: string): { productName?: string; msrp?: string } {
+  return ASSET_METADATA[tokenId] || {};
 }
 
 export async function getAsset(tokenId: bigint) {
-  const result = (await publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreABI,
-    functionName: "getAsset",
-    args: [tokenId],
-  })) as { name: string; state: number; owner: string; mintedAt: bigint; lastUpdated: bigint };
+  const [owner, timestamp, state, flags, reserved] =
+    (await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: TAGITCoreABI,
+      functionName: "getAsset",
+      args: [tokenId],
+    })) as [string, bigint, number, number, number];
 
-  const { productName, msrp } = parseNameField(result.name);
-
-  return {
-    owner: result.owner,
-    timestamp: result.mintedAt,
-    state: result.state,
-    productName,
-    msrp,
-  };
+  return { owner, timestamp, state, flags, reserved };
 }
 
 export async function getTokenByTag(tagHash: `0x${string}`) {

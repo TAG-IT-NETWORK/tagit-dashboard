@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { getAsset, getTagByToken, CONTRACT_ADDRESS } from "@/lib/contract";
+import { useParams, useSearchParams } from "next/navigation";
+import { getAsset, getTagByToken, getMetadataForToken, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -28,6 +28,7 @@ interface AssetData {
 
 export default function AssetVerifyPage() {
   const params = useParams<{ tokenId: string }>();
+  const searchParams = useSearchParams();
   const [asset, setAsset] = useState<AssetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -46,13 +47,18 @@ export default function AssetVerifyPage() {
           }
         } catch {}
 
+        // Priority: URL params > static metadata > fallback
+        const meta = getMetadataForToken(params.tokenId);
+        const productName = searchParams.get("name") || meta.productName;
+        const msrp = searchParams.get("msrp") || meta.msrp;
+
         setAsset({
           state: result.state,
           owner: result.owner,
           timestamp: result.timestamp,
           tagHash,
-          productName: result.productName,
-          msrp: result.msrp,
+          productName,
+          msrp,
         });
       } catch {
         setError(true);
@@ -61,7 +67,7 @@ export default function AssetVerifyPage() {
       }
     }
     load();
-  }, [params.tokenId]);
+  }, [params.tokenId, searchParams]);
 
   if (loading) {
     return (
@@ -117,7 +123,6 @@ export default function AssetVerifyPage() {
         {/* Animated Checkmark Ring */}
         <div className="flex justify-center mb-6 animate-scaleIn">
           <div className="relative w-[100px] h-[100px]">
-            {/* Outer glow */}
             <div
               className="absolute inset-0 rounded-full animate-glowPulse"
               style={{
@@ -126,7 +131,6 @@ export default function AssetVerifyPage() {
                   : "radial-gradient(circle, rgba(251,191,36,0.25) 0%, transparent 70%)",
               }}
             />
-            {/* Ring */}
             <div
               className="absolute inset-0 rounded-full"
               style={{
@@ -134,7 +138,6 @@ export default function AssetVerifyPage() {
                 opacity: 0.3,
               }}
             />
-            {/* Filled circle */}
             <div className="absolute inset-[8px] rounded-full flex items-center justify-center"
               style={{ background: isAuthentic ? "rgba(0,214,143,0.12)" : "rgba(251,191,36,0.12)" }}
             >
