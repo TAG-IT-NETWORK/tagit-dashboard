@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, getTagByToken, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -18,11 +18,10 @@ function formatTimestamp(ts: bigint) {
 }
 
 interface AssetData {
-  name: string;
   state: number;
   owner: string;
-  mintedAt: bigint;
-  lastUpdated: bigint;
+  timestamp: bigint;
+  tagHash: string | null;
 }
 
 export default function AssetVerifyPage() {
@@ -36,12 +35,20 @@ export default function AssetVerifyPage() {
       try {
         const tokenId = BigInt(params.tokenId);
         const result = await getAsset(tokenId);
+
+        let tagHash: string | null = null;
+        try {
+          const tag = await getTagByToken(tokenId);
+          if (tag && tag !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            tagHash = tag as string;
+          }
+        } catch {}
+
         setAsset({
-          name: result.name,
-          state: Number(result.state),
+          state: result.state,
           owner: result.owner,
-          mintedAt: result.mintedAt,
-          lastUpdated: result.lastUpdated,
+          timestamp: result.timestamp,
+          tagHash,
         });
       } catch {
         setError(true);
@@ -113,12 +120,12 @@ export default function AssetVerifyPage() {
           <p className="text-gray-500 text-xs">Asset Verification</p>
         </div>
 
-        {/* Product Name */}
+        {/* Token ID */}
         <h1 className="text-3xl font-bold text-white text-center mb-1">
-          {asset.name}
+          Token #{params.tokenId}
         </h1>
         <p className="text-gray-500 text-center text-sm mb-6">
-          Token #{params.tokenId}
+          On-chain Digital Twin
         </p>
 
         {/* State Badge */}
@@ -149,18 +156,22 @@ export default function AssetVerifyPage() {
           </div>
           <div className="border-t border-white/5" />
           <div className="flex justify-between items-center">
-            <span className="text-gray-500 text-sm">Minted</span>
+            <span className="text-gray-500 text-sm">Registered</span>
             <span className="text-white text-sm">
-              {formatTimestamp(asset.mintedAt)}
+              {formatTimestamp(asset.timestamp)}
             </span>
           </div>
-          <div className="border-t border-white/5" />
-          <div className="flex justify-between items-center">
-            <span className="text-gray-500 text-sm">Last Updated</span>
-            <span className="text-white text-sm">
-              {formatTimestamp(asset.lastUpdated)}
-            </span>
-          </div>
+          {asset.tagHash && (
+            <>
+              <div className="border-t border-white/5" />
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 text-sm">NFC Bound</span>
+                <span className="text-emerald-400 text-sm font-mono">
+                  {truncateAddress(asset.tagHash)}
+                </span>
+              </div>
+            </>
+          )}
           <div className="border-t border-white/5" />
           <div className="flex justify-between items-center">
             <span className="text-gray-500 text-sm">Chain</span>

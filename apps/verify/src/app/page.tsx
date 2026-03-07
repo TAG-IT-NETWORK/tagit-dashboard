@@ -10,7 +10,12 @@ export default function VerifyHome() {
   function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     const id = tokenId.trim();
-    if (id && !isNaN(Number(id))) {
+    if (!id) return;
+    // If it looks like a hex UID (contains A-F or is longer than a typical number), route to tag lookup
+    if (/^[0-9a-fA-F:]{8,}$/.test(id) && /[a-fA-F]/.test(id)) {
+      const clean = id.replace(/[:\-\s]/g, "");
+      router.push(`/tag/${clean}`);
+    } else if (!isNaN(Number(id))) {
       router.push(`/asset/${id}`);
     }
   }
@@ -34,11 +39,10 @@ export default function VerifyHome() {
         <form onSubmit={handleVerify} className="space-y-3">
           <input
             type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
+            inputMode="text"
             value={tokenId}
             onChange={(e) => setTokenId(e.target.value)}
-            placeholder="Enter token ID (e.g. 1, 2, 3)"
+            placeholder="Token ID or NFC UID (e.g. 18 or 04113A2E5F6180)"
             className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 text-center focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37]/50"
           />
           <button

@@ -1,9 +1,9 @@
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, keccak256, toHex } from "viem";
 import { arbitrumSepolia } from "viem/chains";
-import { TAGITCoreDemoABI } from "./abi";
+import { TAGITCoreABI } from "./abi";
 
-const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_TAGIT_CORE_ADDRESS ||
-  "0x62A81066Cc868cDe6115b87F1d585c891BFfCcC3") as `0x${string}`;
+export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_TAGIT_CORE_ADDRESS ||
+  "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f") as `0x${string}`;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
@@ -15,28 +15,38 @@ export const publicClient = createPublicClient({
 });
 
 export async function getAsset(tokenId: bigint) {
+  const [owner, timestamp, state, flags, reserved] =
+    (await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: TAGITCoreABI,
+      functionName: "getAsset",
+      args: [tokenId],
+    })) as [string, bigint, number, number, number];
+
+  return { owner, timestamp, state, flags, reserved };
+}
+
+export async function getTokenByTag(tagHash: `0x${string}`) {
   return publicClient.readContract({
     address: CONTRACT_ADDRESS,
-    abi: TAGITCoreDemoABI,
-    functionName: "getAsset",
+    abi: TAGITCoreABI,
+    functionName: "getTokenByTag",
+    args: [tagHash],
+  });
+}
+
+export async function getTagByToken(tokenId: bigint) {
+  return publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: TAGITCoreABI,
+    functionName: "getTagByToken",
     args: [tokenId],
   });
 }
 
-export async function getTotalAssets() {
-  return publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreDemoABI,
-    functionName: "totalAssets",
-  });
+/** Convert a raw NFC UID (hex string, no colons) to a tag hash */
+export function uidToTagHash(uid: string): `0x${string}` {
+  const clean = uid.replace(/[:\-\s]/g, "").toLowerCase();
+  const bytes = `0x${clean}` as `0x${string}`;
+  return keccak256(bytes);
 }
-
-export async function getTokenIds() {
-  return publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreDemoABI,
-    functionName: "getTokenIds",
-  });
-}
-
-export { CONTRACT_ADDRESS };
