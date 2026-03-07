@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, getMetadataForToken, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -23,6 +23,7 @@ interface AssetData {
   timestamp: bigint;
   productName?: string;
   msrp?: string;
+  flags?: number;
 }
 
 export default function AssetVerifyPage() {
@@ -38,9 +39,10 @@ export default function AssetVerifyPage() {
         const tokenId = BigInt(params.tokenId);
         const result = await getAsset(tokenId);
 
-        // URL params override on-chain metadata
-        const productName = searchParams.get("name") || result.productName || undefined;
-        const msrp = searchParams.get("msrp") || result.msrp || undefined;
+        // Static metadata + URL params override
+        const meta = getMetadataForToken(params.tokenId);
+        const productName = searchParams.get("name") || meta.productName || undefined;
+        const msrp = searchParams.get("msrp") || meta.msrp || undefined;
 
         setAsset({
           state: result.state,

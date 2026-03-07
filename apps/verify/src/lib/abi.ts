@@ -1,22 +1,16 @@
 export const TAGITCoreABI = [
   {
-    type: "function",
-    name: "getAsset",
     inputs: [{ type: "uint256", name: "tokenId" }],
+    name: "getAsset",
     outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "name", type: "string" },
-          { name: "state", type: "uint8" },
-          { name: "owner", type: "address" },
-          { name: "mintedAt", type: "uint256" },
-          { name: "lastUpdated", type: "uint256" },
-        ],
-      },
+      { type: "address", name: "assetOwner" },
+      { type: "uint64", name: "timestamp" },
+      { type: "uint8", name: "state" },
+      { type: "uint8", name: "flags" },
+      { type: "uint16", name: "reserved" },
     ],
     stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [{ type: "uint256", name: "tokenId" }],
@@ -29,6 +23,20 @@ export const TAGITCoreABI = [
     inputs: [],
     name: "totalSupply",
     outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ type: "bytes32", name: "tagHash" }],
+    name: "getTokenByTag",
+    outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    name: "getTagByToken",
+    outputs: [{ type: "bytes32", name: "" }],
     stateMutability: "view",
     type: "function",
   },

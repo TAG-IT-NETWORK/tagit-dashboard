@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getAsset, CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, getMetadataForToken, CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 
 function truncateAddress(address: string) {
@@ -50,13 +50,14 @@ export default function TagVerifyPage() {
           return;
         }
 
+        const meta = getMetadataForToken(tokenId.toString());
         setAsset({
           tokenId,
           state: result.state,
           owner: result.owner,
           timestamp: result.timestamp,
-          productName: result.productName,
-          msrp: result.msrp,
+          productName: meta.productName,
+          msrp: meta.msrp,
         });
       } catch {
         setError("Could not look up this NFC tag on-chain.");
