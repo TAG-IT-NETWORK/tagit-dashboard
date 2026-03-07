@@ -36,9 +36,27 @@ import {
   Plus,
   RefreshCw,
   Loader2,
+  Link2,
+  Zap,
+  ArrowRightLeft,
+  Flag,
+  RotateCcw,
+  MoreHorizontal,
+  ExternalLink,
 } from "lucide-react";
-import { useAllAssets, type Asset as ContractAsset, shortenAddress } from "@tagit/contracts";
+import {
+  useAllAssets,
+  useActivate,
+  useFlag,
+  useRecycle,
+  useClaim,
+  AssetState,
+  type Asset as ContractAsset,
+  shortenAddress,
+} from "@tagit/contracts";
+import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
+import { TransactionStatus } from "@/components/transaction-status";
 
 // Simple skeleton component for loading states
 function Skeleton({ className }: { className?: string }) {
@@ -83,98 +101,125 @@ function toAssetRow(asset: ContractAsset & { tokenId: bigint }): AssetRow {
   };
 }
 
-const columns: ColumnDef<AssetRow>[] = [
-  {
-    accessorKey: "tokenId",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 hover:bg-transparent"
-      >
-        Token ID
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <Link
-        href={`/assets/${row.original.tokenId}`}
-        className="font-mono font-medium hover:text-primary transition-colors"
-      >
-        #{row.original.tokenId}
-      </Link>
-    ),
-  },
-  {
-    accessorKey: "state",
-    header: "State",
-    cell: ({ row }) => <StateBadge state={row.original.state} />,
-    filterFn: (row, id, filterValue: number[]) => {
-      if (!filterValue || filterValue.length === 0) return true;
-      return filterValue.includes(row.original.state);
-    },
-  },
-  {
-    accessorKey: "owner",
-    header: "Owner",
-    cell: ({ row }) => (
-      <Link
-        href={`/users/${row.original.owner}`}
-        className="hover:text-primary transition-colors"
-      >
-        <code className="text-sm">{row.original.owner}</code>
-      </Link>
-    ),
-  },
-  {
-    accessorKey: "tagId",
-    header: "Tag ID",
-    cell: ({ row }) =>
-      row.original.tagId ? (
-        <code className="text-sm text-muted-foreground">
-          {truncateHex(row.original.tagId)}
-        </code>
-      ) : (
-        <span className="text-muted-foreground text-sm">Unbound</span>
+// State → next action label + icon mapping
+const NEXT_ACTION: Record<number, { label: string; icon: typeof Zap }> = {
+  [AssetState.MINTED]: { label: "Bind Tag", icon: Link2 },
+  [AssetState.BOUND]: { label: "Activate", icon: Zap },
+  [AssetState.ACTIVATED]: { label: "Claim", icon: ArrowRightLeft },
+  [AssetState.CLAIMED]: { label: "Flag", icon: Flag },
+  [AssetState.FLAGGED]: { label: "Recycle", icon: RotateCcw },
+};
+
+interface ColumnActions {
+  onAdvance: (tokenId: string, state: number) => void;
+  isPending: boolean;
+}
+
+function createColumns(actions: ColumnActions): ColumnDef<AssetRow>[] {
+  return [
+    {
+      accessorKey: "tokenId",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="p-0 hover:bg-transparent"
+        >
+          Token ID
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
       ),
-  },
-  {
-    accessorKey: "createdAt",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 hover:bg-transparent"
-      >
-        Created
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {formatRelativeTime(row.original.createdAt)}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "updatedAt",
-    header: ({ column }) => (
-      <Button
-        variant="ghost"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="p-0 hover:bg-transparent"
-      >
-        Updated
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      </Button>
-    ),
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {formatRelativeTime(row.original.updatedAt)}
-      </span>
-    ),
-  },
-];
+      cell: ({ row }) => (
+        <Link
+          href={`/assets/${row.original.tokenId}`}
+          className="font-mono font-medium hover:text-primary transition-colors"
+        >
+          #{row.original.tokenId}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: "state",
+      header: "State",
+      cell: ({ row }) => <StateBadge state={row.original.state} />,
+      filterFn: (row, id, filterValue: number[]) => {
+        if (!filterValue || filterValue.length === 0) return true;
+        return filterValue.includes(row.original.state);
+      },
+    },
+    {
+      accessorKey: "owner",
+      header: "Owner",
+      cell: ({ row }) => (
+        <Link
+          href={`/users/${row.original.owner}`}
+          className="hover:text-primary transition-colors"
+        >
+          <code className="text-sm">{shortenAddress(row.original.owner)}</code>
+        </Link>
+      ),
+    },
+    {
+      accessorKey: "tagId",
+      header: "Tag ID",
+      cell: ({ row }) =>
+        row.original.tagId ? (
+          <code className="text-sm text-muted-foreground">
+            {truncateHex(row.original.tagId)}
+          </code>
+        ) : (
+          <span className="text-muted-foreground text-sm">Unbound</span>
+        ),
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="p-0 hover:bg-transparent"
+        >
+          Created
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {formatRelativeTime(row.original.createdAt)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const nextAction = NEXT_ACTION[row.original.state];
+        const Icon = nextAction?.icon;
+        return (
+          <div className="flex items-center gap-1">
+            {nextAction && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={actions.isPending}
+                onClick={() => actions.onAdvance(row.original.tokenId, row.original.state)}
+                className="h-7 text-xs"
+              >
+                {Icon && <Icon className="h-3 w-3 mr-1" />}
+                {nextAction.label}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" asChild className="h-7 w-7 p-0">
+              <Link href={`/assets/${row.original.tokenId}`}>
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+}
 
 const stateFilters = [
   { value: 0, label: "Minted" },
@@ -194,6 +239,7 @@ export default function AssetsPage() {
 }
 
 function AssetsContent() {
+  const chainId = useChainId();
   const [page, setPage] = useState(0);
   const pageSize = 25;
 
@@ -208,6 +254,43 @@ function AssetsContent() {
     error,
     refetch,
   } = useAllAssets({ page, pageSize, refetchInterval: 30000 }); // Auto-refresh every 30s
+
+  // Write hooks for lifecycle actions
+  const activateHook = useActivate();
+  const claimHook = useClaim();
+  const flagHook = useFlag();
+  const recycleHook = useRecycle();
+
+  const anyPending = activateHook.isPending || claimHook.isPending || flagHook.isPending || recycleHook.isPending;
+  const anyConfirming = activateHook.isConfirming || claimHook.isConfirming || flagHook.isConfirming || recycleHook.isConfirming;
+
+  // Refetch after successful tx
+  const lastSuccess = activateHook.isSuccess || claimHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess;
+  useMemo(() => { if (lastSuccess) refetch(); }, [lastSuccess]);
+
+  // Advance asset to next state
+  const handleAdvance = (tokenId: string, currentState: number) => {
+    const id = BigInt(tokenId);
+    switch (currentState) {
+      case AssetState.MINTED:
+        // Bind requires a tag — redirect to detail page
+        window.location.href = `/assets/${tokenId}`;
+        break;
+      case AssetState.BOUND:
+        activateHook.activate(id);
+        break;
+      case AssetState.ACTIVATED:
+        // Claim requires a new owner address — redirect to detail page
+        window.location.href = `/assets/${tokenId}`;
+        break;
+      case AssetState.CLAIMED:
+        flagHook.flag(id);
+        break;
+      case AssetState.FLAGGED:
+        recycleHook.recycle(id);
+        break;
+    }
+  };
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -225,6 +308,11 @@ function AssetsContent() {
     if (stateFilter.length === 0) return allAssets;
     return allAssets.filter((asset) => stateFilter.includes(asset.state));
   }, [allAssets, stateFilter]);
+
+  const columns = useMemo(
+    () => createColumns({ onAdvance: handleAdvance, isPending: anyPending }),
+    [anyPending]
+  );
 
   const table = useReactTable({
     data: filteredData,
@@ -300,6 +388,16 @@ function AssetsContent() {
           </Button>
         </div>
       </div>
+
+      {/* Transaction Status */}
+      {(anyPending || anyConfirming || activateHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess || claimHook.isSuccess || activateHook.error || flagHook.error || recycleHook.error || claimHook.error) && (
+        <div className="space-y-2">
+          <TransactionStatus isPending={activateHook.isPending} isConfirming={activateHook.isConfirming} isSuccess={activateHook.isSuccess} error={activateHook.error} hash={activateHook.hash} chainId={chainId} action="Activate" successMessage="Asset activated!" />
+          <TransactionStatus isPending={claimHook.isPending} isConfirming={claimHook.isConfirming} isSuccess={claimHook.isSuccess} error={claimHook.error} hash={claimHook.hash} chainId={chainId} action="Claim" successMessage="Asset claimed!" />
+          <TransactionStatus isPending={flagHook.isPending} isConfirming={flagHook.isConfirming} isSuccess={flagHook.isSuccess} error={flagHook.error} hash={flagHook.hash} chainId={chainId} action="Flag" successMessage="Asset flagged!" />
+          <TransactionStatus isPending={recycleHook.isPending} isConfirming={recycleHook.isConfirming} isSuccess={recycleHook.isSuccess} error={recycleHook.error} hash={recycleHook.hash} chainId={chainId} action="Recycle" successMessage="Asset recycled!" />
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
