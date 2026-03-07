@@ -3,8 +3,9 @@ import { arbitrumSepolia } from "viem/chains";
 import { TAGITCoreABI } from "./abi";
 
 // Real TAGITCore proxy on Arbitrum Sepolia
-export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_TAGIT_CORE_ADDRESS ||
-  "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f") as `0x${string}`;
+// Hardcoded — do NOT use NEXT_PUBLIC_TAGIT_CORE_ADDRESS env var,
+// it was set to the demo contract on Vercel and caused "Asset Not Found"
+export const CONTRACT_ADDRESS = "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f" as `0x${string}`;
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
