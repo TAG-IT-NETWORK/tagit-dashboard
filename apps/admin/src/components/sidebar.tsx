@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@tagit/ui";
 import {
@@ -55,16 +56,14 @@ export function Sidebar() {
       <div className="flex items-center h-16 px-4 border-b border-border">
         {!collapsed && (
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">T</span>
-            </div>
+            <Image src="/tagit_logo.png" alt="TAG IT" width={32} height={32} className="invert" />
             <span className="font-semibold text-lg">TAG IT Admin</span>
           </Link>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <span className="text-primary-foreground font-bold text-sm">T</span>
-          </div>
+          <Link href="/dashboard" className="mx-auto">
+            <Image src="/tagit_logo.png" alt="TAG IT" width={32} height={32} className="invert" />
+          </Link>
         )}
       </div>
 
