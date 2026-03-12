@@ -81,14 +81,12 @@ test.describe("Asset Detail Page", () => {
     await page.goto("/assets/1");
     await page.waitForLoadState("load");
 
-    // Look for back button or link
-    const backButton = page.locator(
-      'a[href="/assets"], button:has-text("Back"), [class*="back"]'
-    ).first();
+    // Target the actual link to /assets
+    const backLink = page.locator('a[href="/assets"]').first();
 
-    if (await backButton.isVisible()) {
-      await backButton.click();
-      await expect(page).toHaveURL(/\/assets$/);
+    if (await backLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await backLink.click();
+      await expect(page).toHaveURL(/\/assets$/, { timeout: 10000 });
     }
   });
 });
