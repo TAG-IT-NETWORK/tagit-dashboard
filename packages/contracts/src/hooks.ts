@@ -36,6 +36,25 @@ import {
 } from "./abis/CapabilityBadge";
 
 // ============================================================================
+// Shared return types — explicit annotations prevent "cannot be named" errors
+// when consumer packages (e.g. @tagit/console) build with stricter isolation.
+// ============================================================================
+
+interface WriteHookBase {
+  hash: `0x${string}` | undefined;
+  isPending: boolean;
+  isConfirming: boolean;
+  isSuccess: boolean;
+  error: Error | null;
+}
+
+interface ReadHookBase {
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+
+// ============================================================================
 // TAGITCore Read Hooks
 // ============================================================================
 
@@ -195,7 +214,18 @@ export function useAllAssets(options?: {
   page?: number;
   pageSize?: number;
   refetchInterval?: number;
-}) {
+}): {
+  assets: (Asset & { tokenId: bigint })[];
+  totalSupply: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+} {
   const chainId = useChainId();
   const chainContracts = getContractsForChain(chainId);
 
@@ -329,7 +359,7 @@ export function useFlaggedAssets(options?: { pageSize?: number; refetchInterval?
 // TAGITCore Write Hooks
 // ============================================================================
 
-export function useMint() {
+export function useMint(): WriteHookBase & { mint: (to: `0x${string}`, metadataURI: string) => void; tokenId: bigint | null } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -368,7 +398,7 @@ export function useMint() {
   return { mint, hash, isPending, isConfirming, isSuccess, error, tokenId };
 }
 
-export function useBindTag() {
+export function useBindTag(): WriteHookBase & { bindTag: (tokenId: bigint, tagHash: `0x${string}`) => Promise<void> } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -403,7 +433,7 @@ export function useBindTag() {
   return { bindTag, hash, isPending, isConfirming, isSuccess, error };
 }
 
-export function useActivate() {
+export function useActivate(): WriteHookBase & { activate: (tokenId: bigint) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -429,7 +459,7 @@ export function useActivate() {
  * @param tokenId - The asset token ID
  * @param newOwner - The address of the new owner
  */
-export function useClaim() {
+export function useClaim(): WriteHookBase & { claim: (tokenId: bigint, newOwner: `0x${string}`) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -454,7 +484,7 @@ export function useClaim() {
  * Flag a claimed asset as lost/stolen/recall
  * @param tokenId - The asset token ID to flag
  */
-export function useFlag() {
+export function useFlag(): WriteHookBase & { flag: (tokenId: bigint) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -481,7 +511,7 @@ export function useFlag() {
  * @param tokenId - The asset token ID
  * @param newOwner - The proposed rightful owner
  */
-export function useApproveResolve() {
+export function useApproveResolve(): WriteHookBase & { approveResolve: (tokenId: bigint, newOwner: `0x${string}`) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -508,7 +538,7 @@ export function useApproveResolve() {
  * @param tokenId - The asset token ID
  * @param newOwner - The address of the rightful owner
  */
-export function useResolve() {
+export function useResolve(): WriteHookBase & { resolve: (tokenId: bigint, newOwner: `0x${string}`) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -529,7 +559,7 @@ export function useResolve() {
   return { resolve, hash, isPending, isConfirming, isSuccess, error };
 }
 
-export function useRecycle() {
+export function useRecycle(): WriteHookBase & { recycle: (tokenId: bigint) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -562,7 +592,7 @@ export function useRecycle() {
 export function useCapabilityGate(
   address: `0x${string}` | undefined,
   capability: CapabilityHash
-) {
+): ReadHookBase & { hasCapability: boolean } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -589,7 +619,7 @@ export function useCapabilityGate(
  * Gets all capabilities for an address
  * @param address - The address to check
  */
-export function useCapabilities(address: `0x${string}` | undefined) {
+export function useCapabilities(address: `0x${string}` | undefined): ReadHookBase & { capabilities: `0x${string}`[] } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -612,7 +642,7 @@ export function useCapabilities(address: `0x${string}` | undefined) {
   };
 }
 
-export function useGrantCapability() {
+export function useGrantCapability(): WriteHookBase & { grantCapability: (user: `0x${string}`, capabilityId: CapabilityId) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -633,7 +663,7 @@ export function useGrantCapability() {
   return { grantCapability, hash, isPending, isConfirming, isSuccess, error };
 }
 
-export function useRevokeCapability() {
+export function useRevokeCapability(): WriteHookBase & { revokeCapability: (user: `0x${string}`, capabilityId: CapabilityId) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -664,7 +694,7 @@ export function useRevokeCapability() {
  * @param badgeId - The badge ID to check (use BadgeIds.KYC_L1, etc.)
  * @returns hasBadge boolean with loading state
  */
-export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: number) {
+export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: number): ReadHookBase & { hasBadge: boolean; balance: bigint | undefined } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -694,7 +724,7 @@ export function useBadgeCheck(address: `0x${string}` | undefined, badgeId: numbe
  * Gets all badges for an address
  * @param address - The address to check
  */
-export function useBadges(address: `0x${string}` | undefined) {
+export function useBadges(address: `0x${string}` | undefined): ReadHookBase & { badges: { id: BadgeId; name: string }[]; badgeIds: BadgeId[] } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -724,7 +754,7 @@ export function useBadges(address: `0x${string}` | undefined) {
   };
 }
 
-export function useGrantBadge() {
+export function useGrantBadge(): WriteHookBase & { grantBadge: (to: `0x${string}`, badgeId: number) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -745,7 +775,7 @@ export function useGrantBadge() {
   return { grantBadge, hash, isPending, isConfirming, isSuccess, error };
 }
 
-export function useRevokeBadge() {
+export function useRevokeBadge(): WriteHookBase & { revokeBadge: (from: `0x${string}`, badgeId: number) => void } {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 

@@ -8,6 +8,11 @@ vi.mock("@tagit/auth", () => ({
   useCurrentUser: () => mockUseCurrentUser(),
 }));
 
+// Mock ChainSelector to avoid WagmiProvider dependency
+vi.mock("../chain-selector", () => ({
+  ChainSelector: () => <div data-testid="chain-selector">Chain Selector</div>,
+}));
+
 // Mock the UI components
 vi.mock("@tagit/ui", () => ({
   ConnectButton: () => <button data-testid="connect-button">Connect</button>,

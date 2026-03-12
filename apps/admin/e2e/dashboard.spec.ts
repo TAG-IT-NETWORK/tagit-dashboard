@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Dashboard", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays page title", async ({ page }) => {
@@ -36,6 +36,6 @@ test.describe("Dashboard", () => {
   });
 
   test("admin console title is shown in header", async ({ page }) => {
-    await expect(page.locator("text=Admin Console")).toBeVisible();
+    await expect(page.getByText("Admin Console")).toBeVisible();
   });
 });

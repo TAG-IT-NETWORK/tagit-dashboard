@@ -6,13 +6,13 @@ test.describe("Navigation", () => {
 
     // Should show either the dashboard or loading state
     await expect(
-      page.locator("text=Loading").or(page.locator("text=Admin Console"))
+      page.getByText("Loading").or(page.getByText("Admin Console"))
     ).toBeVisible({ timeout: 10000 });
   });
 
   test("sidebar navigation links work", async ({ page }) => {
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Check sidebar is visible
     const sidebar = page.locator('nav, [role="navigation"]').first();

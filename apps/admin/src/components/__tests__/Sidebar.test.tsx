@@ -28,6 +28,25 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock next/image
+vi.mock("next/image", () => ({
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+    className,
+  }: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    className?: string;
+  }) => (
+    <img src={src} alt={alt} width={width} height={height} className={className} />
+  ),
+}));
+
 describe("Sidebar", () => {
   beforeEach(() => {
     mockPathname.mockReturnValue("/dashboard");
@@ -49,7 +68,7 @@ describe("Sidebar", () => {
   it("renders the TAG IT Admin logo", () => {
     render(<Sidebar />);
     expect(screen.getByText("TAG IT Admin")).toBeInTheDocument();
-    expect(screen.getByText("T")).toBeInTheDocument();
+    expect(screen.getByAltText("TAG IT")).toBeInTheDocument();
   });
 
   it("renders navigation links with correct hrefs", () => {
@@ -104,8 +123,8 @@ describe("Sidebar", () => {
 
     // After collapse, the "TAG IT Admin" text should not be visible
     expect(screen.queryByText("TAG IT Admin")).not.toBeInTheDocument();
-    // But the logo "T" should still be visible
-    expect(screen.getByText("T")).toBeInTheDocument();
+    // But the logo image should still be visible
+    expect(screen.getByAltText("TAG IT")).toBeInTheDocument();
   });
 
   it("expands sidebar when expand button is clicked", async () => {

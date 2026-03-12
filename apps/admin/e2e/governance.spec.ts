@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Governance Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/governance");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays governance page title", async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe("Governance Page", () => {
 test.describe("Proposal Detail Page", () => {
   test("shows proposal details", async ({ page }) => {
     await page.goto("/governance/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const content = page.locator(
       "main, [role='main'], [class*='content']"
@@ -57,7 +57,7 @@ test.describe("Proposal Detail Page", () => {
 
   test("vote bar is displayed", async ({ page }) => {
     await page.goto("/governance/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.waitForTimeout(2000);
 
     // Look for vote visualization
@@ -70,7 +70,7 @@ test.describe("Proposal Detail Page", () => {
 
   test("voting buttons are present", async ({ page }) => {
     await page.goto("/governance/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.waitForTimeout(2000);
 
     const voteButtons = page.locator(
@@ -85,7 +85,7 @@ test.describe("Proposal Detail Page", () => {
 test.describe("Create Proposal Page", () => {
   test("create proposal form loads", async ({ page }) => {
     await page.goto("/governance/new");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const content = page.locator(
       "main, [role='main'], [class*='content']"
@@ -95,7 +95,7 @@ test.describe("Create Proposal Page", () => {
 
   test("form inputs are present", async ({ page }) => {
     await page.goto("/governance/new");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.waitForTimeout(2000);
 
     const inputs = page.locator(
