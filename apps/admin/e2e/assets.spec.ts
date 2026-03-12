@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Assets Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/assets");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays assets page title", async ({ page }) => {
@@ -68,7 +68,7 @@ test.describe("Asset Detail Page", () => {
   }) => {
     // Navigate to a specific asset
     await page.goto("/assets/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should show some asset-related content or "not found"
     const content = page.locator(
@@ -79,7 +79,7 @@ test.describe("Asset Detail Page", () => {
 
   test("back button navigates to assets list", async ({ page }) => {
     await page.goto("/assets/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Look for back button or link
     const backButton = page.locator(

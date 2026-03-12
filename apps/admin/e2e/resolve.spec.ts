@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Resolution Queue Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/resolve");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
   });
 
   test("displays resolution queue title", async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe("Resolution Queue Page", () => {
 test.describe("Resolution Detail Page", () => {
   test("shows asset details for resolution", async ({ page }) => {
     await page.goto("/resolve/1000");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     // Should show content area
     const content = page.locator(
@@ -72,7 +72,7 @@ test.describe("Resolution Detail Page", () => {
 
   test("resolution action buttons are present", async ({ page }) => {
     await page.goto("/resolve/1000");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
     await page.waitForTimeout(2000);
 
     // Look for Clear, Quarantine, Decommission buttons
@@ -86,7 +86,7 @@ test.describe("Resolution Detail Page", () => {
 
   test("back to queue link works", async ({ page }) => {
     await page.goto("/resolve/1000");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("load");
 
     const backLink = page.locator(
       'a:has-text("Back"), a[href="/resolve"]'
