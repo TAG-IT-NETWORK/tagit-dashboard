@@ -17,6 +17,8 @@ import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { EventFeed } from "@/components/event-feed";
 import { StatsBar } from "@/components/stats-bar";
+import { AgentActivityMonitor } from "@/components/agent-activity-monitor";
+import { WTagDistributionTracker } from "@/components/wtag-distribution-tracker";
 import {
   Card,
   CardHeader,
@@ -404,6 +406,15 @@ function DashboardContent() {
 
       {/* Live Event Feed */}
       <EventFeed />
+
+      {/* Network Activity — Agent Monitor + wTAG Distribution */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Network Activity</h2>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <AgentActivityMonitor limit={15} pollingInterval={15000} />
+          <WTagDistributionTracker topN={10} pollingInterval={30000} />
+        </div>
+      </div>
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
