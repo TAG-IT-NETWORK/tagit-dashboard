@@ -65,3 +65,32 @@ export type {
   FeedEventType,
   EventSource,
 } from "./types";
+
+// Indexer (agent activity + wTAG distribution)
+export {
+  AGENT_STATUS_CHANGES_QUERY,
+  AGENT_FEEDBACKS_QUERY,
+  AGENT_VALIDATIONS_QUERY,
+  REWARD_DISTRIBUTIONS_QUERY,
+  WTAG_HOLDERS_QUERY,
+  WTAG_TRANSFERS_QUERY,
+  PROTOCOL_STATS_QUERY,
+} from "./indexer-queries";
+
+export { useAgentActivity, useWTagDistribution } from "./indexer-hooks";
+
+export type {
+  IndexerAgent,
+  IndexerAgentStatusChange,
+  IndexerFeedback,
+  IndexerValidationRequest,
+  IndexerRewardDistribution,
+  IndexerWTagAccount,
+  IndexerWTagTransfer,
+  IndexerProtocol,
+  AgentActivityEvent,
+  AgentActivityType,
+  WTagHolder,
+  WTagTransferEvent,
+  WTagDistributionSummary,
+} from "./indexer-types";
