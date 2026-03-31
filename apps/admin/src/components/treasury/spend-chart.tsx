@@ -99,9 +99,9 @@ export function SpendChart({ byPeriod }: SpendChartProps) {
                 className="text-muted-foreground"
               />
               <Tooltip
-                formatter={(value: number, name: string) => [
-                  formatCompactAmount(value),
-                  name.charAt(0).toUpperCase() + name.slice(1),
+                formatter={(value, name) => [
+                  formatCompactAmount(Number(value)),
+                  String(name).charAt(0).toUpperCase() + String(name).slice(1),
                 ]}
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",

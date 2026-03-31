@@ -138,6 +138,14 @@ export {
   type FeedEvent,
   type EventSource,
   type AssetTimelineEvent,
+  // Indexer hooks (agent activity + wTAG distribution)
+  useAgentActivity,
+  useWTagDistribution,
+  type AgentActivityEvent,
+  type AgentActivityType,
+  type WTagHolder,
+  type WTagTransferEvent,
+  type WTagDistributionSummary,
 } from "./subgraph";
 
 // Error handling utilities
