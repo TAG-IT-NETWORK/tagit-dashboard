@@ -1,8 +1,12 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { http, fallback, createConfig } from "wagmi";
+import { http, fallback, createConfig, createStorage } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { optimismSepolia, baseSepolia } from "viem/chains";
 import { supportedChains, arbitrumSepolia } from "./chains";
+
+// Use noopStorage during SSR to avoid indexedDB reference errors
+const ssrSafeStorage =
+  typeof window !== "undefined" ? createStorage({ storage: window.localStorage }) : undefined;
 
 const opRpcUrl = process.env.NEXT_PUBLIC_OP_SEPOLIA_RPC;
 const arbRpcUrl =
@@ -38,6 +42,7 @@ export function createWagmiConfig(projectId: string) {
       transports,
       pollingInterval,
       ssr: true,
+      ...(ssrSafeStorage ? { storage: ssrSafeStorage } : {}),
     });
   }
 

@@ -1,12 +1,17 @@
 "use client";
 
 import { Providers, createWagmiConfig } from "@tagit/config";
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
-const wagmiConfig = createWagmiConfig(
-  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || ""
-);
+function getWagmiConfig() {
+  if (typeof window === "undefined") {
+    // Return a minimal config during SSR to avoid indexedDB access
+    return createWagmiConfig("");
+  }
+  return createWagmiConfig(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "");
+}
 
 export function AppProviders({ children }: { children: ReactNode }) {
+  const [wagmiConfig] = useState(() => getWagmiConfig());
   return <Providers wagmiConfig={wagmiConfig}>{children}</Providers>;
 }

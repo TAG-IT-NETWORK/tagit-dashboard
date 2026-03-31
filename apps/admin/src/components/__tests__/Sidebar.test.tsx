@@ -28,6 +28,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock next/image
+vi.mock("next/image", () => ({
+  default: ({ alt, ...props }: { alt: string; [key: string]: unknown }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt={alt} {...props} />
+  ),
+}));
+
 describe("Sidebar", () => {
   beforeEach(() => {
     mockPathname.mockReturnValue("/dashboard");
@@ -49,28 +57,16 @@ describe("Sidebar", () => {
   it("renders the TAG IT Admin logo", () => {
     render(<Sidebar />);
     expect(screen.getByText("TAG IT Admin")).toBeInTheDocument();
-    expect(screen.getByText("T")).toBeInTheDocument();
+    expect(screen.getByAltText("TAG IT")).toBeInTheDocument();
   });
 
   it("renders navigation links with correct hrefs", () => {
     render(<Sidebar />);
 
-    expect(screen.getByText("Dashboard").closest("a")).toHaveAttribute(
-      "href",
-      "/dashboard"
-    );
-    expect(screen.getByText("Assets").closest("a")).toHaveAttribute(
-      "href",
-      "/assets"
-    );
-    expect(screen.getByText("Users").closest("a")).toHaveAttribute(
-      "href",
-      "/users"
-    );
-    expect(screen.getByText("Governance").closest("a")).toHaveAttribute(
-      "href",
-      "/governance"
-    );
+    expect(screen.getByText("Dashboard").closest("a")).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByText("Assets").closest("a")).toHaveAttribute("href", "/assets");
+    expect(screen.getByText("Users").closest("a")).toHaveAttribute("href", "/users");
+    expect(screen.getByText("Governance").closest("a")).toHaveAttribute("href", "/governance");
   });
 
   it("highlights active navigation item based on pathname", () => {
@@ -104,8 +100,8 @@ describe("Sidebar", () => {
 
     // After collapse, the "TAG IT Admin" text should not be visible
     expect(screen.queryByText("TAG IT Admin")).not.toBeInTheDocument();
-    // But the logo "T" should still be visible
-    expect(screen.getByText("T")).toBeInTheDocument();
+    // But the logo image should still be visible
+    expect(screen.getByAltText("TAG IT")).toBeInTheDocument();
   });
 
   it("expands sidebar when expand button is clicked", async () => {

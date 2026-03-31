@@ -26,6 +26,11 @@ vi.mock("@tagit/ui", () => ({
   ),
 }));
 
+// Mock ChainSelector to avoid wagmi provider dependency
+vi.mock("../chain-selector", () => ({
+  ChainSelector: () => <div data-testid="chain-selector" />,
+}));
+
 describe("Header", () => {
   beforeEach(() => {
     mockUseCurrentUser.mockReturnValue({
