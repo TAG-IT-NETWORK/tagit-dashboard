@@ -12,6 +12,7 @@ export {
   isMultiChainEnabled,
   optimismSepolia,
   arbitrumSepolia,
+  baseSepolia,
 } from "./chains";
 export { createWagmiConfig, wagmiConfig } from "./wagmi";
 export { Providers } from "./providers";

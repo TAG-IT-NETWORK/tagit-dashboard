@@ -1,16 +1,23 @@
 "use client";
 
 import { useChainId, useSwitchChain } from "wagmi";
-import { supportedChains, getPrimaryChainId, getChainRole, isMultiChainEnabled } from "@tagit/config";
+import {
+  supportedChains,
+  getPrimaryChainId,
+  getChainRole,
+  isMultiChainEnabled,
+} from "@tagit/config";
 
 const chainLabels: Record<number, string> = {
   421614: "Arbitrum Sepolia",
   11155420: "OP Sepolia",
+  84532: "Base Sepolia",
 };
 
 const chainColors: Record<number, string> = {
   421614: "bg-blue-500",
   11155420: "bg-red-500",
+  84532: "bg-blue-600",
 };
 
 export function ChainSelector() {
@@ -42,9 +49,7 @@ export function ChainSelector() {
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${chainColors[chain.id] ?? "bg-gray-500"}`}
-            />
+            <span className={`w-2 h-2 rounded-full ${chainColors[chain.id] ?? "bg-gray-500"}`} />
             {label}
             {multiChain && (
               <span className={`text-[10px] ${role === "mirror" ? "opacity-60" : ""}`}>

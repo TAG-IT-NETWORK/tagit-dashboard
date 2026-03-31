@@ -4,10 +4,12 @@ export {
   CONTRACTS,
   OP_SEPOLIA_CHAIN_ID,
   ARBITRUM_SEPOLIA_CHAIN_ID,
+  BASE_SEPOLIA_CHAIN_ID,
   getContractsForChain,
   getContractAddress,
   START_BLOCKS,
   ARBITRUM_START_BLOCKS,
+  BASE_SEPOLIA_START_BLOCKS,
   startBlocksByChain,
   type ContractName,
   type ContractAddresses,
@@ -170,6 +172,7 @@ export function shortenHash(hash: string, chars = 6): string {
 const explorerBaseUrls: Record<number, string> = {
   421614: "https://sepolia.arbiscan.io",
   11155420: "https://optimism-sepolia.blockscout.com",
+  84532: "https://sepolia.basescan.org",
 };
 
 export function getExplorerUrl(chainId: number): string {
