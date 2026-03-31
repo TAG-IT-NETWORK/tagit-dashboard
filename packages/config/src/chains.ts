@@ -1,5 +1,5 @@
 import { defineChain } from "viem";
-import { optimismSepolia, arbitrumSepolia as _arbitrumSepolia } from "viem/chains";
+import { optimismSepolia, arbitrumSepolia as _arbitrumSepolia, baseSepolia } from "viem/chains";
 
 // Custom fee estimator for Arbitrum Sepolia.
 // MetaMask and wagmi's internal simulation ignore baseFeeMultiplier,
@@ -31,7 +31,7 @@ export const arbitrumSepolia = defineChain({
   },
 });
 
-export const supportedChains = [arbitrumSepolia, optimismSepolia] as const;
+export const supportedChains = [arbitrumSepolia, optimismSepolia, baseSepolia] as const;
 export const defaultChain = arbitrumSepolia;
 
 export type SupportedChainId = (typeof supportedChains)[number]["id"];
@@ -40,6 +40,7 @@ export type SupportedChainId = (typeof supportedChains)[number]["id"];
 export const explorerUrls: Record<number, string> = {
   [arbitrumSepolia.id]: "https://sepolia.arbiscan.io",
   [optimismSepolia.id]: "https://optimism-sepolia.blockscout.com",
+  [baseSepolia.id]: "https://sepolia.basescan.org",
 };
 
 export function getExplorerUrl(chainId: number): string {
@@ -57,12 +58,16 @@ export function getExplorerAddressUrl(chainId: number, address: string): string 
 /** Read NEXT_PUBLIC_PRIMARY_CHAIN env var and return the primary chain ID */
 export function getPrimaryChainId(): number {
   const env = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_PRIMARY_CHAIN : undefined;
-  return env === "op_sepolia" ? optimismSepolia.id : arbitrumSepolia.id;
+  if (env === "op_sepolia") return optimismSepolia.id;
+  if (env === "base_sepolia") return baseSepolia.id;
+  return arbitrumSepolia.id;
 }
 
-/** Return the mirror (non-primary) chain ID */
+/** Return the first non-primary chain ID (backwards-compatible) */
 export function getMirrorChainId(): number {
-  return getPrimaryChainId() === arbitrumSepolia.id ? optimismSepolia.id : arbitrumSepolia.id;
+  const primaryId = getPrimaryChainId();
+  const mirror = supportedChains.find((c) => c.id !== primaryId);
+  return mirror?.id ?? optimismSepolia.id;
 }
 
 /** Return "primary" or "mirror" for a given chain ID */
@@ -72,8 +77,9 @@ export function getChainRole(chainId: number): "primary" | "mirror" {
 
 /** Whether dual-chain mode is enabled (default: true) */
 export function isMultiChainEnabled(): boolean {
-  const env = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_MULTI_CHAIN_ENABLED : undefined;
+  const env =
+    typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_MULTI_CHAIN_ENABLED : undefined;
   return env !== "false";
 }
 
-export { optimismSepolia };
+export { optimismSepolia, baseSepolia };

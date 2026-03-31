@@ -44,6 +44,27 @@ const ARBITRUM_SEPOLIA_CONTRACTS = {
 } as const;
 
 // ──────────────────────────────────────────────
+// Base Sepolia addresses (pending deployment)
+// ──────────────────────────────────────────────
+
+export const BASE_SEPOLIA_CHAIN_ID = 84532 as const;
+
+const BASE_SEPOLIA_CONTRACTS = {
+  TAGITCore: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITAccess: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  IdentityBadge: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  CapabilityBadge: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITRecovery: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITPaymaster: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITTreasury: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITPrograms: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITStaking: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITAccount: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITAccountFactory: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  CCIPAdapter: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+} as const;
+
+// ──────────────────────────────────────────────
 // Chain-keyed lookup
 // ──────────────────────────────────────────────
 
@@ -53,6 +74,7 @@ export type ContractName = keyof ContractAddresses;
 const addressesByChain: Record<number, ContractAddresses> = {
   [OP_SEPOLIA_CHAIN_ID]: OP_SEPOLIA_CONTRACTS,
   [ARBITRUM_SEPOLIA_CHAIN_ID]: ARBITRUM_SEPOLIA_CONTRACTS,
+  [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_CONTRACTS,
 };
 
 /** Get contract addresses for a given chain ID */
@@ -99,8 +121,14 @@ export const ARBITRUM_START_BLOCKS = {
   TAGITPaymaster: 115_000_000, // deployed earlier
 } as const;
 
+// Base Sepolia start blocks — will be updated after deploy
+export const BASE_SEPOLIA_START_BLOCKS = {
+  TAGITCore: 0,
+} as const;
+
 /** Get start blocks for a given chain ID */
 export const startBlocksByChain: Record<number, Record<string, number>> = {
   [OP_SEPOLIA_CHAIN_ID]: START_BLOCKS,
   [ARBITRUM_SEPOLIA_CHAIN_ID]: ARBITRUM_START_BLOCKS,
+  [BASE_SEPOLIA_CHAIN_ID]: BASE_SEPOLIA_START_BLOCKS,
 };
