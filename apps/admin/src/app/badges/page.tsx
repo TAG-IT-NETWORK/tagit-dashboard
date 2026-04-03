@@ -3,12 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
-import {
-  BadgeIds,
-  BadgeIdNames,
-  useGrantBadge,
-  useRevokeBadge,
-} from "@tagit/contracts";
+import { BadgeIds, BadgeIdNames, useGrantBadge, useRevokeBadge } from "@tagit/contracts";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { getAddress } from "viem";
 import {
@@ -21,25 +16,15 @@ import {
   Badge,
   Input,
 } from "@tagit/ui";
-import {
-  Shield,
-  Award,
-  Users,
-  Plus,
-  Minus,
-  X,
-  Search,
-  Check,
-  AlertCircle,
-} from "lucide-react";
+import { Shield, Award, Users, Plus, Minus, X, Search, Check, AlertCircle } from "lucide-react";
+import { useBadgeHolderCounts } from "@/lib/hooks/use-badge-holder-counts";
 
-// Badge info with mock holder counts
+// Badge static info — holders are resolved from on-chain data
 interface BadgeInfo {
   id: number;
   name: string;
   category: "kyc" | "role" | "authority";
   description: string;
-  holders: number;
 }
 
 const badgeInfoList: BadgeInfo[] = [
@@ -48,49 +33,42 @@ const badgeInfoList: BadgeInfo[] = [
     name: BadgeIdNames[BadgeIds.KYC_L1],
     category: "kyc",
     description: "Basic identity verification",
-    holders: 342,
   },
   {
     id: BadgeIds.KYC_L2,
     name: BadgeIdNames[BadgeIds.KYC_L2],
     category: "kyc",
     description: "Enhanced identity verification with document check",
-    holders: 189,
   },
   {
     id: BadgeIds.KYC_L3,
     name: BadgeIdNames[BadgeIds.KYC_L3],
     category: "kyc",
     description: "Full identity verification with in-person validation",
-    holders: 45,
   },
   {
     id: BadgeIds.MANUFACTURER,
     name: BadgeIdNames[BadgeIds.MANUFACTURER],
     category: "role",
     description: "Authorized product manufacturer",
-    holders: 23,
   },
   {
     id: BadgeIds.RETAILER,
     name: BadgeIdNames[BadgeIds.RETAILER],
     category: "role",
     description: "Authorized retail distributor",
-    holders: 67,
   },
   {
     id: BadgeIds.GOV_MIL,
     name: BadgeIdNames[BadgeIds.GOV_MIL],
     category: "authority",
     description: "Government or military authority",
-    holders: 5,
   },
   {
     id: BadgeIds.LAW_ENFORCEMENT,
     name: BadgeIdNames[BadgeIds.LAW_ENFORCEMENT],
     category: "authority",
     description: "Law enforcement authority",
-    holders: 8,
   },
 ];
 
@@ -281,6 +259,9 @@ function BadgesContent() {
     mode: "grant" | "revoke";
   } | null>(null);
 
+  // Live on-chain holder counts — one balanceOfBatch call per badge type
+  const { counts: holderCounts, isLoading: countsLoading } = useBadgeHolderCounts();
+
   const filteredBadges = badgeInfoList.filter((badge) => {
     const matchesSearch =
       badge.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -291,11 +272,22 @@ function BadgesContent() {
 
   const categories = [
     { value: "kyc", label: "KYC", count: badgeInfoList.filter((b) => b.category === "kyc").length },
-    { value: "role", label: "Role", count: badgeInfoList.filter((b) => b.category === "role").length },
-    { value: "authority", label: "Authority", count: badgeInfoList.filter((b) => b.category === "authority").length },
+    {
+      value: "role",
+      label: "Role",
+      count: badgeInfoList.filter((b) => b.category === "role").length,
+    },
+    {
+      value: "authority",
+      label: "Authority",
+      count: badgeInfoList.filter((b) => b.category === "authority").length,
+    },
   ];
 
-  const totalHolders = badgeInfoList.reduce((sum, b) => sum + b.holders, 0);
+  const totalHolders = badgeInfoList.reduce(
+    (sum, b) => sum + (holderCounts[b.id as keyof typeof holderCounts] ?? 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -332,7 +324,13 @@ function BadgesContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Badge Holders</p>
-                <p className="text-2xl font-bold">{totalHolders}</p>
+                <p className="text-2xl font-bold">
+                  {countsLoading ? (
+                    <span className="animate-pulse text-muted-foreground">—</span>
+                  ) : (
+                    totalHolders
+                  )}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -412,6 +410,7 @@ function BadgesContent() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredBadges.map((badge) => {
           const CategoryIcon = getCategoryIcon(badge.category);
+          const holders = holderCounts[badge.id as keyof typeof holderCounts] ?? 0;
           return (
             <Card key={badge.id} className="relative overflow-hidden">
               <div
@@ -419,16 +418,14 @@ function BadgesContent() {
                   badge.category === "kyc"
                     ? "bg-blue-500"
                     : badge.category === "role"
-                    ? "bg-green-500"
-                    : "bg-red-500"
+                      ? "bg-green-500"
+                      : "bg-red-500"
                 }`}
               />
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <div
-                      className={`p-2 rounded-lg border ${getCategoryColor(badge.category)}`}
-                    >
+                    <div className={`p-2 rounded-lg border ${getCategoryColor(badge.category)}`}>
                       <CategoryIcon className="h-4 w-4" />
                     </div>
                     <div>
@@ -448,7 +445,11 @@ function BadgesContent() {
                     <Users className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Holders</span>
                   </div>
-                  <span className="font-bold">{badge.holders}</span>
+                  {countsLoading ? (
+                    <span className="animate-pulse text-muted-foreground font-bold">—</span>
+                  ) : (
+                    <span className="font-bold">{holders}</span>
+                  )}
                 </div>
 
                 <div className="flex gap-2">

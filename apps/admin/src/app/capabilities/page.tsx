@@ -23,29 +23,18 @@ import {
   Badge,
   Input,
 } from "@tagit/ui";
-import {
-  Shield,
-  Key,
-  Users,
-  Plus,
-  Minus,
-  X,
-  Search,
-  Check,
-  AlertCircle,
-  Copy,
-} from "lucide-react";
+import { Shield, Key, Users, Plus, Minus, X, Search, Check, AlertCircle, Copy } from "lucide-react";
+import { useCapabilityHolderCounts } from "@/lib/hooks/use-badge-holder-counts";
 
 type CapabilityKey = keyof typeof CapabilityIds;
 
-// Capability info with mock holder counts
+// Capability static info — holders are resolved from on-chain data
 interface CapabilityInfo {
   key: CapabilityKey;
   name: string;
   id: CapabilityId;
   hash: string; // For display only
   description: string;
-  holders: number;
   riskLevel: "low" | "medium" | "high";
 }
 
@@ -56,7 +45,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.MINTER,
     hash: CapabilityHashes.MINTER,
     description: "Can mint new asset tokens",
-    holders: 12,
     riskLevel: "medium",
   },
   {
@@ -65,7 +53,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.BINDER,
     hash: CapabilityHashes.BINDER,
     description: "Can bind assets to physical tags",
-    holders: 18,
     riskLevel: "medium",
   },
   {
@@ -74,7 +61,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.ACTIVATOR,
     hash: CapabilityHashes.ACTIVATOR,
     description: "Can activate bound assets",
-    holders: 25,
     riskLevel: "low",
   },
   {
@@ -83,7 +69,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.CLAIMER,
     hash: CapabilityHashes.CLAIMER,
     description: "Can claim assets on behalf of users",
-    holders: 15,
     riskLevel: "low",
   },
   {
@@ -92,7 +77,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.FLAGGER,
     hash: CapabilityHashes.FLAGGER,
     description: "Can flag assets for review",
-    holders: 8,
     riskLevel: "medium",
   },
   {
@@ -101,7 +85,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.RESOLVER,
     hash: CapabilityHashes.RESOLVER,
     description: "Can resolve flagged assets",
-    holders: 3,
     riskLevel: "high",
   },
   {
@@ -110,7 +93,6 @@ const capabilityInfoList: CapabilityInfo[] = [
     id: CapabilityIds.RECYCLER,
     hash: CapabilityHashes.RECYCLER,
     description: "Can recycle decommissioned assets",
-    holders: 5,
     riskLevel: "medium",
   },
 ];
@@ -213,9 +195,7 @@ function GrantRevokeModal({ capability, mode, onClose }: GrantRevokeModalProps) 
         <CardContent className="space-y-4">
           <div className="p-3 rounded-lg border bg-muted/50">
             <div className="flex items-center justify-between mb-2">
-              <Badge variant={getRiskBadgeVariant(capability.riskLevel)}>
-                {capability.name}
-              </Badge>
+              <Badge variant={getRiskBadgeVariant(capability.riskLevel)}>{capability.name}</Badge>
               <Badge variant="outline" className="text-xs">
                 {capability.riskLevel.toUpperCase()} RISK
               </Badge>
@@ -317,6 +297,9 @@ function CapabilitiesContent() {
   } | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
+  // Live on-chain holder counts — one balanceOfBatch call per capability type
+  const { counts: holderCounts, isLoading: countsLoading } = useCapabilityHolderCounts();
+
   const handleCopyHash = async (hash: string) => {
     await navigator.clipboard.writeText(hash);
     setCopiedHash(hash);
@@ -332,12 +315,24 @@ function CapabilitiesContent() {
   });
 
   const riskLevels = [
-    { value: "low", label: "Low", count: capabilityInfoList.filter((c) => c.riskLevel === "low").length },
-    { value: "medium", label: "Medium", count: capabilityInfoList.filter((c) => c.riskLevel === "medium").length },
-    { value: "high", label: "High", count: capabilityInfoList.filter((c) => c.riskLevel === "high").length },
+    {
+      value: "low",
+      label: "Low",
+      count: capabilityInfoList.filter((c) => c.riskLevel === "low").length,
+    },
+    {
+      value: "medium",
+      label: "Medium",
+      count: capabilityInfoList.filter((c) => c.riskLevel === "medium").length,
+    },
+    {
+      value: "high",
+      label: "High",
+      count: capabilityInfoList.filter((c) => c.riskLevel === "high").length,
+    },
   ];
 
-  const totalHolders = capabilityInfoList.reduce((sum, c) => sum + c.holders, 0);
+  const totalHolders = capabilityInfoList.reduce((sum, c) => sum + (holderCounts[c.key] ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -345,9 +340,7 @@ function CapabilitiesContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Capability Management</h1>
-          <p className="text-muted-foreground">
-            Manage operational capabilities and permissions
-          </p>
+          <p className="text-muted-foreground">Manage operational capabilities and permissions</p>
         </div>
       </div>
 
@@ -374,7 +367,13 @@ function CapabilitiesContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Grants</p>
-                <p className="text-2xl font-bold">{totalHolders}</p>
+                <p className="text-2xl font-bold">
+                  {countsLoading ? (
+                    <span className="animate-pulse text-muted-foreground">—</span>
+                  ) : (
+                    totalHolders
+                  )}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -477,7 +476,10 @@ function CapabilitiesContent() {
               </thead>
               <tbody>
                 {filteredCapabilities.map((cap) => (
-                  <tr key={cap.key} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                  <tr
+                    key={cap.key}
+                    className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                  >
                     <td className="px-4 py-4">
                       <div>
                         <div className="font-medium">{cap.name}</div>
@@ -510,7 +512,11 @@ function CapabilitiesContent() {
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{cap.holders}</span>
+                        {countsLoading ? (
+                          <span className="animate-pulse text-muted-foreground font-medium">—</span>
+                        ) : (
+                          <span className="font-medium">{holderCounts[cap.key] ?? 0}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-4">
