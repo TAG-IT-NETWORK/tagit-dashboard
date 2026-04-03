@@ -17,6 +17,7 @@ import {
   ChevronRight,
   FlaskConical,
   Bot,
+  BrainCircuit,
   Megaphone,
   Play,
 } from "lucide-react";
@@ -31,15 +32,14 @@ const navigation = [
   { name: "Resolve", href: "/resolve", icon: AlertTriangle },
   { name: "Governance", href: "/governance", icon: Vote },
   { name: "Treasury", href: "/treasury", icon: Wallet },
+  { name: "AI Agents", href: "/agents", icon: BrainCircuit },
   { name: "BD Agent", href: "/adagent", icon: Bot },
   { name: "Influencer", href: "/influencer", icon: Megaphone },
   { name: "Demo", href: "/demo", icon: Play },
 ];
 
 // Testing section
-const testingNavigation = [
-  { name: "Lifecycle Test", href: "/test/lifecycle", icon: FlaskConical },
-];
+const testingNavigation = [{ name: "Lifecycle Test", href: "/test/lifecycle", icon: FlaskConical }];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -49,7 +49,7 @@ export function Sidebar() {
     <aside
       className={cn(
         "flex flex-col h-screen bg-card border-r border-border transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
       )}
     >
       {/* Logo */}
@@ -80,7 +80,7 @@ export function Sidebar() {
                 isActive
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                collapsed && "justify-center"
+                collapsed && "justify-center",
               )}
               title={collapsed ? item.name : undefined}
             >
@@ -110,7 +110,7 @@ export function Sidebar() {
                 isActive
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                collapsed && "justify-center"
+                collapsed && "justify-center",
               )}
               title={collapsed ? item.name : undefined}
             >
