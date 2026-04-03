@@ -1,67 +1,87 @@
 // Chain IDs defined locally to avoid cross-package type resolution issues
 
 // ──────────────────────────────────────────────
-// OP Sepolia addresses (existing deployment)
+// OP Sepolia addresses (updated Apr 2, 2026)
 // ──────────────────────────────────────────────
 
 export const OP_SEPOLIA_CHAIN_ID = 11155420 as const;
 
 const OP_SEPOLIA_CONTRACTS = {
-  TAGITCore: "0x8bde22da889306d422802728cb98b6da42ed8e1a" as `0x${string}`,
+  TAGITCore: "0x8BdE22da889306d422802728cb98B6Da42ed8e1a" as `0x${string}`,
   TAGITAccess: "0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9" as `0x${string}`,
   IdentityBadge: "0x26F2EBb84664EF1eF8554e15777EBEc6611256A6" as `0x${string}`,
   CapabilityBadge: "0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505" as `0x${string}`,
-  TAGITRecovery: "0x6138a80c06A5e6a3CB6cc491A3a2c4DF4adD1600" as `0x${string}`,
-  TAGITPaymaster: "0x4339c46D63231063250834D9b3fa4E51FdB8026e" as `0x${string}`,
-  TAGITTreasury: "0xf6f5e2e03f6e28aE9Dc17bCc814a0cf758c887c9" as `0x${string}`,
-  TAGITPrograms: "0xe78DB7702FF5190DAc2F3E09213Ff84bF9efE32b" as `0x${string}`,
-  TAGITStaking: "0x12EE464e32a683f813fDb478e6C8e68E3d63d781" as `0x${string}`,
+  TAGITRecovery: "0x17c0af6B37aBD06587303f1695a06A668F8A5A8c" as `0x${string}`,
+  TAGITPaymaster: "0x670DC1C7821E0A717CFf5Cc949B05EC01b532104" as `0x${string}`,
+  TAGITTreasury: "0x841B07Ad929CCC589446e29Aa0C4Dd1639B48674" as `0x${string}`,
+  TAGITPrograms: "0x4d1007eB4823a5a13905A0361478C339421ce4C9" as `0x${string}`,
+  TAGITStaking: "0xe500CDfbA693CE1f39A6F05CfB4614971370Ee93" as `0x${string}`,
   TAGITAccount: "0xC159FDec7a8fDc0d98571C89c342e28bB405e682" as `0x${string}`,
-  TAGITAccountFactory: "0x8D27B612a9D3e45d51D2234B2f4e03dCC5ca844b" as `0x${string}`,
-  CCIPAdapter: "0x8dA6D7ffCD4cc0F2c9FfD6411CeD7C9c573C9E88" as `0x${string}`,
+  TAGITAccountFactory: "0x0ECe601E24789409C87010E064F88d584b051d68" as `0x${string}`,
+  CCIPAdapter: "0x76C375716bE762EEcb4860D06bB051735e6fb3FA" as `0x${string}`,
+  TAGITToken: "0x061a89736F91cAC11272B8A95fc7e377cD0e4067" as `0x${string}`,
+  TAGITGovernor: "0x8A7cd4FC493663Fc5CD0268704969D644BA773e3" as `0x${string}`,
+  TAGITEmissions: "0x0259822faf08597f5B9D399F59332d136c6D518d" as `0x${string}`,
+  TAGITBurner: "0xBAa0346AD5ED79Ec280cb0951C5Ea80A35D985A9" as `0x${string}`,
+  TAGITVesting: "0x4052d29e2aB49193F0577934963b9650F633e63F" as `0x${string}`,
+  IntegrationFactory: "0xac3687df5A09a5FeD697eb40B6dB22a98cC7B0a8" as `0x${string}`,
+  VerificationEscrow: "0x698D4DbaE56BC7e36E2Ab34bd47aB97461219726" as `0x${string}`,
 } as const;
 
 // ──────────────────────────────────────────────
-// Arbitrum Sepolia addresses (hackathon deployment)
-// Placeholder until forge script broadcast
+// Arbitrum Sepolia addresses (full redeployment Apr 2, 2026)
 // ──────────────────────────────────────────────
 
 export const ARBITRUM_SEPOLIA_CHAIN_ID = 421614 as const;
 
 const ARBITRUM_SEPOLIA_CONTRACTS = {
-  TAGITCore: "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f" as `0x${string}`,
-  TAGITAccess: "0x676f593c451E4dF2345026af891Acc92c4344455" as `0x${string}`,
-  IdentityBadge: "0xEd6a36beB559A8047121B6300fF0060b0E64b5C7" as `0x${string}`,
-  CapabilityBadge: "0xa8BbC7f95f5D979e8E9208bc627194384b257c24" as `0x${string}`,
-  TAGITRecovery: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  TAGITPaymaster: "0xBbB9f7dB1C38Af7998b511d8026042755Eb4F4C4" as `0x${string}`,
-  TAGITTreasury: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  TAGITPrograms: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  TAGITStaking: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  TAGITAccount: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  TAGITAccountFactory: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-  CCIPAdapter: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  TAGITCore: "0x5952f5af2429e6f973FE40aD6bEad5c770837233" as `0x${string}`,
+  TAGITAccess: "0x801c45774fC70DC6ADe30CC0a2F524CadadCDdC7" as `0x${string}`,
+  IdentityBadge: "0x76965313aF612bac577E137D8190fB1E3523a307" as `0x${string}`,
+  CapabilityBadge: "0xB639d0B53338F83c25883271ea4c1aDc60F14f7A" as `0x${string}`,
+  TAGITRecovery: "0xfFdDB206e8F0027EC598EDA8b0CdFf528f9a3A7F" as `0x${string}`,
+  TAGITPaymaster: "0x533830101306d69D70b830ABdeE954774c561c32" as `0x${string}`,
+  TAGITTreasury: "0x79af1F94Bbe40Ad8A52774fFD69626EE48701d48" as `0x${string}`,
+  TAGITPrograms: "0xe798CD1CD53DdD27D07b1ea084c0D379A5Bc400c" as `0x${string}`,
+  TAGITStaking: "0xc7fB8B6A838449a19d138601cF1711C5f36Fd655" as `0x${string}`,
+  TAGITAccount: "0xa97fBBD5aB97a0d8067E3dD1A51d2b0b88e14ac2" as `0x${string}`,
+  TAGITAccountFactory: "0xBC68ff3E74020c78e8A69cD553503A9aF93bBDC1" as `0x${string}`,
+  CCIPAdapter: "0x8b1b3C5946a62C4ba35B25621e74d49a41D40BC5" as `0x${string}`,
+  TAGITToken: "0x42456C31b336D866DE9EB56f9916Af0A97Ae14f6" as `0x${string}`,
+  TAGITGovernor: "0xad0b3009b5C57D3034bB4b8eBaCb1028D6891c06" as `0x${string}`,
+  TAGITEmissions: "0xa6203965F164aDbE954041C912F517CAeDD90aA0" as `0x${string}`,
+  TAGITBurner: "0xca85E7B6CcE9907DEd1A6b2b6DC98Fba5FE7E8C5" as `0x${string}`,
+  TAGITVesting: "0xE4C87C0acDbd73789Ea16fE1f6D712050C0bFd13" as `0x${string}`,
+  IntegrationFactory: "0x7580f30625730C8Ad1086bC36eeB1258472430EA" as `0x${string}`,
+  VerificationEscrow: "0xF78C7d5bdED8eA0B159b0223a631679E91508C04" as `0x${string}`,
 } as const;
 
 // ──────────────────────────────────────────────
-// Base Sepolia addresses (v2 redeployment Mar 31, 2026 — fixed Token→Staking order)
+// Base Sepolia addresses (v2 redeployment Mar 31, 2026)
 // ──────────────────────────────────────────────
 
 export const BASE_SEPOLIA_CHAIN_ID = 84532 as const;
 
 const BASE_SEPOLIA_CONTRACTS = {
-  TAGITCore: "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d" as `0x${string}`,
+  TAGITCore: "0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D" as `0x${string}`,
   TAGITAccess: "0xb56A1D91995C212342FaA843468F03521340A1D6" as `0x${string}`,
   IdentityBadge: "0xebdAC9A0663c02a7297681b078aaD893EF345030" as `0x${string}`,
   CapabilityBadge: "0xb05d22706B08A3F6409601de520cf7A6dbCB573d" as `0x${string}`,
-  TAGITRecovery: "0x6Bc3c69367E586810a3b317fA9F0406504E95866" as `0x${string}`,
-  TAGITPaymaster: "0x6fFfA92eFb419e812d5c9C9D0c1b1A0F5C6FFd1c" as `0x${string}`,
-  TAGITTreasury: "0xa4A3720d705334f409Dd24836Cc75D642125f759" as `0x${string}`,
-  TAGITPrograms: "0x62a3CF048E66Be0119F0CcD97eC964B726B9A982" as `0x${string}`,
-  TAGITStaking: "0xb22F5688559d07e3A12dBB89F0481B967407F267" as `0x${string}`,
+  TAGITRecovery: "0x6BC3C69367E586810A3B317fA9F0406504e95866" as `0x${string}`,
+  TAGITPaymaster: "0x6fFFa92efb419E812d5c9C9D0c1B1a0f5c6fFd1C" as `0x${string}`,
+  TAGITTreasury: "0xa4a3720d705334f409DD24836CC75d642125f759" as `0x${string}`,
+  TAGITPrograms: "0x62a3CF048E66BE0119F0ccD97Ec964B726B9a982" as `0x${string}`,
+  TAGITStaking: "0xB22F5688559D07e3a12DBB89f0481b967407F267" as `0x${string}`,
   TAGITAccount: "0x2160044C7c46B08a552361595E09e8C8DDD06E85" as `0x${string}`,
-  TAGITAccountFactory: "0x3eD2C0e92f0E52dC68D04172Ad37Df4724893AD3" as `0x${string}`,
+  TAGITAccountFactory: "0x3ed2c0E92F0e52dC68d04172aD37df4724893aD3" as `0x${string}`,
   CCIPAdapter: "0x5e190F6Ebde4BD1e11a5566a1e81a933cdDf3505" as `0x${string}`,
+  TAGITToken: "0x5f98B83cD7Aef769cc51D2FB739BA49D561170DE" as `0x${string}`,
+  TAGITGovernor: "0xCF67DF870EccBB7838c3ab7876467c89d84dce89" as `0x${string}`,
+  TAGITEmissions: "0x0672fcC5b753786C2cD1805494fF094CB5d6E579" as `0x${string}`,
+  TAGITBurner: "0xCB8AbCe0770C499B789481F8c6C20Fa0d6980d2a" as `0x${string}`,
+  TAGITVesting: "0x7dd4c98a2aFE60eE06bA5c136dBeb7f93DD2699D" as `0x${string}`,
+  IntegrationFactory: "0xd68919371c26700dDb8252aD1825Aa02a0381a86" as `0x${string}`,
+  VerificationEscrow: "0x4c9aACfcb64169E3BC187c227c4C0e0a5CFDA1cF" as `0x${string}`,
 } as const;
 
 // ──────────────────────────────────────────────
@@ -112,16 +132,16 @@ export const START_BLOCKS = {
   CCIPAdapter: 37959312,
 } as const;
 
-// Arbitrum Sepolia start blocks — will be updated after deploy
+// Arbitrum Sepolia start blocks (redeployed Apr 2, 2026)
 export const ARBITRUM_START_BLOCKS = {
   TAGITCore: 246_901_619,
   TAGITAccess: 246_901_619,
   IdentityBadge: 246_901_619,
   CapabilityBadge: 246_901_619,
-  TAGITPaymaster: 115_000_000, // deployed earlier
+  TAGITPaymaster: 246_901_619,
 } as const;
 
-// Base Sepolia start blocks — will be updated after deploy
+// Base Sepolia start blocks
 export const BASE_SEPOLIA_START_BLOCKS = {
   TAGITCore: 0,
 } as const;
