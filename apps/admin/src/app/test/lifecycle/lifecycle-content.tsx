@@ -95,6 +95,7 @@ export function LifecycleContent() {
   const [productDescription, setProductDescription] = useState("");
   const [productCategory, setProductCategory] = useState("general");
   const [productOrigin, setProductOrigin] = useState("");
+  const [productImage, setProductImage] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Contract hooks
@@ -318,7 +319,7 @@ export function LifecycleContent() {
     const metadata = {
       name: productName || `Asset ${Date.now()}`,
       description: productDescription || "TAG IT Digital Twin",
-      image: "ipfs://QmPlaceholder",
+      image: productImage || "ipfs://QmPlaceholder",
       attributes: [
         ...(productBrand ? [{ trait_type: "Brand", value: productBrand }] : []),
         ...(productSKU ? [{ trait_type: "SKU", value: productSKU }] : []),
@@ -393,6 +394,7 @@ export function LifecycleContent() {
     setProductDescription("");
     setProductCategory("general");
     setProductOrigin("");
+    setProductImage("");
     setShowAdvanced(false);
   };
 
@@ -645,6 +647,18 @@ export function LifecycleContent() {
                           placeholder="Brief product description"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Product Image URL</Label>
+                      <Input
+                        value={productImage}
+                        onChange={(e) => setProductImage(e.target.value)}
+                        placeholder="https://... or ipfs://... (optional)"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Paste an image URL or IPFS link. If empty, an on-chain SVG will be generated
+                        automatically.
+                      </p>
                     </div>
                     <button
                       type="button"
