@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getAddress } from "viem";
 import Link from "next/link";
 import {
@@ -47,6 +47,8 @@ import {
   Scale,
   RefreshCw,
   Search,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import { BindTagModal } from "@/components/bind-tag-modal";
 import { LIFECYCLE_STEPS, generateTestMetadataURI } from "@/lib/test-utils";
@@ -97,6 +99,33 @@ export function LifecycleContent() {
   const [productOrigin, setProductOrigin] = useState("");
   const [productImage, setProductImage] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview immediately
+    setImagePreview(URL.createObjectURL(file));
+    setImageUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/ipfs", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setProductImage(data.url); // ipfs://Qm...
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setProductImage("");
+      setImagePreview("");
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   // Contract hooks
   const {
@@ -649,16 +678,65 @@ export function LifecycleContent() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Product Image URL</Label>
-                      <Input
-                        value={productImage}
-                        onChange={(e) => setProductImage(e.target.value)}
-                        placeholder="https://... or ipfs://... (optional)"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Paste an image URL or IPFS link. If empty, an on-chain SVG will be generated
-                        automatically.
-                      </p>
+                      <Label>Product Image</Label>
+                      <div className="flex gap-3 items-start">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              value={productImage}
+                              onChange={(e) => {
+                                setProductImage(e.target.value);
+                                setImagePreview("");
+                              }}
+                              placeholder="ipfs://... or https://... (optional)"
+                              className="font-mono text-sm"
+                            />
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleImageUpload}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={imageUploading}
+                              className="shrink-0"
+                            >
+                              {imageUploading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {imageUploading
+                              ? "Uploading to IPFS..."
+                              : productImage
+                                ? "Image pinned to IPFS"
+                                : "Upload a photo or paste a URL. If empty, a generated SVG is used."}
+                          </p>
+                        </div>
+                        {(imagePreview || productImage) && (
+                          <div className="w-16 h-16 rounded-md border border-border overflow-hidden shrink-0 bg-muted">
+                            {imagePreview ? (
+                              <img
+                                src={imagePreview}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : productImage ? (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <button
                       type="button"
