@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 const explorerUrls: Record<number, string> = {
   421614: "https://sepolia.arbiscan.io",
   11155420: "https://optimism-sepolia.blockscout.com",
+  84532: "https://sepolia.basescan.org",
 };
 
 export interface AddressBadgeProps {
