@@ -49,10 +49,7 @@ import {
   Search,
 } from "lucide-react";
 import { BindTagModal } from "@/components/bind-tag-modal";
-import {
-  LIFECYCLE_STEPS,
-  generateTestMetadataURI,
-} from "@/lib/test-utils";
+import { LIFECYCLE_STEPS, generateTestMetadataURI } from "@/lib/test-utils";
 import { generateTestUID, uidToTagId, formatUID, truncateTagId } from "@/lib/tag-utils";
 
 interface StepState {
@@ -91,15 +88,81 @@ export function LifecycleContent() {
   const [claimAddress, setClaimAddress] = useState("");
   const [resolveAddress, setResolveAddress] = useState("");
 
+  // Product metadata form
+  const [productName, setProductName] = useState("");
+  const [productBrand, setProductBrand] = useState("");
+  const [productSKU, setProductSKU] = useState("");
+  const [productDescription, setProductDescription] = useState("");
+  const [productCategory, setProductCategory] = useState("general");
+  const [productOrigin, setProductOrigin] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   // Contract hooks
-  const { mint, hash: mintHash, isPending: mintPending, isConfirming: mintConfirming, isSuccess: mintSuccess, error: mintError, tokenId: mintedTokenId } = useMint();
-  const { bindTag, hash: bindHash, isPending: bindPending, isConfirming: bindConfirming, isSuccess: bindSuccess, error: bindError } = useBindTag();
-  const { activate, hash: activateHash, isPending: activatePending, isConfirming: activateConfirming, isSuccess: activateSuccess, error: activateError } = useActivate();
-  const { claim, hash: claimHash, isPending: claimPending, isConfirming: claimConfirming, isSuccess: claimSuccess, error: claimError } = useClaim();
-  const { flag, hash: flagHash, isPending: flagPending, isConfirming: flagConfirming, isSuccess: flagSuccess, error: flagError } = useFlag();
-  const { approveResolve, hash: approveResolveHash, isPending: approveResolvePending, isConfirming: approveResolveConfirming, isSuccess: approveResolveSuccess, error: approveResolveError } = useApproveResolve();
-  const { resolve, hash: resolveHash, isPending: resolvePending, isConfirming: resolveConfirming, isSuccess: resolveSuccess, error: resolveError } = useResolve();
-  const { recycle, hash: recycleHash, isPending: recyclePending, isConfirming: recycleConfirming, isSuccess: recycleSuccess, error: recycleError } = useRecycle();
+  const {
+    mint,
+    hash: mintHash,
+    isPending: mintPending,
+    isConfirming: mintConfirming,
+    isSuccess: mintSuccess,
+    error: mintError,
+    tokenId: mintedTokenId,
+  } = useMint();
+  const {
+    bindTag,
+    hash: bindHash,
+    isPending: bindPending,
+    isConfirming: bindConfirming,
+    isSuccess: bindSuccess,
+    error: bindError,
+  } = useBindTag();
+  const {
+    activate,
+    hash: activateHash,
+    isPending: activatePending,
+    isConfirming: activateConfirming,
+    isSuccess: activateSuccess,
+    error: activateError,
+  } = useActivate();
+  const {
+    claim,
+    hash: claimHash,
+    isPending: claimPending,
+    isConfirming: claimConfirming,
+    isSuccess: claimSuccess,
+    error: claimError,
+  } = useClaim();
+  const {
+    flag,
+    hash: flagHash,
+    isPending: flagPending,
+    isConfirming: flagConfirming,
+    isSuccess: flagSuccess,
+    error: flagError,
+  } = useFlag();
+  const {
+    approveResolve,
+    hash: approveResolveHash,
+    isPending: approveResolvePending,
+    isConfirming: approveResolveConfirming,
+    isSuccess: approveResolveSuccess,
+    error: approveResolveError,
+  } = useApproveResolve();
+  const {
+    resolve,
+    hash: resolveHash,
+    isPending: resolvePending,
+    isConfirming: resolveConfirming,
+    isSuccess: resolveSuccess,
+    error: resolveError,
+  } = useResolve();
+  const {
+    recycle,
+    hash: recycleHash,
+    isPending: recyclePending,
+    isConfirming: recycleConfirming,
+    isSuccess: recycleSuccess,
+    error: recycleError,
+  } = useRecycle();
 
   // Fetch asset data
   const { asset, refetch: refetchAsset } = useAsset(tokenId ?? 0n);
@@ -112,12 +175,12 @@ export function LifecycleContent() {
 
   // Map on-chain asset state to the next lifecycle step
   const stateToStep: Record<number, number> = {
-    [AssetState.MINTED]: 1,    // next: bind
-    [AssetState.BOUND]: 2,     // next: activate
+    [AssetState.MINTED]: 1, // next: bind
+    [AssetState.BOUND]: 2, // next: activate
     [AssetState.ACTIVATED]: 3, // next: claim
-    [AssetState.CLAIMED]: 4,   // next: flag
-    [AssetState.FLAGGED]: 5,   // next: resolve
-    [AssetState.RECYCLED]: 6,  // done
+    [AssetState.CLAIMED]: 4, // next: flag
+    [AssetState.FLAGGED]: 5, // next: resolve
+    [AssetState.RECYCLED]: 6, // done
   };
 
   // When loading an existing token, sync step from on-chain state
@@ -251,11 +314,32 @@ export function LifecycleContent() {
     });
   }, [mintError, bindError, activateError, claimError, flagError, resolveError, recycleError]);
 
+  const buildMetadataURI = () => {
+    const metadata = {
+      name: productName || `Asset ${Date.now()}`,
+      description: productDescription || "TAG IT Digital Twin",
+      image: "ipfs://QmPlaceholder",
+      attributes: [
+        ...(productBrand ? [{ trait_type: "Brand", value: productBrand }] : []),
+        ...(productSKU ? [{ trait_type: "SKU", value: productSKU }] : []),
+        ...(productCategory ? [{ trait_type: "Category", value: productCategory }] : []),
+        ...(productOrigin ? [{ trait_type: "Origin", value: productOrigin }] : []),
+        { trait_type: "Created", value: new Date().toISOString() },
+      ],
+      tagit: {
+        version: "2.0",
+        lifecycle: "MINTED",
+        nfcBound: false,
+      },
+    };
+    return `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+  };
+
   const handleMint = () => {
     if (!address) return;
-    // Normalize address to proper checksum format
     const checksumAddress = getAddress(address);
-    mint(checksumAddress, metadataURI || generateTestMetadataURI());
+    const uri = showAdvanced ? metadataURI : buildMetadataURI();
+    mint(checksumAddress, uri || generateTestMetadataURI());
   };
 
   const handleBindWithModal = () => {
@@ -303,6 +387,13 @@ export function LifecycleContent() {
     setClaimAddress("");
     setResolveAddress("");
     setMetadataURI(generateTestMetadataURI());
+    setProductName("");
+    setProductBrand("");
+    setProductSKU("");
+    setProductDescription("");
+    setProductCategory("general");
+    setProductOrigin("");
+    setShowAdvanced(false);
   };
 
   if (!isConnected) {
@@ -360,10 +451,10 @@ export function LifecycleContent() {
                         isCompleted
                           ? "bg-green-500 border-green-500 text-white"
                           : hasError
-                          ? "bg-destructive border-destructive text-white"
-                          : isActive
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "bg-muted border-border text-muted-foreground"
+                            ? "bg-destructive border-destructive text-white"
+                            : isActive
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "bg-muted border-border text-muted-foreground"
                       }`}
                     >
                       {isCompleted ? (
@@ -419,12 +510,14 @@ export function LifecycleContent() {
                       <p className="text-sm text-muted-foreground">Owner</p>
                       <AddressBadge address={asset.owner} chainId={chainId} truncate />
                     </div>
-                    {tagHash && tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" && (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Tag ID</p>
-                        <code className="text-xs break-all">{truncateTagId(tagHash)}</code>
-                      </div>
-                    )}
+                    {tagHash &&
+                      tagHash !==
+                        "0x0000000000000000000000000000000000000000000000000000000000000000" && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Tag ID</p>
+                          <code className="text-xs break-all">{truncateTagId(tagHash)}</code>
+                        </div>
+                      )}
                   </>
                 )}
                 <Button variant="outline" size="sm" className="w-full" asChild>
@@ -488,21 +581,100 @@ export function LifecycleContent() {
             {/* Step 1: Mint */}
             {currentStep === 0 && (
               <>
-                <div className="space-y-2">
-                  <Label>Metadata URI</Label>
-                  <Input
-                    value={metadataURI}
-                    onChange={(e) => setMetadataURI(e.target.value)}
-                    placeholder="ipfs://... or data:..."
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Pre-filled with test metadata. You can change this or use IPFS.
-                  </p>
-                </div>
+                {!showAdvanced ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Product Name *</Label>
+                        <Input
+                          value={productName}
+                          onChange={(e) => setProductName(e.target.value)}
+                          placeholder="e.g., Nike Air Max 90"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Brand</Label>
+                        <Input
+                          value={productBrand}
+                          onChange={(e) => setProductBrand(e.target.value)}
+                          placeholder="e.g., Nike"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>SKU / Serial</Label>
+                        <Input
+                          value={productSKU}
+                          onChange={(e) => setProductSKU(e.target.value)}
+                          placeholder="e.g., CW2288-111"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <select
+                          value={productCategory}
+                          onChange={(e) => setProductCategory(e.target.value)}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                        >
+                          <option value="general">General</option>
+                          <option value="footwear">Footwear</option>
+                          <option value="apparel">Apparel</option>
+                          <option value="electronics">Electronics</option>
+                          <option value="luxury">Luxury Goods</option>
+                          <option value="pharmaceutical">Pharmaceutical</option>
+                          <option value="automotive">Automotive</option>
+                          <option value="defense">Defense / Gov</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Manufacturing Origin</Label>
+                        <Input
+                          value={productOrigin}
+                          onChange={(e) => setProductOrigin(e.target.value)}
+                          placeholder="e.g., Ho Chi Minh City, Vietnam"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={productDescription}
+                          onChange={(e) => setProductDescription(e.target.value)}
+                          placeholder="Brief product description"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(true)}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Switch to raw metadata URI
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Metadata URI (Advanced)</Label>
+                    <Input
+                      value={metadataURI}
+                      onChange={(e) => setMetadataURI(e.target.value)}
+                      placeholder="ipfs://... or data:application/json;base64,..."
+                      className="font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(false)}
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                      Switch to product form
+                    </button>
+                  </div>
+                )}
                 <Button
                   onClick={handleMint}
-                  disabled={mintPending || mintConfirming}
+                  disabled={mintPending || mintConfirming || (!showAdvanced && !productName)}
                   className="w-full"
                 >
                   {mintPending || mintConfirming ? (
@@ -513,7 +685,7 @@ export function LifecycleContent() {
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
-                      Mint Test Asset
+                      Mint Digital Twin
                     </>
                   )}
                 </Button>
@@ -637,8 +809,8 @@ export function LifecycleContent() {
               <>
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4">
                   <p className="text-sm">
-                    Flagging marks an asset as lost, stolen, or subject to recall.
-                    This initiates the AIRP recovery protocol.
+                    Flagging marks an asset as lost, stolen, or subject to recall. This initiates
+                    the AIRP recovery protocol.
                   </p>
                 </div>
                 <Button
@@ -667,9 +839,9 @@ export function LifecycleContent() {
               <>
                 <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 mb-4">
                   <p className="text-sm">
-                    Resolving returns the asset to the rightful owner after AIRP recovery.
-                    This requires two wallet confirmations: approval + execution.
-                    Enter the address of the verified owner.
+                    Resolving returns the asset to the rightful owner after AIRP recovery. This
+                    requires two wallet confirmations: approval + execution. Enter the address of
+                    the verified owner.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -692,7 +864,13 @@ export function LifecycleContent() {
                 </div>
                 <Button
                   onClick={handleResolve}
-                  disabled={!resolveAddress || approveResolvePending || approveResolveConfirming || resolvePending || resolveConfirming}
+                  disabled={
+                    !resolveAddress ||
+                    approveResolvePending ||
+                    approveResolveConfirming ||
+                    resolvePending ||
+                    resolveConfirming
+                  }
                   className="w-full"
                 >
                   {approveResolvePending ? (
