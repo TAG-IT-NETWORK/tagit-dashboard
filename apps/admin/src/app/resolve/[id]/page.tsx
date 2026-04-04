@@ -15,6 +15,7 @@ import {
 } from "@tagit/contracts";
 import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
+import { RequireCapability, Capabilities } from "@/components/require-capability";
 import {
   Card,
   CardContent,
@@ -125,12 +126,7 @@ interface ResolutionModalProps {
   tokenId: string;
 }
 
-function ResolutionModal({
-  isOpen,
-  onClose,
-  onConfirm,
-  tokenId,
-}: ResolutionModalProps) {
+function ResolutionModal({ isOpen, onClose, onConfirm, tokenId }: ResolutionModalProps) {
   const [newOwner, setNewOwner] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -179,8 +175,7 @@ function ResolutionModal({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">
-              Notes{" "}
-              <span className="text-muted-foreground">(min 10 characters)</span>
+              Notes <span className="text-muted-foreground">(min 10 characters)</span>
             </label>
             <textarea
               value={notes}
@@ -359,7 +354,8 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
             <h2 className="text-lg font-semibold text-green-600">Resolution Successful!</h2>
             <p className="text-muted-foreground">
-              Asset #{tokenId} has been resolved. Current state: {AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}
+              Asset #{tokenId} has been resolved. Current state:{" "}
+              {AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}
             </p>
             {txHash && (
               <a
@@ -386,10 +382,10 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
   const asset = {
     tokenId,
     owner: contractAsset.owner,
-    tagId: tagHash &&
-      tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000"
-      ? (tagHash as string)
-      : null,
+    tagId:
+      tagHash && tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000"
+        ? (tagHash as string)
+        : null,
     previousState: AssetState.ACTIVATED, // We don't have previous state without indexer
     flaggedBy: contractAsset.owner, // Placeholder - requires indexer
     flaggedAt,
@@ -423,15 +419,13 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
             <div className="flex items-center gap-1">
               <User className="h-4 w-4" />
               <span>by</span>
-              <AddressBadge
-                address={asset.flaggedBy}
-                showCopy={false}
-                showEtherscan={false}
-              />
+              <AddressBadge address={asset.flaggedBy} showCopy={false} showEtherscan={false} />
             </div>
             <div className="flex items-center gap-1">
               <Package className="h-4 w-4" />
-              <span>Was {AssetStateNames[asset.previousState as keyof typeof AssetStateNames]}</span>
+              <span>
+                Was {AssetStateNames[asset.previousState as keyof typeof AssetStateNames]}
+              </span>
             </div>
           </div>
         </div>
@@ -520,9 +514,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                 <FileText className="h-5 w-5" />
                 Investigation Panel
               </CardTitle>
-              <CardDescription>
-                Collapsible sections for detailed investigation
-              </CardDescription>
+              <CardDescription>Collapsible sections for detailed investigation</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {/* Ownership Chain */}
@@ -641,9 +633,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                   <History className="h-5 w-5" />
                   Resolution History
                 </CardTitle>
-                <CardDescription>
-                  Previous resolutions for this asset
-                </CardDescription>
+                <CardDescription>Previous resolutions for this asset</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
@@ -743,7 +733,9 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
               {!isFlagged && (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
                   <p className="text-sm text-yellow-600">
-                    This asset is in state "{AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}" and cannot be resolved.
+                    This asset is in state "
+                    {AssetStateNames[contractAsset.state as keyof typeof AssetStateNames]}" and
+                    cannot be resolved.
                   </p>
                 </div>
               )}
@@ -801,11 +793,11 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
 }
 
 export default function ResolveDetailPage({ params }: ResolveDetailPageProps) {
-  // Development mode: Skip capability check while wagmi context issue is being debugged
-  // TODO: Re-enable RequireCapability when wagmi integration is fixed
   return (
     <WagmiGuard>
-      <ResolveDetailContent tokenId={params.id} />
+      <RequireCapability capability={Capabilities.RESOLVER}>
+        <ResolveDetailContent tokenId={params.id} />
+      </RequireCapability>
     </WagmiGuard>
   );
 }
