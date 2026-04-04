@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AppProviders } from "./providers";
 import { AdminShell } from "@/components/admin-shell";
+import { Toaster } from "@tagit/ui";
 
 export function ClientShellContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -15,7 +16,9 @@ export function ClientShellContent({ children }: { children: ReactNode }) {
 
   return (
     <AppProviders>
-      <AdminShell>{children}</AdminShell>
+      <Toaster>
+        <AdminShell>{children}</AdminShell>
+      </Toaster>
     </AppProviders>
   );
 }

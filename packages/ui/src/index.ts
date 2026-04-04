@@ -25,7 +25,12 @@ export {
 } from "./components/dialog";
 export { ConnectButton, type ConnectButtonProps } from "./components/connect-button";
 export { MetricCard, type MetricCardProps } from "./components/metric-card";
-export { StateBadge, getStateLabel, getStateColor, type StateBadgeProps } from "./components/state-badge";
+export {
+  StateBadge,
+  getStateLabel,
+  getStateColor,
+  type StateBadgeProps,
+} from "./components/state-badge";
 export { AddressBadge, type AddressBadgeProps } from "./components/address-badge";
 
 // Phase 3 Components
@@ -50,6 +55,20 @@ export {
   type Priority,
   type PriorityBadgeProps,
 } from "./components/priority-badge";
+
+// Toast
+export {
+  ToastProvider,
+  ToastContext,
+  type Toast,
+  type ToastOptions,
+  type ToastVariant,
+  type ToastContextValue,
+} from "./components/toast";
+export { Toaster } from "./components/toaster";
+
+// Hooks
+export { useToast } from "./hooks/use-toast";
 
 // Utils
 export { cn } from "./lib/utils";
