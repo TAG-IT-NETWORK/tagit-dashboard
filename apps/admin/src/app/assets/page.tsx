@@ -115,6 +115,15 @@ interface ColumnActions {
   isPending: boolean;
 }
 
+// Extend TanStack Table's ColumnMeta to carry optional responsive classes.
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    /** Tailwind classes applied to both the <th> and every <td> for this column. */
+    className?: string;
+  }
+}
+
 function createColumns(actions: ColumnActions): ColumnDef<AssetRow>[] {
   return [
     {
@@ -161,18 +170,20 @@ function createColumns(actions: ColumnActions): ColumnDef<AssetRow>[] {
     },
     {
       accessorKey: "tagId",
+      // Hide on mobile — show from md breakpoint up.
+      meta: { className: "hidden md:table-cell" },
       header: "Tag ID",
       cell: ({ row }) =>
         row.original.tagId ? (
-          <code className="text-sm text-muted-foreground">
-            {truncateHex(row.original.tagId)}
-          </code>
+          <code className="text-sm text-muted-foreground">{truncateHex(row.original.tagId)}</code>
         ) : (
           <span className="text-muted-foreground text-sm">Unbound</span>
         ),
     },
     {
       accessorKey: "createdAt",
+      // Hide on mobile — show from md breakpoint up.
+      meta: { className: "hidden md:table-cell" },
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -261,12 +272,20 @@ function AssetsContent() {
   const flagHook = useFlag();
   const recycleHook = useRecycle();
 
-  const anyPending = activateHook.isPending || claimHook.isPending || flagHook.isPending || recycleHook.isPending;
-  const anyConfirming = activateHook.isConfirming || claimHook.isConfirming || flagHook.isConfirming || recycleHook.isConfirming;
+  const anyPending =
+    activateHook.isPending || claimHook.isPending || flagHook.isPending || recycleHook.isPending;
+  const anyConfirming =
+    activateHook.isConfirming ||
+    claimHook.isConfirming ||
+    flagHook.isConfirming ||
+    recycleHook.isConfirming;
 
   // Refetch after successful tx
-  const lastSuccess = activateHook.isSuccess || claimHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess;
-  useMemo(() => { if (lastSuccess) refetch(); }, [lastSuccess]);
+  const lastSuccess =
+    activateHook.isSuccess || claimHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess;
+  useMemo(() => {
+    if (lastSuccess) refetch();
+  }, [lastSuccess]);
 
   // Advance asset to next state
   const handleAdvance = (tokenId: string, currentState: number) => {
@@ -298,10 +317,7 @@ function AssetsContent() {
   const [rowSelection, setRowSelection] = useState({});
 
   // Transform contract assets to table rows
-  const allAssets = useMemo(
-    () => contractAssets.map(toAssetRow),
-    [contractAssets]
-  );
+  const allAssets = useMemo(() => contractAssets.map(toAssetRow), [contractAssets]);
 
   // Apply state filter client-side
   const filteredData = useMemo(() => {
@@ -311,7 +327,7 @@ function AssetsContent() {
 
   const columns = useMemo(
     () => createColumns({ onAdvance: handleAdvance, isPending: anyPending }),
-    [anyPending]
+    [anyPending],
   );
 
   const table = useReactTable({
@@ -332,7 +348,7 @@ function AssetsContent() {
 
   const toggleStateFilter = (state: number) => {
     setStateFilter((prev) =>
-      prev.includes(state) ? prev.filter((s) => s !== state) : [...prev, state]
+      prev.includes(state) ? prev.filter((s) => s !== state) : [...prev, state],
     );
   };
 
@@ -390,12 +406,57 @@ function AssetsContent() {
       </div>
 
       {/* Transaction Status */}
-      {(anyPending || anyConfirming || activateHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess || claimHook.isSuccess || activateHook.error || flagHook.error || recycleHook.error || claimHook.error) && (
+      {(anyPending ||
+        anyConfirming ||
+        activateHook.isSuccess ||
+        flagHook.isSuccess ||
+        recycleHook.isSuccess ||
+        claimHook.isSuccess ||
+        activateHook.error ||
+        flagHook.error ||
+        recycleHook.error ||
+        claimHook.error) && (
         <div className="space-y-2">
-          <TransactionStatus isPending={activateHook.isPending} isConfirming={activateHook.isConfirming} isSuccess={activateHook.isSuccess} error={activateHook.error} hash={activateHook.hash} chainId={chainId} action="Activate" successMessage="Asset activated!" />
-          <TransactionStatus isPending={claimHook.isPending} isConfirming={claimHook.isConfirming} isSuccess={claimHook.isSuccess} error={claimHook.error} hash={claimHook.hash} chainId={chainId} action="Claim" successMessage="Asset claimed!" />
-          <TransactionStatus isPending={flagHook.isPending} isConfirming={flagHook.isConfirming} isSuccess={flagHook.isSuccess} error={flagHook.error} hash={flagHook.hash} chainId={chainId} action="Flag" successMessage="Asset flagged!" />
-          <TransactionStatus isPending={recycleHook.isPending} isConfirming={recycleHook.isConfirming} isSuccess={recycleHook.isSuccess} error={recycleHook.error} hash={recycleHook.hash} chainId={chainId} action="Recycle" successMessage="Asset recycled!" />
+          <TransactionStatus
+            isPending={activateHook.isPending}
+            isConfirming={activateHook.isConfirming}
+            isSuccess={activateHook.isSuccess}
+            error={activateHook.error}
+            hash={activateHook.hash}
+            chainId={chainId}
+            action="Activate"
+            successMessage="Asset activated!"
+          />
+          <TransactionStatus
+            isPending={claimHook.isPending}
+            isConfirming={claimHook.isConfirming}
+            isSuccess={claimHook.isSuccess}
+            error={claimHook.error}
+            hash={claimHook.hash}
+            chainId={chainId}
+            action="Claim"
+            successMessage="Asset claimed!"
+          />
+          <TransactionStatus
+            isPending={flagHook.isPending}
+            isConfirming={flagHook.isConfirming}
+            isSuccess={flagHook.isSuccess}
+            error={flagHook.error}
+            hash={flagHook.hash}
+            chainId={chainId}
+            action="Flag"
+            successMessage="Asset flagged!"
+          />
+          <TransactionStatus
+            isPending={recycleHook.isPending}
+            isConfirming={recycleHook.isConfirming}
+            isSuccess={recycleHook.isSuccess}
+            error={recycleHook.error}
+            hash={recycleHook.hash}
+            chainId={chainId}
+            action="Recycle"
+            successMessage="Asset recycled!"
+          />
         </div>
       )}
 
@@ -403,9 +464,7 @@ function AssetsContent() {
       {error && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
-            <p className="text-destructive text-sm">
-              Error loading assets: {error.message}
-            </p>
+            <p className="text-destructive text-sm">Error loading assets: {error.message}</p>
           </CardContent>
         </Card>
       )}
@@ -462,7 +521,7 @@ function AssetsContent() {
       {/* Table */}
       <Card>
         <CardContent className="pt-6">
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <table className="w-full">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -470,7 +529,7 @@ function AssetsContent() {
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                        className={`px-4 py-3 text-left text-sm font-medium text-muted-foreground${header.column.columnDef.meta?.className ? ` ${header.column.columnDef.meta.className}` : ""}`}
                       >
                         {header.isPlaceholder
                           ? null
@@ -482,25 +541,37 @@ function AssetsContent() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  // Loading skeleton
+                  // Loading skeleton — only render cells for visible columns
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="border-b">
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-20" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-32" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-28" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="px-4 py-3">
+                        <Skeleton className="h-5 w-16" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Skeleton className="h-5 w-20" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Skeleton className="h-5 w-32" />
+                      </td>
+                      <td className="hidden md:table-cell px-4 py-3">
+                        <Skeleton className="h-5 w-28" />
+                      </td>
+                      <td className="hidden md:table-cell px-4 py-3">
+                        <Skeleton className="h-5 w-16" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Skeleton className="h-5 w-16" />
+                      </td>
                     </tr>
                   ))
                 ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b hover:bg-muted/50 transition-colors"
-                    >
+                    <tr key={row.id} className="border-b hover:bg-muted/50 transition-colors">
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-4 py-3">
+                        <td
+                          key={cell.id}
+                          className={`px-4 py-3${cell.column.columnDef.meta?.className ? ` ${cell.column.columnDef.meta.className}` : ""}`}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -512,7 +583,9 @@ function AssetsContent() {
                       colSpan={columns.length}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      {totalSupply === 0 ? "No assets minted yet." : "No assets match your filters."}
+                      {totalSupply === 0
+                        ? "No assets minted yet."
+                        : "No assets match your filters."}
                     </td>
                   </tr>
                 )}

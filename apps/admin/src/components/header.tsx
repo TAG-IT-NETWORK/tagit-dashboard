@@ -2,15 +2,28 @@
 
 import { ConnectButton, Badge } from "@tagit/ui";
 import { useCurrentUser } from "@tagit/auth";
-import { Bell } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { ChainSelector } from "./chain-selector";
 
-export function Header() {
+interface HeaderProps {
+  /** Called when the hamburger button is pressed (mobile only). */
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { badges, isConnected, isLoading } = useCurrentUser();
 
   return (
-    <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-card">
-      <div className="flex items-center gap-4">
+    <header className="flex items-center justify-between h-16 px-4 md:px-6 border-b border-border bg-card flex-shrink-0">
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Hamburger — visible only below md breakpoint */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <h2 className="text-lg font-semibold text-foreground">Admin Console</h2>
         <ChainSelector />
       </div>
