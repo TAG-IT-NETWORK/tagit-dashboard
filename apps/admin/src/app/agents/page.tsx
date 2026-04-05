@@ -309,6 +309,12 @@ export default function AgentsPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          <Button size="sm" asChild>
+            <Link href="/agents/register">
+              <Bot className="h-4 w-4 mr-2" />
+              Register Agent
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -342,101 +348,105 @@ export default function AgentsPage() {
             const registered = new Date(agent.registeredAt * 1000);
 
             return (
-              <Card key={agent.id} className="relative overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Bot className="h-5 w-5 text-primary" />
+              <Link key={agent.id} href={`/agents/${agent.id}`} className="block">
+                <Card className="relative overflow-hidden" hoverable>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Bot className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{name}</CardTitle>
+                          <CardDescription>{role}</CardDescription>
+                        </div>
+                      </div>
+                      <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Identity */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-1">Agent ID</p>
+                        <p className="font-mono font-bold">#{agent.id}</p>
                       </div>
                       <div>
-                        <CardTitle className="text-base">{name}</CardTitle>
-                        <CardDescription>{role}</CardDescription>
+                        <p className="text-muted-foreground text-xs mb-1">Registered</p>
+                        <p className="text-xs">{registered.toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Identity */}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+
+                    {/* Wallet */}
                     <div>
-                      <p className="text-muted-foreground text-xs mb-1">Agent ID</p>
-                      <p className="font-mono font-bold">#{agent.id}</p>
+                      <p className="text-muted-foreground text-xs mb-1">Wallet</p>
+                      <AddressBadge address={agent.wallet} chainId={chainId} truncate />
                     </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs mb-1">Registered</p>
-                      <p className="text-xs">{registered.toLocaleDateString()}</p>
-                    </div>
-                  </div>
 
-                  {/* Wallet */}
-                  <div>
-                    <p className="text-muted-foreground text-xs mb-1">Wallet</p>
-                    <AddressBadge address={agent.wallet} chainId={chainId} truncate />
-                  </div>
+                    {/* Reputation */}
+                    <div className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <Star className="h-3 w-3" />
+                        Reputation
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-lg font-bold">
+                            {rating > 0 ? rating.toFixed(1) : "--"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Rating</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{agent.reputation.totalFeedback}</p>
+                          <p className="text-xs text-muted-foreground">Reviews</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">
+                            {agent.reputation.weightedScore > 0
+                              ? (agent.reputation.weightedScore / 100).toFixed(1)
+                              : "--"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Score</p>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Reputation */}
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Star className="h-3 w-3" />
-                      Reputation
+                    {/* Validation */}
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <ShieldCheck className="h-3 w-3" />
+                        Validation
+                      </div>
+                      {agent.validation.isValidated ? (
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-xs text-green-500 font-medium">
+                            Validated ({agent.validation.latestScore}%)
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Not validated</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <p className="text-lg font-bold">{rating > 0 ? rating.toFixed(1) : "--"}</p>
-                        <p className="text-xs text-muted-foreground">Rating</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold">{agent.reputation.totalFeedback}</p>
-                        <p className="text-xs text-muted-foreground">Reviews</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold">
-                          {agent.reputation.weightedScore > 0
-                            ? (agent.reputation.weightedScore / 100).toFixed(1)
-                            : "--"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Score</p>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Validation */}
-                  <div className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <ShieldCheck className="h-3 w-3" />
-                      Validation
-                    </div>
-                    {agent.validation.isValidated ? (
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-xs text-green-500 font-medium">
-                          Validated ({agent.validation.latestScore}%)
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <XCircle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Not validated</span>
-                      </div>
+                    {/* A2A Link */}
+                    {agent.uri && (
+                      <a
+                        href={agent.uri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {agent.uri}
+                      </a>
                     )}
-                  </div>
-
-                  {/* A2A Link */}
-                  {agent.uri && (
-                    <a
-                      href={agent.uri}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      {agent.uri}
-                    </a>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>
