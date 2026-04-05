@@ -196,3 +196,49 @@ export function getBlockscoutTxUrl(hash: string): string {
 export function getBlockscoutAddressUrl(address: string): string {
   return `https://optimism-sepolia.blockscout.com/address/${address}`;
 }
+
+// ============================================================================
+// Agent Contracts (ERC-8004)
+// ============================================================================
+
+// Agent addresses
+export { getAgentContractsForChain, type AgentContractAddresses } from "./agent-addresses";
+
+// Agent ABIs & types
+export {
+  TAGITAgentIdentityABI,
+  AgentStatus,
+  AgentStatusNames,
+  type AgentStatusType,
+  type AgentIdentity,
+} from "./abis/TAGITAgentIdentity";
+
+export {
+  TAGITAgentReputationABI,
+  type Feedback,
+  type ReputationSummary,
+} from "./abis/TAGITAgentReputation";
+
+export {
+  TAGITAgentValidationABI,
+  RequestStatus,
+  RequestStatusNames,
+  type RequestStatusType,
+  type ValidationRequest,
+  type ValidatorResponse,
+  type ValidationSummary,
+} from "./abis/TAGITAgentValidation";
+
+// Agent write hooks
+export {
+  useRegisterAgent,
+  useSuspendAgent,
+  useReactivateAgent,
+  useDecommissionAgent,
+  useSetAgentMetadata,
+  useGiveFeedback,
+  useRevokeFeedback,
+  useAppendResponse,
+  useValidationRequest,
+  useValidationResponse,
+} from "./agent-hooks";

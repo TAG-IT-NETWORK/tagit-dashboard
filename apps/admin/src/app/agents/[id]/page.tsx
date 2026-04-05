@@ -14,6 +14,10 @@ import {
   Button,
   AddressBadge,
 } from "@tagit/ui";
+import { AgentReputationTab } from "@/components/agents/agent-reputation-tab";
+import { AgentValidationTab } from "@/components/agents/agent-validation-tab";
+import { AgentAdminTab } from "@/components/agents/agent-admin-tab";
+import { AgentA2ATab } from "@/components/agents/agent-a2a-tab";
 import {
   getAgentContractsForChain,
   TAGITAgentIdentityABI,
@@ -279,7 +283,7 @@ function OverviewTab({ agent, chainId }: OverviewTabProps) {
 
 // ── Placeholder Tab ──
 
-function PlaceholderTab({ label }: { label: string }) {
+function _PlaceholderTab({ label }: { label: string }) {
   return (
     <Card>
       <CardContent className="py-12 text-center">
@@ -510,10 +514,18 @@ export default function AgentDetailPage() {
       {/* Tab content */}
       <div>
         {activeTab === "overview" && <OverviewTab agent={agent} chainId={chainId} />}
-        {activeTab === "reputation" && <PlaceholderTab label="Reputation" />}
-        {activeTab === "validation" && <PlaceholderTab label="Validation" />}
-        {activeTab === "a2a" && <PlaceholderTab label="A2A Test" />}
-        {activeTab === "admin" && <PlaceholderTab label="Admin" />}
+        {activeTab === "reputation" && agent && (
+          <AgentReputationTab agentId={agent.id} registrant={agent.identity.registrant} />
+        )}
+        {activeTab === "validation" && agent && <AgentValidationTab agentId={agent.id} />}
+        {activeTab === "a2a" && agent && <AgentA2ATab agentId={agent.id} agentUri={agent.uri} />}
+        {activeTab === "admin" && agent && (
+          <AgentAdminTab
+            agentId={agent.id}
+            registrant={agent.identity.registrant}
+            currentStatus={agent.status}
+          />
+        )}
       </div>
     </div>
   );
