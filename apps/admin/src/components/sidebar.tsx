@@ -21,6 +21,7 @@ import {
   Megaphone,
   Play,
   X,
+  Coins,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -33,6 +34,7 @@ const navigation = [
   { name: "Resolve", href: "/resolve", icon: AlertTriangle },
   { name: "Governance", href: "/governance", icon: Vote },
   { name: "Treasury", href: "/treasury", icon: Wallet },
+  { name: "Tokenomics", href: "/tokenomics", icon: Coins },
   { name: "AI Agents", href: "/agents", icon: BrainCircuit },
   { name: "BD Agent", href: "/adagent", icon: Bot },
   { name: "Influencer", href: "/influencer", icon: Megaphone },
