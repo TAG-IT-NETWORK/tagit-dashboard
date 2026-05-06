@@ -35,8 +35,14 @@ describe("chains config — Base Sepolia integration", () => {
     expect(getPrimaryChainId()).toBe(84532);
   });
 
-  it("getPrimaryChainId defaults to Arbitrum Sepolia when env is unset", async () => {
+  it("getPrimaryChainId defaults to Base Sepolia when env is unset", async () => {
     delete process.env.NEXT_PUBLIC_PRIMARY_CHAIN;
+    const { getPrimaryChainId } = await import("@tagit/config");
+    expect(getPrimaryChainId()).toBe(84532);
+  });
+
+  it("getPrimaryChainId returns Arbitrum Sepolia when env is arb_sepolia", async () => {
+    process.env.NEXT_PUBLIC_PRIMARY_CHAIN = "arb_sepolia";
     const { getPrimaryChainId } = await import("@tagit/config");
     expect(getPrimaryChainId()).toBe(421614);
   });

@@ -1,18 +1,16 @@
 import { createPublicClient, http, keccak256 } from "viem";
-import { arbitrumSepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 import { TAGITCoreABI } from "./abi";
 
-// Real TAGITCore proxy on Arbitrum Sepolia
+// Real TAGITCore proxy on Base Sepolia (primary chain)
 // Hardcoded — do NOT use NEXT_PUBLIC_TAGIT_CORE_ADDRESS env var,
 // it was set to the demo contract on Vercel and caused "Asset Not Found"
-export const CONTRACT_ADDRESS = "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f" as `0x${string}`;
+export const CONTRACT_ADDRESS = "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d" as `0x${string}`;
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC ||
-  "https://sepolia-rollup.arbitrum.io/rpc";
+const RPC_URL = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || "https://sepolia.base.org";
 
 export const publicClient = createPublicClient({
-  chain: arbitrumSepolia,
+  chain: baseSepolia,
   transport: http(RPC_URL),
 });
 
@@ -28,13 +26,12 @@ export function getMetadataForToken(tokenId: string): { productName?: string; ms
 }
 
 export async function getAsset(tokenId: bigint) {
-  const [owner, timestamp, state, flags, reserved] =
-    (await publicClient.readContract({
-      address: CONTRACT_ADDRESS,
-      abi: TAGITCoreABI,
-      functionName: "getAsset",
-      args: [tokenId],
-    })) as [string, bigint, number, number, number];
+  const [owner, timestamp, state, flags, reserved] = (await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: TAGITCoreABI,
+    functionName: "getAsset",
+    args: [tokenId],
+  })) as [string, bigint, number, number, number];
 
   return { owner, timestamp, state, flags, reserved };
 }

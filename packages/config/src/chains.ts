@@ -31,8 +31,8 @@ export const arbitrumSepolia = defineChain({
   },
 });
 
-export const supportedChains = [arbitrumSepolia, optimismSepolia, baseSepolia] as const;
-export const defaultChain = arbitrumSepolia;
+export const supportedChains = [baseSepolia, arbitrumSepolia, optimismSepolia] as const;
+export const defaultChain = baseSepolia;
 
 export type SupportedChainId = (typeof supportedChains)[number]["id"];
 
@@ -59,8 +59,8 @@ export function getExplorerAddressUrl(chainId: number, address: string): string 
 export function getPrimaryChainId(): number {
   const env = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_PRIMARY_CHAIN : undefined;
   if (env === "op_sepolia") return optimismSepolia.id;
-  if (env === "base_sepolia") return baseSepolia.id;
-  return arbitrumSepolia.id;
+  if (env === "arb_sepolia") return arbitrumSepolia.id;
+  return baseSepolia.id;
 }
 
 /** Return the first non-primary chain ID (backwards-compatible) */
