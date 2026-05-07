@@ -14,8 +14,9 @@ export const publicClient = createPublicClient({
   transport: http(RPC_URL),
 });
 
-/** Static metadata for known demo tokens */
+/** Static metadata for known demo tokens (fallback when ?meta= IPFS URL is missing) */
 const ASSET_METADATA: Record<string, { productName?: string; msrp?: string }> = {
+  "5": { productName: "PDRN Capsule Cream 100", msrp: "$22.00" },
   "18": { productName: "TAG IT Sneaker", msrp: "$199.99" },
   "19": { productName: "Nike Air Max 90", msrp: "$149.99" },
   "20": { productName: "DI0R Eye Cream", msrp: "$77.73" },
