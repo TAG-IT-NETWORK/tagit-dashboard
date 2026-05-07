@@ -22,8 +22,35 @@ interface AssetData {
   owner: string;
   timestamp: bigint;
   productName?: string;
+  brand?: string;
+  description?: string;
+  image?: string;
+  images?: string[];
   msrp?: string;
+  sku?: string;
+  origin?: string;
+  size?: string;
   flags?: number;
+}
+
+const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
+
+function ipfsToHttp(uri?: string): string | undefined {
+  if (!uri) return undefined;
+  if (uri.startsWith("ipfs://")) return IPFS_GATEWAY + uri.slice("ipfs://".length);
+  return uri;
+}
+
+interface RemoteMetadata {
+  name?: string;
+  brand?: string;
+  description?: string;
+  image?: string;
+  images?: string[];
+  msrp?: string;
+  sku?: string;
+  origin?: string;
+  size?: string;
 }
 
 export default function AssetVerifyPage() {
@@ -40,16 +67,37 @@ export default function AssetVerifyPage() {
         const result = await getAsset(tokenId);
 
         // Static metadata + URL params override
-        const meta = getMetadataForToken(params.tokenId);
-        const productName = searchParams.get("name") || meta.productName || undefined;
-        const msrp = searchParams.get("msrp") || meta.msrp || undefined;
+        const staticMeta = getMetadataForToken(params.tokenId);
+
+        // Optional: ?meta=ipfs://Qm... pulls full metadata JSON from IPFS
+        let remote: RemoteMetadata = {};
+        const metaParam = searchParams.get("meta");
+        if (metaParam) {
+          const url = ipfsToHttp(metaParam);
+          if (url) {
+            try {
+              const res = await fetch(url, { cache: "no-store" });
+              if (res.ok) remote = (await res.json()) as RemoteMetadata;
+            } catch {
+              // Ignore IPFS fetch errors — fall back to static + URL params
+            }
+          }
+        }
 
         setAsset({
           state: result.state,
           owner: result.owner,
           timestamp: result.timestamp,
-          productName,
-          msrp,
+          productName:
+            searchParams.get("name") || remote.name || staticMeta.productName || undefined,
+          brand: searchParams.get("brand") || remote.brand || undefined,
+          description: remote.description || undefined,
+          image: ipfsToHttp(remote.image) || searchParams.get("image") || undefined,
+          images: remote.images?.map((u) => ipfsToHttp(u)).filter((u): u is string => !!u),
+          msrp: searchParams.get("msrp") || remote.msrp || staticMeta.msrp || undefined,
+          sku: searchParams.get("sku") || remote.sku || undefined,
+          origin: searchParams.get("origin") || remote.origin || undefined,
+          size: remote.size || undefined,
         });
       } catch {
         setError(true);
@@ -117,6 +165,39 @@ export default function AssetVerifyPage() {
       style={{ background: "#000" }}
     >
       <div className="w-full max-w-[420px] py-[52px] px-5">
+        {/* Product Image (hero) */}
+        {asset.image && (
+          <div
+            className="mb-6 rounded-2xl overflow-hidden border border-white/10 animate-fadeUp"
+            style={{ background: "rgba(255,255,255,0.03)" }}
+          >
+            <img
+              src={asset.image}
+              alt={asset.productName || `Token #${params.tokenId}`}
+              className="w-full h-auto block"
+              loading="eager"
+            />
+          </div>
+        )}
+
+        {/* Image gallery (additional) */}
+        {asset.images && asset.images.length > 1 && (
+          <div
+            className="mb-6 flex gap-2 overflow-x-auto animate-fadeUp"
+            style={{ animationDelay: "0.1s" }}
+          >
+            {asset.images.slice(1).map((img, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-white/10"
+                style={{ background: "rgba(255,255,255,0.03)" }}
+              >
+                <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Animated Checkmark Ring */}
         <div className="flex justify-center mb-6 animate-scaleIn">
           <div className="relative w-[100px] h-[100px]">
@@ -198,6 +279,50 @@ export default function AssetVerifyPage() {
             <span className="text-white text-sm font-mono">{truncateAddress(asset.owner)}</span>
           </div>
 
+          {/* Brand (conditional) */}
+          {asset.brand && (
+            <>
+              <div className="border-t border-white/5" />
+              <div className="flex justify-between items-center py-3">
+                <span className="text-gray-500 text-sm">Brand</span>
+                <span className="text-white text-sm">{asset.brand}</span>
+              </div>
+            </>
+          )}
+
+          {/* SKU (conditional) */}
+          {asset.sku && (
+            <>
+              <div className="border-t border-white/5" />
+              <div className="flex justify-between items-center py-3">
+                <span className="text-gray-500 text-sm">SKU</span>
+                <span className="text-white text-sm font-mono">{asset.sku}</span>
+              </div>
+            </>
+          )}
+
+          {/* Origin (conditional) */}
+          {asset.origin && (
+            <>
+              <div className="border-t border-white/5" />
+              <div className="flex justify-between items-center py-3">
+                <span className="text-gray-500 text-sm">Origin</span>
+                <span className="text-white text-sm">{asset.origin}</span>
+              </div>
+            </>
+          )}
+
+          {/* Size (conditional) */}
+          {asset.size && (
+            <>
+              <div className="border-t border-white/5" />
+              <div className="flex justify-between items-center py-3">
+                <span className="text-gray-500 text-sm">Size</span>
+                <span className="text-white text-sm">{asset.size}</span>
+              </div>
+            </>
+          )}
+
           {/* MSRP (conditional) */}
           {asset.msrp && (
             <>
@@ -233,6 +358,18 @@ export default function AssetVerifyPage() {
             </span>
           </div>
         </div>
+
+        {/* Description (conditional) */}
+        {asset.description && (
+          <div
+            className="rounded-2xl border border-white/10 p-5 mb-5 animate-fadeUp"
+            style={{ background: "rgba(255,255,255,0.03)", animationDelay: "0.4s" }}
+          >
+            <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">
+              {asset.description}
+            </p>
+          </div>
+        )}
 
         {/* Security Strip */}
         <div
