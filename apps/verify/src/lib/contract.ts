@@ -5,7 +5,7 @@ import { TAGITCoreABI } from "./abi";
 // Real TAGITCore proxy on Base Sepolia (primary chain)
 // Hardcoded — do NOT use NEXT_PUBLIC_TAGIT_CORE_ADDRESS env var,
 // it was set to the demo contract on Vercel and caused "Asset Not Found"
-export const CONTRACT_ADDRESS = "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d" as `0x${string}`;
+export const CONTRACT_ADDRESS = "0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D" as `0x${string}`;
 
 const RPC_URL = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || "https://sepolia.base.org";
 
