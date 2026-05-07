@@ -69,11 +69,13 @@ export default function AssetVerifyPage() {
         // Static metadata + URL params override
         const staticMeta = getMetadataForToken(params.tokenId);
 
-        // Optional: ?meta=ipfs://Qm... pulls full metadata JSON from IPFS
+        // ?meta=ipfs://Qm... query param wins; otherwise fall back to the
+        // static map's `meta` pointer (so known tokens auto-load full metadata
+        // even when the chip URL is just /asset/5 with no params).
         let remote: RemoteMetadata = {};
-        const metaParam = searchParams.get("meta");
-        if (metaParam) {
-          const url = ipfsToHttp(metaParam);
+        const metaSource = searchParams.get("meta") || staticMeta.meta;
+        if (metaSource) {
+          const url = ipfsToHttp(metaSource);
           if (url) {
             try {
               const res = await fetch(url, { cache: "no-store" });
