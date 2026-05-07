@@ -33,7 +33,9 @@ interface AssetData {
   flags?: number;
 }
 
-const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
+// w3s.link is generally faster than the public Pinata gateway and
+// doesn't have the same per-IP rate limits.
+const IPFS_GATEWAY = "https://w3s.link/ipfs/";
 
 function ipfsToHttp(uri?: string): string | undefined {
   if (!uri) return undefined;
@@ -78,7 +80,8 @@ export default function AssetVerifyPage() {
           const url = ipfsToHttp(metaSource);
           if (url) {
             try {
-              const res = await fetch(url, { cache: "no-store" });
+              // IPFS content is immutable by CID — safe (and much faster) to cache.
+              const res = await fetch(url, { cache: "force-cache" });
               if (res.ok) remote = (await res.json()) as RemoteMetadata;
             } catch {
               // Ignore IPFS fetch errors — fall back to static + URL params
@@ -167,36 +170,20 @@ export default function AssetVerifyPage() {
       style={{ background: "#000" }}
     >
       <div className="w-full max-w-[420px] py-[52px] px-5">
-        {/* Product Image (hero) */}
+        {/* Product Image (single, compact) */}
         {asset.image && (
           <div
-            className="mb-6 rounded-2xl overflow-hidden border border-white/10 animate-fadeUp"
-            style={{ background: "rgba(255,255,255,0.03)" }}
+            className="mb-6 rounded-2xl overflow-hidden border border-white/10 animate-fadeUp flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.03)", height: 220 }}
           >
             <img
               src={asset.image}
               alt={asset.productName || `Token #${params.tokenId}`}
-              className="w-full h-auto block"
+              className="max-h-full max-w-full object-contain"
               loading="eager"
+              decoding="async"
+              fetchPriority="high"
             />
-          </div>
-        )}
-
-        {/* Image gallery (additional) */}
-        {asset.images && asset.images.length > 1 && (
-          <div
-            className="mb-6 flex gap-2 overflow-x-auto animate-fadeUp"
-            style={{ animationDelay: "0.1s" }}
-          >
-            {asset.images.slice(1).map((img, i) => (
-              <div
-                key={i}
-                className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-white/10"
-                style={{ background: "rgba(255,255,255,0.03)" }}
-              >
-                <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
-              </div>
-            ))}
           </div>
         )}
 
