@@ -170,23 +170,6 @@ export default function AssetVerifyPage() {
       style={{ background: "#000" }}
     >
       <div className="w-full max-w-[420px] py-[52px] px-5">
-        {/* Product Image (single, compact) */}
-        {asset.image && (
-          <div
-            className="mb-6 rounded-2xl overflow-hidden border border-white/10 animate-fadeUp flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.03)", height: 220 }}
-          >
-            <img
-              src={asset.image}
-              alt={asset.productName || `Token #${params.tokenId}`}
-              className="max-h-full max-w-full object-contain"
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
-            />
-          </div>
-        )}
-
         {/* Animated Checkmark Ring */}
         <div className="flex justify-center mb-6 animate-scaleIn">
           <div className="relative w-[100px] h-[100px]">
