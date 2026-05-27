@@ -4,9 +4,10 @@ test.describe("Navigation", () => {
   test("homepage redirects to dashboard or shows loading", async ({ page }) => {
     await page.goto("/");
 
-    // Should show either the dashboard or loading state
+    // Should show either the dashboard or loading state ("Admin Console" appears
+    // in both desktop + mobile headers, so scope to the first match for strict mode)
     await expect(
-      page.locator("text=Loading").or(page.locator("text=Admin Console"))
+      page.locator("text=Loading").or(page.locator("text=Admin Console").first()).first(),
     ).toBeVisible({ timeout: 10000 });
   });
 
