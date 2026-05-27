@@ -23,6 +23,7 @@ import {
   useFlag,
   useApproveResolve,
   useResolve,
+  useResolveApprovalStatus,
   useRecycle,
   useAsset,
   useTagByToken,
@@ -198,6 +199,14 @@ export function LifecycleContent() {
   const { asset, refetch: refetchAsset } = useAsset(tokenId ?? 0n);
   const { data: tagHash } = useTagByToken(tokenId ?? 0n);
 
+  // Live resolve quorum status (2-of-3) for the current token
+  const {
+    approvalCount: resolveApprovals,
+    recipient: resolveLockedRecipient,
+    quorumReached: resolveQuorumReached,
+    refetch: refetchResolveStatus,
+  } = useResolveApprovalStatus(tokenId ?? 0n);
+
   // Initialize metadata URI
   useEffect(() => {
     setMetadataURI(generateTestMetadataURI());
@@ -293,13 +302,15 @@ export function LifecycleContent() {
     }
   }, [flagSuccess, flagHash, refetchAsset]);
 
-  // After approval succeeds, auto-trigger resolve
+  // After an approval confirms, re-read quorum status so the UI shows the new
+  // approval count. We do NOT auto-fire resolve() — a 2-of-3 needs a second
+  // approval from a different wallet first, so resolve is a separate gated step.
   useEffect(() => {
-    if (approveResolveSuccess && approveResolveHash && tokenId && resolveAddress) {
-      const checksumAddr = getAddress(resolveAddress) as `0x${string}`;
-      resolve(tokenId, checksumAddr);
+    if (approveResolveSuccess && approveResolveHash) {
+      const t = setTimeout(() => refetchResolveStatus(), 2000);
+      return () => clearTimeout(t);
     }
-  }, [approveResolveSuccess, approveResolveHash, tokenId, resolveAddress, resolve]);
+  }, [approveResolveSuccess, approveResolveHash, refetchResolveStatus]);
 
   useEffect(() => {
     if (resolveSuccess && resolveHash) {
@@ -398,10 +409,29 @@ export function LifecycleContent() {
     flag(tokenId);
   };
 
+  // Once the first approver locks a recipient on-chain, that address is binding —
+  // subsequent approvals and the final resolve must reuse it or the contract reverts.
+  const RESOLVE_ZERO = "0x0000000000000000000000000000000000000000";
+  const resolveRecipientLocked =
+    resolveLockedRecipient && resolveLockedRecipient !== RESOLVE_ZERO
+      ? (resolveLockedRecipient as `0x${string}`)
+      : null;
+  const resolveEffectiveOwner = resolveRecipientLocked ?? (resolveAddress || null);
+  const resolveApprovalsNum = resolveApprovals !== undefined ? Number(resolveApprovals) : 0;
+
+  // Step 1/2: current connected wallet approves. Uses the locked recipient if one
+  // exists, otherwise the entered address (which the first approval will lock in).
   const handleResolve = () => {
-    if (!tokenId || !resolveAddress) return;
-    const checksumAddr = getAddress(resolveAddress) as `0x${string}`;
+    if (!tokenId || !resolveEffectiveOwner) return;
+    const checksumAddr = getAddress(resolveEffectiveOwner) as `0x${string}`;
     approveResolve(tokenId, checksumAddr);
+  };
+
+  // Step 3: execute once quorum (2-of-3) is reached.
+  const handleExecuteResolve = () => {
+    if (!tokenId || !resolveEffectiveOwner || !resolveQuorumReached) return;
+    const checksumAddr = getAddress(resolveEffectiveOwner) as `0x${string}`;
+    resolve(tokenId, checksumAddr);
   };
 
   const handleRecycle = () => {
@@ -926,72 +956,124 @@ export function LifecycleContent() {
               </>
             )}
 
-            {/* Step 6: Resolve */}
+            {/* Step 6: Resolve (2-of-3 quorum) */}
             {currentStep === 5 && tokenId && (
               <>
                 <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 mb-4">
                   <p className="text-sm">
-                    Resolving returns the asset to the rightful owner after AIRP recovery. This
-                    requires two wallet confirmations: approval + execution. Enter the address of
-                    the verified owner.
+                    Resolving returns a flagged asset to the rightful owner. It needs a{" "}
+                    <strong>2-of-3 resolver quorum</strong>: two <em>different</em> RESOLVER wallets
+                    approve, then any resolver executes. Approve with one wallet, switch accounts in
+                    your wallet extension, approve with a second, then execute.
                   </p>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Rightful Owner Address</Label>
                   <Input
-                    value={resolveAddress}
+                    value={resolveRecipientLocked ?? resolveAddress}
                     onChange={(e) => setResolveAddress(e.target.value)}
                     placeholder="0x..."
                     className="font-mono"
+                    disabled={!!resolveRecipientLocked}
                   />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => address && setResolveAddress(address)}
-                    >
-                      Use My Address
-                    </Button>
+                  {resolveRecipientLocked ? (
+                    <p className="text-xs text-muted-foreground">
+                      Recipient locked by the first approver — used for all approvals + execution.
+                    </p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => address && setResolveAddress(address)}
+                      >
+                        Use My Address
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quorum progress */}
+                <div className="rounded-lg border bg-muted/40 p-3 my-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Approvals</span>
+                    <span className="font-mono font-medium">
+                      {resolveApprovalsNum} / 2{" "}
+                      {resolveQuorumReached && <span className="text-green-500">✓</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Connected wallet</span>
+                    <span className="font-mono text-xs">
+                      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "not connected"}
+                    </span>
                   </div>
                 </div>
-                <Button
-                  onClick={handleResolve}
-                  disabled={
-                    !resolveAddress ||
-                    approveResolvePending ||
-                    approveResolveConfirming ||
-                    resolvePending ||
-                    resolveConfirming
-                  }
-                  className="w-full"
-                >
-                  {approveResolvePending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Approve in wallet...
-                    </>
-                  ) : approveResolveConfirming ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Approval confirming...
-                    </>
-                  ) : resolvePending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Confirm resolve in wallet...
-                    </>
-                  ) : resolveConfirming ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Resolving...
-                    </>
-                  ) : (
-                    <>
-                      <Scale className="h-4 w-4 mr-2" />
-                      Approve &amp; Resolve
-                    </>
-                  )}
-                </Button>
+
+                {/* Step 1/2: approve */}
+                {!resolveQuorumReached && (
+                  <>
+                    <Button
+                      onClick={handleResolve}
+                      disabled={
+                        !resolveEffectiveOwner || approveResolvePending || approveResolveConfirming
+                      }
+                      className="w-full"
+                    >
+                      {approveResolvePending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Approve in wallet...
+                        </>
+                      ) : approveResolveConfirming ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Approval confirming...
+                        </>
+                      ) : (
+                        <>
+                          <Scale className="h-4 w-4 mr-2" />
+                          Approve with this wallet ({resolveApprovalsNum === 0 ? "1st" : "2nd"} of
+                          2)
+                        </>
+                      )}
+                    </Button>
+                    {resolveApprovalsNum > 0 && (
+                      <p className="text-xs text-amber-500 mt-2">
+                        ⚠️ Now switch to your <strong>second</strong> RESOLVER account in your
+                        wallet extension, then approve again. The same address can&apos;t approve
+                        twice.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {/* Step 3: execute */}
+                {resolveQuorumReached && (
+                  <Button
+                    onClick={handleExecuteResolve}
+                    disabled={resolvePending || resolveConfirming}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {resolvePending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Confirm resolve in wallet...
+                      </>
+                    ) : resolveConfirming ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Resolving...
+                      </>
+                    ) : (
+                      <>
+                        <Scale className="h-4 w-4 mr-2" />
+                        Execute Resolve &amp; Transfer
+                      </>
+                    )}
+                  </Button>
+                )}
               </>
             )}
 

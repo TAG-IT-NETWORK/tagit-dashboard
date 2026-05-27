@@ -35,7 +35,7 @@ export const TAGITAccessABI = [
   {
     inputs: [
       { type: "address", name: "user" },
-      { type: "bytes32", name: "capability" },
+      { type: "uint256", name: "capability" },
     ],
     name: "hasCapability",
     outputs: [{ type: "bool", name: "" }],
@@ -45,7 +45,7 @@ export const TAGITAccessABI = [
   {
     inputs: [
       { type: "address", name: "user" },
-      { type: "bytes32", name: "capability" },
+      { type: "uint256", name: "capability" },
     ],
     name: "requireCapability",
     outputs: [],

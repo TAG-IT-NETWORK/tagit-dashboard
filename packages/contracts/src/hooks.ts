@@ -1,5 +1,13 @@
-import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useWalletClient, useChainId } from "wagmi";
-import { useMemo } from "react";
+import {
+  useReadContract,
+  useReadContracts,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useWalletClient,
+  useChainId,
+  usePublicClient,
+} from "wagmi";
+import { useMemo, useState, useEffect } from "react";
 import { keccak256, toBytes, encodePacked, toHex } from "viem";
 import { getContractsForChain } from "./addresses";
 
@@ -10,7 +18,7 @@ import { getContractsForChain } from "./addresses";
  * errors. 0.5 gwei gives 25x headroom over typical 0.02 gwei baseFee.
  */
 const ARB_SEPOLIA_GAS = {
-  maxFeePerGas: 500_000_000n,       // 0.5 gwei
+  maxFeePerGas: 500_000_000n, // 0.5 gwei
   maxPriorityFeePerGas: 10_000_000n, // 0.01 gwei
 } as const;
 
@@ -24,7 +32,12 @@ import {
   type Asset,
   type AssetStateType,
 } from "./abis/TAGITCore";
-import { TAGITAccessABI, Capabilities, CapabilityNames, type CapabilityHash } from "./abis/TAGITAccess";
+import {
+  TAGITAccessABI,
+  Capabilities,
+  CapabilityNames,
+  type CapabilityHash,
+} from "./abis/TAGITAccess";
 import { IdentityBadgeABI, BadgeIds, BadgeIdNames, type BadgeId } from "./abis/IdentityBadge";
 import {
   CapabilityBadgeABI,
@@ -58,9 +71,7 @@ export function useAsset(tokenId: bigint) {
   });
 
   // Contract returns multiple values as an array: [owner, timestamp, state, flags, reserved]
-  const data = result.data as
-    | readonly [`0x${string}`, bigint, number, number, number]
-    | undefined;
+  const data = result.data as readonly [`0x${string}`, bigint, number, number, number] | undefined;
 
   const asset: Asset | undefined = data
     ? {
@@ -292,7 +303,7 @@ export function useAllAssets(options?: {
  */
 export function useAssetsByState(
   state: AssetStateType,
-  options?: { pageSize?: number; refetchInterval?: number }
+  options?: { pageSize?: number; refetchInterval?: number },
 ) {
   const pageSize = options?.pageSize ?? 50;
   const refetchInterval = options?.refetchInterval ?? 0;
@@ -334,7 +345,11 @@ export function useMint() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({
+  const {
+    isLoading: isConfirming,
+    isSuccess,
+    data: receipt,
+  } = useWaitForTransactionReceipt({
     hash,
     chainId,
     confirmations: 1,
@@ -373,7 +388,12 @@ export function useBindTag() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
   const { data: walletClient } = useWalletClient();
 
   const bindTag = async (tokenId: bigint, tagHash: `0x${string}`) => {
@@ -381,10 +401,7 @@ export function useBindTag() {
 
     const challengeResponse = toHex(toBytes(`challenge${tokenId.toString()}`));
     const messageHash = keccak256(
-      encodePacked(
-        ["uint256", "bytes32", "bytes"],
-        [tokenId, tagHash, challengeResponse]
-      )
+      encodePacked(["uint256", "bytes32", "bytes"], [tokenId, tagHash, challengeResponse]),
     );
     const oracleSignature = await walletClient.signMessage({
       message: { raw: toBytes(messageHash) },
@@ -408,7 +425,12 @@ export function useActivate() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const activate = (tokenId: bigint) => {
     writeContract({
@@ -434,7 +456,12 @@ export function useClaim() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const claim = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -459,7 +486,12 @@ export function useFlag() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const flag = (tokenId: bigint) => {
     writeContract({
@@ -486,7 +518,12 @@ export function useApproveResolve() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const approveResolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -513,7 +550,12 @@ export function useResolve() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const resolve = (tokenId: bigint, newOwner: `0x${string}`) => {
     writeContract({
@@ -529,12 +571,106 @@ export function useResolve() {
   return { resolve, hash, isPending, isConfirming, isSuccess, error };
 }
 
+/**
+ * Read the current resolve-approval quorum status for a flagged asset.
+ * Used to drive the multi-signer resolve UI: how many of the required
+ * approvals have been collected, the recipient locked in by the first
+ * approver, and whether the quorum threshold has been met.
+ * @param tokenId - The asset token ID
+ */
+export function useResolveApprovalStatus(tokenId: bigint) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const result = useReadContract({
+    address: contracts.TAGITCore,
+    abi: TAGITCoreABI,
+    functionName: "getResolveApprovalStatus",
+    args: [tokenId],
+    chainId,
+  });
+
+  const data = result.data as readonly [bigint, `0x${string}`, boolean] | undefined;
+
+  return {
+    approvalCount: data ? data[0] : undefined,
+    recipient: data ? data[1] : undefined,
+    quorumReached: data ? data[2] : false,
+    isLoading: result.isLoading,
+    error: result.error,
+    refetch: result.refetch,
+  };
+}
+
+/**
+ * Read the ordered list of addresses that have cast resolve approvals for a token,
+ * from ResolveApproved event logs. Lets the UI attribute approval #1 to a known
+ * agent (e.g. the autonomous Recovery Resolver Agent). Best-effort: returns [] if
+ * the RPC rejects the log range.
+ * @param tokenId - The asset token ID
+ */
+export function useResolveApprovers(tokenId: bigint) {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+  const publicClient = usePublicClient({ chainId });
+  const [approvers, setApprovers] = useState<`0x${string}`[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!publicClient || tokenId === undefined) return;
+    setIsLoading(true);
+    (async () => {
+      try {
+        const latest = await publicClient.getBlockNumber();
+        const span = 50_000n;
+        const fromBlock = latest > span ? latest - span : 0n;
+        const logs = await publicClient.getLogs({
+          address: contracts.TAGITCore,
+          event: {
+            type: "event",
+            name: "ResolveApproved",
+            inputs: [
+              { indexed: true, name: "tokenId", type: "uint256" },
+              { indexed: true, name: "approver", type: "address" },
+              { indexed: false, name: "approvalCount", type: "uint256" },
+            ],
+          },
+          args: { tokenId },
+          fromBlock,
+          toBlock: "latest",
+        });
+        if (!cancelled) {
+          const ordered = logs
+            .map((l) => (l as unknown as { args: { approver: `0x${string}` } }).args.approver)
+            .filter((a): a is `0x${string}` => !!a);
+          setApprovers(ordered);
+        }
+      } catch {
+        if (!cancelled) setApprovers([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, contracts.TAGITCore, tokenId]);
+
+  return { approvers, isLoading };
+}
+
 export function useRecycle() {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const recycle = (tokenId: bigint) => {
     writeContract({
@@ -559,10 +695,7 @@ export function useRecycle() {
  * @param address - The address to check
  * @param capability - The capability hash (use Capabilities.MINTER, etc.)
  */
-export function useCapabilityGate(
-  address: `0x${string}` | undefined,
-  capability: CapabilityHash
-) {
+export function useCapabilityGate(address: `0x${string}` | undefined, capability: CapabilityHash) {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);
 
@@ -570,7 +703,9 @@ export function useCapabilityGate(
     address: contracts.TAGITAccess,
     abi: TAGITAccessABI,
     functionName: "hasCapability",
-    args: address ? [address, capability] : undefined,
+    // Capability IDs are uint256 on-chain; the Capabilities constants are keccak
+    // hashes (0x… hex), so coerce to bigint for correct uint256 encoding.
+    args: address ? [address, BigInt(capability)] : undefined,
     chainId,
     query: {
       enabled: !!address,
@@ -617,7 +752,12 @@ export function useGrantCapability() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const grantCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -638,7 +778,12 @@ export function useRevokeCapability() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const revokeCapability = (user: `0x${string}`, capabilityId: CapabilityId) => {
     writeContract({
@@ -729,7 +874,12 @@ export function useGrantBadge() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const grantBadge = (to: `0x${string}`, badgeId: number) => {
     writeContract({
@@ -750,7 +900,12 @@ export function useRevokeBadge() {
   const contracts = getContractsForChain(chainId);
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash, chainId, confirmations: 1, pollingInterval: 4_000 });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
 
   const revokeBadge = (from: `0x${string}`, badgeId: number) => {
     writeContract({
@@ -772,7 +927,7 @@ export function useRevokeBadge() {
 
 export function useCapabilityBadgeBalance(
   address: `0x${string}` | undefined,
-  capabilityId: number
+  capabilityId: number,
 ) {
   const chainId = useChainId();
   const contracts = getContractsForChain(chainId);

@@ -93,6 +93,8 @@ export {
   useFlag,
   useApproveResolve,
   useResolve,
+  useResolveApprovalStatus,
+  useResolveApprovers,
   useRecycle,
   // TAGITAccess
   useCapabilityGate,
