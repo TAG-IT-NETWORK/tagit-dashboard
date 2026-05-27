@@ -28,6 +28,8 @@ import {
 
 const SERVICES_URL = process.env.NEXT_PUBLIC_SERVICES_URL ?? "http://localhost:3100";
 const BASE = `${SERVICES_URL}/api/v1/recovery`;
+// Skip the ngrok-free browser interstitial when the services API is tunneled.
+const SERVICES_HEADERS = { "ngrok-skip-browser-warning": "true" };
 
 interface Status {
   agentId: number;
@@ -80,9 +82,15 @@ export function RecoveryResolverPanel() {
   const refresh = useCallback(async () => {
     try {
       const [s, c, d] = await Promise.all([
-        fetch(`${BASE}/status`).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${BASE}/claims`).then((r) => (r.ok ? r.json() : { claims: [] })),
-        fetch(`${BASE}/decisions`).then((r) => (r.ok ? r.json() : { decisions: [] })),
+        fetch(`${BASE}/status`, { headers: SERVICES_HEADERS }).then((r) =>
+          r.ok ? r.json() : null,
+        ),
+        fetch(`${BASE}/claims`, { headers: SERVICES_HEADERS }).then((r) =>
+          r.ok ? r.json() : { claims: [] },
+        ),
+        fetch(`${BASE}/decisions`, { headers: SERVICES_HEADERS }).then((r) =>
+          r.ok ? r.json() : { decisions: [] },
+        ),
       ]);
       if (!s) {
         setOffline(true);
@@ -108,7 +116,9 @@ export function RecoveryResolverPanel() {
     try {
       await fetch(`${BASE}${path}`, {
         method: "POST",
-        headers: body ? { "Content-Type": "application/json" } : {},
+        headers: body
+          ? { "Content-Type": "application/json", ...SERVICES_HEADERS }
+          : { ...SERVICES_HEADERS },
         body: body ? JSON.stringify(body) : undefined,
       });
       await refresh();
