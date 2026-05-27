@@ -13,7 +13,7 @@ test.describe("Navigation", () => {
 
   test("sidebar navigation links work", async ({ page }) => {
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Check sidebar is visible
     const sidebar = page.locator('nav, [role="navigation"]').first();
