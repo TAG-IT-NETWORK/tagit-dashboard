@@ -45,10 +45,12 @@ test.describe("Resolution Queue Page", () => {
   test("clicking review navigates to detail page", async ({ page }) => {
     await page.waitForTimeout(2000);
 
-    // Look for Review button
-    const reviewButton = page.locator('a:has-text("Review"), button:has-text("Review")').first();
+    // Match only real detail links (a[href="/resolve/<id>"]). The generic
+    // "Review" text matched non-navigating elements when the queue is empty, so
+    // the click did nothing and the URL never changed.
+    const reviewButton = page.locator('a[href^="/resolve/"]').first();
 
-    if (await reviewButton.isVisible()) {
+    if (await reviewButton.isVisible().catch(() => false)) {
       await reviewButton.click();
       await expect(page).toHaveURL(/resolve\/\d+/);
     }
