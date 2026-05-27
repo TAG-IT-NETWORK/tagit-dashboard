@@ -294,7 +294,9 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
   const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${SERVICES_URL}/api/v1/recovery/decisions`)
+    fetch(`${SERVICES_URL}/api/v1/recovery/decisions`, {
+      headers: { "ngrok-skip-browser-warning": "true" },
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { decisions?: AgentDecision[] } | null) => {
         if (cancelled || !d?.decisions) return;
