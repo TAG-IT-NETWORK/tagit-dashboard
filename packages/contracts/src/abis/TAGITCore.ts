@@ -224,6 +224,17 @@ export const TAGITCoreABI = [
   },
   {
     inputs: [{ type: "uint256", name: "tokenId" }],
+    name: "getResolveApprovalStatus",
+    outputs: [
+      { type: "uint256", name: "approvalCount" },
+      { type: "address", name: "recipient" },
+      { type: "bool", name: "quorumReached" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ type: "uint256", name: "tokenId" }],
     name: "recycle",
     outputs: [],
     stateMutability: "nonpayable",
@@ -288,6 +299,16 @@ export const TAGITCoreABI = [
     anonymous: false,
     inputs: [
       { indexed: true, name: "tokenId", type: "uint256" },
+      { indexed: true, name: "approver", type: "address" },
+      { indexed: false, name: "approvalCount", type: "uint256" },
+    ],
+    name: "ResolveApproved",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "tokenId", type: "uint256" },
       { indexed: false, name: "from", type: "uint8" },
       { indexed: false, name: "to", type: "uint8" },
       { indexed: false, name: "actor", type: "address" },
@@ -316,9 +337,7 @@ export const TAGITCoreABI = [
   // UUPS Proxy events
   {
     anonymous: false,
-    inputs: [
-      { indexed: true, name: "implementation", type: "address" },
-    ],
+    inputs: [{ indexed: true, name: "implementation", type: "address" }],
     name: "Upgraded",
     type: "event",
   },

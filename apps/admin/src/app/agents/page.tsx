@@ -28,6 +28,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { RecoveryResolverPanel } from "@/components/agents/recovery-resolver-panel";
 
 // ── ABIs (minimal view functions only) ──
 
@@ -317,6 +318,9 @@ export default function AgentsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Recovery Resolver Agent — live control + feedback */}
+      <RecoveryResolverPanel />
 
       {/* Error */}
       {error && (

@@ -9,11 +9,13 @@ import {
   AssetState,
   AssetStateNames,
   useAsset,
+  useApproveResolve,
   useResolve,
+  useResolveApprovalStatus,
   useTagByToken,
   getExplorerTxUrl,
 } from "@tagit/contracts";
-import { useChainId } from "wagmi";
+import { useChainId, useAccount } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { RequireCapability, Capabilities } from "@/components/require-capability";
 import {
@@ -63,6 +65,20 @@ import {
 
 interface ResolveDetailPageProps {
   params: { id: string };
+}
+
+// tagit-services base URL (Recovery Resolver Agent). Public read endpoints.
+const SERVICES_URL = process.env.NEXT_PUBLIC_SERVICES_URL ?? "http://localhost:3100";
+
+interface AgentDecision {
+  ts: number;
+  tokenId: string;
+  rightfulOwner: string;
+  riskScore: number | null;
+  action: "approved" | "abstained" | "skipped";
+  reason: string;
+  txHash?: string;
+  explorerUrl?: string;
 }
 
 function formatDate(timestamp: number): string {
@@ -147,10 +163,11 @@ function ResolutionModal({ isOpen, onClose, onConfirm, tokenId }: ResolutionModa
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
-            Resolve & Transfer
+            Start Resolution
           </DialogTitle>
           <DialogDescription>
-            Resolve flagged asset by transferring to a new owner address.
+            Resolving requires a 2-of-3 resolver quorum: two different RESOLVER wallets approve,
+            then the transfer executes. Enter the rightful owner to begin.
           </DialogDescription>
         </DialogHeader>
 
@@ -195,7 +212,7 @@ function ResolutionModal({ isOpen, onClose, onConfirm, tokenId }: ResolutionModa
             disabled={!canSubmit}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
-            Resolve & Transfer
+            Begin Approval
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -231,6 +248,11 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
   });
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [txSuccess, setTxSuccess] = useState(false);
+  // The rightful owner the operator wants to transfer to. Set when the modal is
+  // confirmed; presence of this value reveals the multi-signer approval workflow.
+  const [proposedOwner, setProposedOwner] = useState<`0x${string}` | null>(null);
+
+  const { address: connectedAddress } = useAccount();
 
   // Fetch live asset data
   const {
@@ -240,7 +262,17 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     refetch: refetchAsset,
   } = useAsset(BigInt(tokenId));
 
-  // Resolution hook
+  // Approval step (quorum) — must reach RESOLVE_QUORUM before resolve() can execute
+  const {
+    approveResolve,
+    hash: approveHash,
+    isPending: approvePending,
+    isConfirming: approveConfirming,
+    isSuccess: approveSuccess,
+    error: approveError,
+  } = useApproveResolve();
+
+  // Execution step
   const {
     resolve,
     hash: txHash,
@@ -249,6 +281,46 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     isSuccess,
     error: resolveError,
   } = useResolve();
+
+  // Live quorum status (how many approvals collected, locked-in recipient)
+  const {
+    approvalCount,
+    recipient: onchainRecipient,
+    quorumReached,
+    refetch: refetchStatus,
+  } = useResolveApprovalStatus(BigInt(tokenId));
+
+  // Recovery Resolver Agent decision for this token (if the agent auto-approved)
+  const [agentDecision, setAgentDecision] = useState<AgentDecision | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${SERVICES_URL}/api/v1/recovery/decisions`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { decisions?: AgentDecision[] } | null) => {
+        if (cancelled || !d?.decisions) return;
+        const hit = d.decisions.find((x) => x.tokenId === tokenId && x.action === "approved");
+        setAgentDecision(hit ?? null);
+      })
+      .catch(() => {
+        /* services offline — badge simply won't show */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tokenId, txSuccess]);
+
+  // Once the first approver locks a recipient on-chain, that address is binding.
+  // Subsequent approvals and the final resolve MUST use it, or the contract reverts
+  // with RecipientMismatch.
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const lockedRecipient = onchainRecipient && onchainRecipient !== ZERO ? onchainRecipient : null;
+  const effectiveOwner = lockedRecipient ?? proposedOwner;
+  const recipientConflict =
+    !!lockedRecipient &&
+    !!proposedOwner &&
+    lockedRecipient.toLowerCase() !== proposedOwner.toLowerCase();
+  const approvals = approvalCount !== undefined ? Number(approvalCount) : 0;
+  const anyTxBusy = approvePending || approveConfirming || isPending || isConfirming;
 
   // Tag hash for display
   const { data: tagHash } = useTagByToken(BigInt(tokenId));
@@ -271,8 +343,31 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
     }
   }, [isSuccess, txSuccess, refetchAsset]);
 
-  const handleResolve = (newOwner: string, _notes: string) => {
-    resolve(BigInt(tokenId), newOwner as `0x${string}`);
+  // After an approval confirms, re-read the on-chain quorum status so the UI
+  // reflects the new approval count and locked recipient. Delayed slightly so the
+  // read lands on a block that includes the approval tx.
+  useEffect(() => {
+    if (approveSuccess) {
+      const t = setTimeout(() => refetchStatus(), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [approveSuccess, approveHash, refetchStatus]);
+
+  // Modal confirm: capture the rightful owner and reveal the approval workflow.
+  const handleStartResolution = (newOwner: string, _notes: string) => {
+    setProposedOwner(newOwner as `0x${string}`);
+  };
+
+  // Step 1/2: current connected wallet approves the resolution.
+  const handleApprove = () => {
+    if (!effectiveOwner) return;
+    approveResolve(BigInt(tokenId), effectiveOwner as `0x${string}`);
+  };
+
+  // Step 3: execute once quorum is reached.
+  const handleExecuteResolve = () => {
+    if (!effectiveOwner || !quorumReached) return;
+    resolve(BigInt(tokenId), effectiveOwner as `0x${string}`);
   };
 
   // Mock data for investigation panels (requires indexer)
@@ -686,29 +781,37 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
         {/* Sidebar - Resolution Actions */}
         <div className="space-y-6">
           {/* Transaction Status */}
-          {(isPending || isConfirming || resolveError) && (
-            <Card className={resolveError ? "border-destructive" : "border-blue-500"}>
+          {(anyTxBusy || approveError || resolveError) && (
+            <Card
+              className={approveError || resolveError ? "border-destructive" : "border-blue-500"}
+            >
               <CardContent className="pt-6">
-                {isPending && (
+                {(approvePending || isPending) && (
                   <div className="flex items-center gap-2 text-blue-600">
                     <Clock className="h-4 w-4 animate-pulse" />
-                    <span className="text-sm">Waiting for wallet confirmation...</span>
+                    <span className="text-sm">
+                      {approvePending
+                        ? "Confirm approval in wallet..."
+                        : "Confirm resolve in wallet..."}
+                    </span>
                   </div>
                 )}
-                {isConfirming && (
+                {(approveConfirming || isConfirming) && (
                   <div className="flex items-center gap-2 text-blue-600">
                     <Clock className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Transaction confirming...</span>
+                    <span className="text-sm">
+                      {approveConfirming ? "Approval confirming..." : "Resolve confirming..."}
+                    </span>
                   </div>
                 )}
-                {resolveError && (
+                {(approveError || resolveError) && (
                   <div className="text-sm text-destructive">
-                    Error: {resolveError.message?.slice(0, 100)}
+                    Error: {(approveError ?? resolveError)?.message?.slice(0, 140)}
                   </div>
                 )}
-                {txHash && !isSuccess && (
+                {(approveHash || txHash) && !isSuccess && (
                   <a
-                    href={getExplorerTxUrl(chainId, txHash)}
+                    href={getExplorerTxUrl(chainId, (txHash ?? approveHash) as `0x${string}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
@@ -725,7 +828,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
               <CardTitle>Resolution Actions</CardTitle>
               <CardDescription>
                 {isFlagged
-                  ? "Choose an action to resolve this flagged asset"
+                  ? "2-of-3 resolver quorum — two different wallets approve, then resolve"
                   : "Asset is not currently flagged"}
               </CardDescription>
             </CardHeader>
@@ -740,17 +843,143 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                 </div>
               )}
 
-              <Button
-                onClick={() => setShowResolveModal(true)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-                disabled={isPending || isConfirming || !isFlagged}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Resolve
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Resolve this flagged asset by transferring to a new owner.
-              </p>
+              {/* Phase A: no proposed owner yet → open the modal */}
+              {isFlagged && !proposedOwner && approvals === 0 && (
+                <>
+                  <Button
+                    onClick={() => setShowResolveModal(true)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    disabled={anyTxBusy}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Start Resolution
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Begins a 2-of-3 approval. You&apos;ll approve with one resolver wallet, switch
+                    accounts, approve with a second, then execute.
+                  </p>
+                </>
+              )}
+
+              {/* Phase B: approval workflow */}
+              {isFlagged && (proposedOwner || approvals > 0) && (
+                <div className="space-y-4">
+                  {/* Quorum progress */}
+                  <div className="p-3 rounded-lg bg-muted/50 border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Approvals</span>
+                      <span className="font-mono font-medium">
+                        {approvals} / 2 {quorumReached && <span className="text-green-600">✓</span>}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Recipient</span>
+                      <AddressBadge
+                        address={effectiveOwner ?? ZERO}
+                        chainId={chainId}
+                        showEtherscan={false}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Your wallet</span>
+                      {connectedAddress ? (
+                        <AddressBadge
+                          address={connectedAddress}
+                          showCopy={false}
+                          showEtherscan={false}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">not connected</span>
+                      )}
+                    </div>
+
+                    {/* Autonomous agent attribution — shown when the Recovery
+                        Resolver Agent (ERC-8004) cast approval #1 for this token */}
+                    {agentDecision && (
+                      <div className="pt-2 border-t space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Approval 1</span>
+                          <Badge className="bg-violet-500/15 text-violet-600 border-violet-500/30 gap-1">
+                            <Shield className="h-3 w-3" />
+                            Recovery Agent (auto)
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          ERC-8004 agent auto-approved
+                          {agentDecision.riskScore !== null
+                            ? ` (fraud risk ${agentDecision.riskScore}/100)`
+                            : ""}
+                          {agentDecision.explorerUrl && (
+                            <>
+                              {" — "}
+                              <a
+                                href={agentDecision.explorerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                tx
+                              </a>
+                            </>
+                          )}
+                          . You provide approval&nbsp;2 + execute.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {recipientConflict && (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                      <p className="text-xs text-red-600">
+                        The first approver locked recipient {lockedRecipient?.slice(0, 10)}…, which
+                        differs from the address you entered. Approvals must agree — the locked
+                        recipient will be used.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Step 1/2: approve */}
+                  {!quorumReached && (
+                    <>
+                      <Button
+                        onClick={handleApprove}
+                        className="w-full"
+                        disabled={anyTxBusy || !effectiveOwner}
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Approve with this wallet ({approvals === 0 ? "1st" : "2nd"} of 2)
+                      </Button>
+                      {approvals > 0 && (
+                        <p className="text-xs text-amber-600">
+                          ⚠️ Now switch to your <strong>second</strong> RESOLVER account in your
+                          wallet extension (MetaMask → switch account), then click Approve again.
+                          The same address cannot approve twice.
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* Step 3: execute */}
+                  {quorumReached && (
+                    <Button
+                      onClick={handleExecuteResolve}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      disabled={anyTxBusy}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Execute Resolve &amp; Transfer
+                    </Button>
+                  )}
+
+                  <button
+                    onClick={() => setProposedOwner(null)}
+                    className="text-xs text-muted-foreground hover:underline"
+                    disabled={anyTxBusy || approvals > 0}
+                  >
+                    Cancel / change recipient
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -785,7 +1014,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
       <ResolutionModal
         isOpen={showResolveModal}
         onClose={() => setShowResolveModal(false)}
-        onConfirm={handleResolve}
+        onConfirm={handleStartResolution}
         tokenId={tokenId}
       />
     </div>

@@ -3,22 +3,22 @@ import { test, expect } from "@playwright/test";
 test.describe("Assets Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/assets");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test("displays assets page title", async ({ page }) => {
-    await expect(
-      page.locator("h1, h2").filter({ hasText: /asset/i }).first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("h1, h2").filter({ hasText: /asset/i }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("shows asset table or list", async ({ page }) => {
     await page.waitForTimeout(2000);
 
     // Look for table or list elements
-    const tableOrList = page.locator(
-      'table, [role="table"], [class*="table"], [class*="list"]'
-    ).first();
+    const tableOrList = page
+      .locator('table, [role="table"], [class*="table"], [class*="list"]')
+      .first();
     await expect(tableOrList).toBeVisible({ timeout: 10000 });
   });
 
@@ -51,9 +51,11 @@ test.describe("Assets Page", () => {
     await page.waitForTimeout(2000);
 
     // Look for search input or filter controls
-    const searchOrFilter = page.locator(
-      'input[type="search"], input[placeholder*="earch"], [class*="filter"], [class*="search"]'
-    ).first();
+    const searchOrFilter = page
+      .locator(
+        'input[type="search"], input[placeholder*="earch"], [class*="filter"], [class*="search"]',
+      )
+      .first();
 
     // Search/filter may or may not be present depending on implementation
     const isVisible = await searchOrFilter.isVisible().catch(() => false);
@@ -63,30 +65,25 @@ test.describe("Assets Page", () => {
 });
 
 test.describe("Asset Detail Page", () => {
-  test("shows asset details when navigating to specific asset", async ({
-    page,
-  }) => {
+  test("shows asset details when navigating to specific asset", async ({ page }) => {
     // Navigate to a specific asset
     await page.goto("/assets/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Should show some asset-related content or "not found"
-    const content = page.locator(
-      "main, [role='main'], [class*='content']"
-    ).first();
+    const content = page.locator("main, [role='main'], [class*='content']").first();
     await expect(content).toBeVisible({ timeout: 10000 });
   });
 
   test("back button navigates to assets list", async ({ page }) => {
     await page.goto("/assets/1");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
-    // Look for back button or link
-    const backButton = page.locator(
-      'a[href="/assets"], button:has-text("Back"), [class*="back"]'
-    ).first();
+    // Look for a back link/button. NB: avoid `[class*="back"]` — it matches the
+    // `bg-background` root element and "clicks" a non-link, so navigation never happens.
+    const backButton = page.locator('a[href="/assets"], button:has-text("Back")').first();
 
-    if (await backButton.isVisible()) {
+    if (await backButton.isVisible().catch(() => false)) {
       await backButton.click();
       await expect(page).toHaveURL(/\/assets$/);
     }

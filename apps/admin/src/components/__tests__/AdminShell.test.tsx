@@ -12,12 +12,21 @@ vi.mock("../header", () => ({
   Header: () => <header data-testid="header">Header</header>,
 }));
 
+// AdminShell gates children behind a connected wallet — mock as connected so
+// children render, and stub the connect modal.
+vi.mock("wagmi", () => ({
+  useAccount: () => ({ isConnected: true, isConnecting: false }),
+}));
+vi.mock("@rainbow-me/rainbowkit", () => ({
+  useConnectModal: () => ({ openConnectModal: vi.fn() }),
+}));
+
 describe("AdminShell", () => {
   it("renders children content", () => {
     render(
       <AdminShell>
         <div data-testid="test-content">Test Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     expect(screen.getByTestId("test-content")).toBeInTheDocument();
@@ -28,7 +37,7 @@ describe("AdminShell", () => {
     render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     expect(screen.getByTestId("sidebar")).toBeInTheDocument();
@@ -38,7 +47,7 @@ describe("AdminShell", () => {
     render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     expect(screen.getByTestId("header")).toBeInTheDocument();
@@ -48,7 +57,7 @@ describe("AdminShell", () => {
     const { container } = render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     const wrapper = container.firstChild as HTMLElement;
@@ -60,13 +69,13 @@ describe("AdminShell", () => {
     render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     const main = screen.getByRole("main");
     expect(main).toHaveClass("flex-1");
     expect(main).toHaveClass("overflow-y-auto");
-    expect(main).toHaveClass("p-6");
+    expect(main).toHaveClass("md:p-6");
   });
 
   it("renders multiple children correctly", () => {
@@ -75,7 +84,7 @@ describe("AdminShell", () => {
         <div data-testid="child-1">Child 1</div>
         <div data-testid="child-2">Child 2</div>
         <div data-testid="child-3">Child 3</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     expect(screen.getByTestId("child-1")).toBeInTheDocument();
@@ -93,7 +102,7 @@ describe("AdminShell", () => {
             <span>Nested content</span>
           </div>
         </div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     expect(screen.getByText("Page Title")).toBeInTheDocument();
@@ -105,7 +114,7 @@ describe("AdminShell", () => {
     const { container } = render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     // Root is flex container
@@ -123,7 +132,7 @@ describe("AdminShell", () => {
     const { container } = render(
       <AdminShell>
         <div>Content</div>
-      </AdminShell>
+      </AdminShell>,
     );
 
     const root = container.firstChild as HTMLElement;

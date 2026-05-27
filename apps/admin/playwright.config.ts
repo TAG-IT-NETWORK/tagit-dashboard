@@ -6,10 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ["html", { open: "never" }],
-    ["list"],
-  ],
+  reporter: [["html", { open: "never" }], ["list"]],
   use: {
     baseURL: "http://localhost:3001",
     trace: "on-first-retry",
@@ -39,5 +36,7 @@ export default defineConfig({
     url: "http://localhost:3001",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    // Render pages without a connected wallet so E2E can exercise them.
+    env: { NEXT_PUBLIC_E2E: "true" },
   },
 });

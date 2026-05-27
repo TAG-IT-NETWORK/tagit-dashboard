@@ -17,6 +17,11 @@ export function AdminShell({ children }: AdminShellProps) {
   const { openConnectModal } = useConnectModal();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // E2E bypass: render content without a connected wallet so Playwright can
+  // exercise the pages. Enabled only when NEXT_PUBLIC_E2E=true (set by the test
+  // webServer); never set in production.
+  const e2eBypass = process.env.NEXT_PUBLIC_E2E === "true";
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
@@ -29,7 +34,7 @@ export function AdminShell({ children }: AdminShellProps) {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 <p className="text-muted-foreground">Connecting wallet...</p>
               </div>
-            ) : !isConnected ? (
+            ) : !isConnected && !e2eBypass ? (
               <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
                 <Wallet className="h-12 w-12 text-muted-foreground" />
                 <h2 className="text-xl font-semibold">Connect Wallet</h2>

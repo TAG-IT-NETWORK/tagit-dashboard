@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Dashboard", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test("displays page title", async ({ page }) => {
@@ -29,13 +29,12 @@ test.describe("Dashboard", () => {
 
   test("sidebar is visible", async ({ page }) => {
     // Look for sidebar navigation
-    const sidebar = page.locator(
-      'aside, nav, [class*="sidebar"], [class*="Sidebar"]'
-    ).first();
+    const sidebar = page.locator('aside, nav, [class*="sidebar"], [class*="Sidebar"]').first();
     await expect(sidebar).toBeVisible();
   });
 
   test("admin console title is shown in header", async ({ page }) => {
-    await expect(page.locator("text=Admin Console")).toBeVisible();
+    // "Admin Console" appears in both the desktop and mobile headers — match the first.
+    await expect(page.locator("text=Admin Console").first()).toBeVisible();
   });
 });
