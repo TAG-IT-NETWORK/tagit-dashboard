@@ -44,7 +44,23 @@ export interface WriteNdefRequest extends BaseRequest {
   type: "write-ndef";
   records: NdefRecordDTO[];
 }
-export type BridgeRequest = GetStatusRequest | ReadUidRequest | ReadNdefRequest | WriteNdefRequest;
+/** SDM personalization of the chip currently on the antenna (Phase 3a). */
+export interface PersonalizeSdmRequest extends BaseRequest {
+  type: "personalize-sdm";
+  baseUrl: string;
+}
+export interface PersonalizeSdmResult {
+  urlTemplate: string;
+  piccDataOffset: number;
+  sdmMacOffset: number;
+  notes: string[];
+}
+export type BridgeRequest =
+  | GetStatusRequest
+  | ReadUidRequest
+  | ReadNdefRequest
+  | WriteNdefRequest
+  | PersonalizeSdmRequest;
 
 // --- Bridge -> Client messages ---------------------------------------------
 
