@@ -50,9 +50,18 @@ export interface NfcBridgeState {
   ready: boolean;
 }
 
+/**
+ * Distributive Omit — non-distributive `Omit<BridgeRequest, "id">` collapses the
+ * union to its common keys (just `type`), which means newly-added request
+ * shapes like `personalize-sdm` lose their extra fields. Distributing keeps
+ * each variant's own shape.
+ */
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+export type BridgeRequestPayload = DistributiveOmit<BridgeRequest, "id">;
+
 export interface UseNfcBridge extends NfcBridgeState {
   /** Send an RPC request and await the bridge's result payload. */
-  request: (req: Omit<BridgeRequest, "id">) => Promise<unknown>;
+  request: (req: BridgeRequestPayload) => Promise<unknown>;
   /** Update connection config and reconnect. */
   updateConfig: (config: Partial<BridgeConfig>) => void;
   reconnect: () => void;
@@ -194,7 +203,7 @@ export function useNfcBridge(enabled = true): UseNfcBridge {
     wsRef.current = null;
   }, []);
 
-  const request = useCallback((req: Omit<BridgeRequest, "id">): Promise<unknown> => {
+  const request = useCallback((req: BridgeRequestPayload): Promise<unknown> => {
     return new Promise((resolve, reject) => {
       const socket = wsRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {

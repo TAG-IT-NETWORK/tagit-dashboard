@@ -30,7 +30,14 @@ import {
 import { getNFCSupportStatus, readNFCTag, type NFCTagInfo } from "@/lib/nfc";
 import { uidToTagId, isValidUID, formatUID, generateTestUID } from "@/lib/tag-utils";
 import { useNfcBridge } from "@/lib/nfc-bridge";
-import { CHIP_OPTIONS, CHIP_SPECS, type ChipType } from "@/lib/nfc-bridge-protocol";
+import {
+  CHIP_OPTIONS,
+  CHIP_SPECS,
+  type ChipType,
+  type PersonalizeSdmResult,
+} from "@/lib/nfc-bridge-protocol";
+
+const SUN_BASE_URL = "https://verify.tagit.network/sun";
 
 interface BindTagModalProps {
   open: boolean;
@@ -221,6 +228,7 @@ export function BindTagModal({ open, onOpenChange, tokenId, onSuccess }: BindTag
                 tokenDraft={tokenDraft}
                 setTokenDraft={setTokenDraft}
               />
+              {bridge.card?.chip === "NTAG424DNA" && <ProgramSunPanel bridge={bridge} />}
             </div>
           )}
 
@@ -536,6 +544,85 @@ function ReaderStatusPanel({
           <p className="text-xs text-muted-foreground">Capacity {bridge.card.capacityBytes} B</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── SDM personalization panel (Phase 3a — factory-key, non-bricking) ─────
+/**
+ * Shows up inside the Bind modal's Desktop Reader pane when an NTAG 424 DNA is
+ * on the antenna. One button: ask the bridge to personalize the chip for SUN
+ * (write the verify URL template + enable SDM on file 2). On success the chip
+ * will produce a `https://verify.tagit.network/sun?picc=…&cmac=…` URL on every
+ * subsequent tap, ready for the `/sun` verifier.
+ */
+function ProgramSunPanel({ bridge }: { bridge: ReturnType<typeof useNfcBridge> }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<PersonalizeSdmResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const data = (await bridge.request({
+        type: "personalize-sdm",
+        baseUrl: SUN_BASE_URL,
+      })) as PersonalizeSdmResult;
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "personalization failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-medium text-violet-300 text-sm flex items-center gap-2">
+            <Nfc className="h-4 w-4" /> NTAG 424 DNA — SUN programming
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Writes the verify URL template and enables SDM on file 2. Phase 3a uses factory keys
+            (non-destructive). Tap the chip after to test.
+          </p>
+        </div>
+        <Button type="button" size="sm" disabled={busy || !bridge.ready} onClick={run}>
+          {busy ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Programming…
+            </>
+          ) : (
+            "Program SDM"
+          )}
+        </Button>
+      </div>
+
+      {result && (
+        <div className="rounded-md border border-green-500/40 bg-green-500/10 p-3 space-y-1 text-xs">
+          <div className="flex items-center gap-2 text-green-400">
+            <Check className="h-3 w-3" /> Personalized. Lift the chip and tap your phone on it.
+          </div>
+          <div className="text-muted-foreground">
+            URL template: <code className="font-mono break-all">{result.urlTemplate}</code>
+          </div>
+          <div className="text-muted-foreground">
+            Offsets: picc={result.piccDataOffset}, cmac={result.sdmMacOffset}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span className="font-mono">{error}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
