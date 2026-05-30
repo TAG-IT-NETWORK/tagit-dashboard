@@ -131,6 +131,30 @@ export function deriveSessionKey(sdmFileReadKey: Buffer, uid: Buffer, counter: n
   return aesCmac(sdmFileReadKey, sv2);
 }
 
+/** Role byte for SDMFileRead (CMAC) key diversification — must match the bridge. */
+const ROLE_SDM_FILE_READ = 0x01;
+
+/**
+ * Derive the per-chip SDMFileRead (CMAC) key from the master secret and UID —
+ * Phase 3b. MUST byte-match the bridge's `diversifyKey(masterKey, uid, 0x01)`
+ * in tagit-nfc-bridge/src/sdm-personalize.ts:
+ *
+ *     fileReadKey = AES-CMAC(masterKey, 0x01 ‖ "TAGIT-SDM" ‖ UID(7))
+ *
+ * The SDMMetaRead key (decrypts PICCData) is NOT diversified — it stays equal
+ * to the master key so we can decrypt PICCData to learn the UID first.
+ */
+export function deriveFileReadKey(masterKey: Buffer, uid: Buffer): Buffer {
+  if (masterKey.length !== BLOCK_SIZE) throw new Error("master key must be 16 bytes");
+  if (uid.length !== 7) throw new Error("uid must be 7 bytes");
+  const sv = Buffer.concat([
+    Buffer.from([ROLE_SDM_FILE_READ]),
+    Buffer.from("TAGIT-SDM", "ascii"),
+    uid,
+  ]);
+  return aesCmac(masterKey, sv);
+}
+
 /**
  * Truncate a 16-byte CMAC tag to the 8 bytes the chip emits in the URL: take
  * bytes at odd indices (1, 3, 5, 7, 9, 11, 13, 15). Per AN12196 §3.5.4.
@@ -180,7 +204,11 @@ export function verifySunUrl(piccHex: string, cmacHex: string, masterKey: Buffer
     return { valid: false, reason: `unexpected PICC tag 0x${tag.toString(16)}` };
   }
 
-  const sessionKey = deriveSessionKey(masterKey, uid, counter);
+  // Phase 3b: the CMAC key (SDMFileRead) is diversified per-chip; the decrypt
+  // key (SDMMetaRead) above is the global master. For factory-key chips the
+  // master is all-zeros and the derivation just produces another value off it.
+  const fileReadKey = deriveFileReadKey(masterKey, uid);
+  const sessionKey = deriveSessionKey(fileReadKey, uid, counter);
   // For URLs that only carry UID+Counter (no encrypted file data), the CMAC
   // covers an empty message under the per-tap session key.
   const fullTag = aesCmac(sessionKey, Buffer.alloc(0));
@@ -227,7 +255,7 @@ export function mintSunUrl(
   cipher.setAutoPadding(false);
   const picc = Buffer.concat([cipher.update(plain), cipher.final()]);
 
-  const sessionKey = deriveSessionKey(masterKey, uid, counter);
+  const sessionKey = deriveSessionKey(deriveFileReadKey(masterKey, uid), uid, counter);
   const fullTag = aesCmac(sessionKey, Buffer.alloc(0));
   const cmac = truncateCmac(fullTag);
 
