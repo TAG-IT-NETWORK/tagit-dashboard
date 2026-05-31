@@ -193,12 +193,12 @@ export function LifecycleConsole({ tokenId }: { tokenId: bigint }) {
         </CardContent>
       </Card>
 
-      {/* 2-column: lifecycle (left) · actions + audit (right) */}
-      <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-        {/* Left — live lifecycle position */}
-        <LifecycleFsmGraph state={asset.state} />
+      {/* Live lifecycle position — full width (horizontal graph) */}
+      <LifecycleFsmGraph state={asset.state} />
 
-        {/* Right — what you can do + what happened */}
+      {/* Actions (+ inline form) · Audit trail */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* What you can do */}
         <div className="space-y-5">
           <LifecycleActionPanel
             state={asset.state}
@@ -262,10 +262,10 @@ export function LifecycleConsole({ tokenId }: { tokenId: bigint }) {
               </CardContent>
             </Card>
           )}
-
-          {/* Audit trail */}
-          <LifecycleAuditTrail tokenId={tokenId} explorerBase={explorerBase} />
         </div>
+
+        {/* What happened */}
+        <LifecycleAuditTrail tokenId={tokenId} explorerBase={explorerBase} />
       </div>
 
       {/* NFC bind + Program SDM (decoupled — available any time) */}
