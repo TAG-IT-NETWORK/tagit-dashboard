@@ -3,15 +3,17 @@
 /**
  * Branched lifecycle FSM graph for the Digital Twin Console.
  *
- * Shows the REAL state-machine topology (not the old straight line): the
- * manufacturing spine (Minted → Bound → Activated → Claimed), the recall branch
- * down to Flagged (flag from Bound/Activated/Claimed; resolve restores the exact
- * prior state), and the Recycled terminal (reachable from any live state). The
- * asset's current state glows; visited/relevant states are emphasized.
+ * Two balanced rows that fill the card width:
+ *   1. Manufacturing → consumer spine: Minted → Bound → Activated → Claimed.
+ *   2. Recovery & end-of-life: Flagged (flag from Bound/Activated/Claimed;
+ *      resolve restores the exact prior state) and the Recycled terminal
+ *      (recycle from any live state).
+ * The asset's current state glows.
  */
 import { AssetState, AssetStateNames, type AssetStateType } from "@tagit/contracts";
+import { RotateCcw } from "lucide-react";
 
-// State -> accent hex (matches @tagit/ui StateBadge palette).
+// State → accent hex (matches @tagit/ui StateBadge palette).
 const STATE_HEX: Record<number, string> = {
   0: "#6b7280",
   1: "#6b7280",
@@ -22,29 +24,38 @@ const STATE_HEX: Record<number, string> = {
   6: "#f97316",
 };
 
-function Node({ state, current }: { state: AssetStateType; current: boolean }) {
+function Node({
+  state,
+  current,
+  size = "md",
+}: {
+  state: AssetStateType;
+  current: boolean;
+  size?: "md" | "sm";
+}) {
   const hex = STATE_HEX[state];
+  const pad = size === "md" ? "px-5 py-3 min-w-[112px]" : "px-4 py-2.5 min-w-[96px]";
   return (
     <div
-      className="relative flex flex-col items-center gap-1 rounded-xl border px-3 py-2 transition-all"
+      className={`relative flex flex-col items-center justify-center rounded-2xl border transition-all ${pad}`}
       style={{
         borderColor: current ? hex : `${hex}40`,
-        background: current ? `${hex}26` : `${hex}0d`,
-        boxShadow: current ? `0 0 0 1px ${hex}, 0 0 18px ${hex}55` : "none",
+        background: current ? `${hex}24` : `${hex}0a`,
+        boxShadow: current ? `0 0 0 1px ${hex}, 0 0 26px ${hex}66` : "none",
       }}
     >
       {current && (
         <span
-          className="absolute -top-1.5 -right-1.5 h-3 w-3 animate-pulse rounded-full"
-          style={{ background: hex }}
+          className="absolute -right-1.5 -top-1.5 h-3 w-3 animate-pulse rounded-full"
+          style={{ background: hex, boxShadow: `0 0 8px ${hex}` }}
         />
       )}
-      <span className="text-[10px] font-semibold tabular-nums" style={{ color: `${hex}cc` }}>
+      <span className="text-[11px] font-bold tabular-nums" style={{ color: `${hex}cc` }}>
         {state}
       </span>
       <span
-        className="text-xs font-bold tracking-wide"
-        style={{ color: current ? "#fff" : `${hex}cc` }}
+        className="mt-0.5 text-sm font-bold tracking-wide"
+        style={{ color: current ? "#fff" : `${hex}dd` }}
       >
         {AssetStateNames[state]}
       </span>
@@ -52,59 +63,68 @@ function Node({ state, current }: { state: AssetStateType; current: boolean }) {
   );
 }
 
-function Edge({ label, vertical = false }: { label: string; vertical?: boolean }) {
-  if (vertical) {
-    return (
-      <div className="flex flex-col items-center text-gray-600">
-        <div className="h-5 w-px bg-white/15" />
-        <span className="my-0.5 text-[9px] uppercase tracking-wider text-gray-500">{label}</span>
-        <div className="h-5 w-px bg-white/15" />
-      </div>
-    );
-  }
+/** Horizontal arrow with a label above it. */
+function Arrow({ label }: { label: string }) {
   return (
-    <div className="flex flex-1 flex-col items-center">
-      <span className="mb-0.5 text-[9px] uppercase tracking-wider text-gray-500">{label}</span>
-      <div className="h-px w-full bg-white/15" />
+    <div className="flex min-w-[52px] flex-1 flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+        {label}
+      </span>
+      <div className="flex w-full items-center text-gray-500">
+        <div className="h-px flex-1 bg-white/25" />
+        <span className="-ml-[3px] text-[10px] leading-none">▶</span>
+      </div>
     </div>
   );
 }
 
 export function LifecycleFsmGraph({ state }: { state: AssetStateType }) {
+  const isFlagged = state === AssetState.FLAGGED;
+  const isRecycled = state === AssetState.RECYCLED;
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-      <div className="mb-4 text-xs font-medium uppercase tracking-wider text-gray-500">
-        Lifecycle — live position
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+      <div className="mb-5 text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">
+        Lifecycle · live position
       </div>
 
-      {/* Manufacturing spine */}
-      <div className="flex items-center gap-1">
+      {/* Spine: Minted → Bound → Activated → Claimed */}
+      <div className="flex items-center">
         <Node state={AssetState.MINTED} current={state === AssetState.MINTED} />
-        <Edge label="bind" />
+        <Arrow label="bind" />
         <Node state={AssetState.BOUND} current={state === AssetState.BOUND} />
-        <Edge label="activate" />
+        <Arrow label="activate" />
         <Node state={AssetState.ACTIVATED} current={state === AssetState.ACTIVATED} />
-        <Edge label="claim" />
+        <Arrow label="claim" />
         <Node state={AssetState.CLAIMED} current={state === AssetState.CLAIMED} />
       </div>
 
-      {/* Recall branch: flag down from the spine, resolve back up */}
-      <div className="mt-1 flex items-start justify-end gap-6 pr-2">
-        <div className="flex flex-col items-center">
-          <div className="flex items-center gap-2 text-[9px] uppercase tracking-wider text-gray-500">
-            <span className="text-red-400/70">↓ flag</span>
-            <span className="text-yellow-500/70">resolve ↑</span>
+      {/* Recovery & end-of-life */}
+      <div className="mt-6 rounded-xl border border-white/[0.07] bg-white/[0.015] p-4">
+        <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+          Recovery &amp; end-of-life
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="text-xs font-medium uppercase tracking-wider text-red-400/80">
+            flag&nbsp;▶
+          </span>
+          <Node state={AssetState.FLAGGED} current={isFlagged} size="sm" />
+          <div className="flex items-center gap-1.5 text-xs text-yellow-500/90">
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>resolve restores prior state</span>
           </div>
-          <div className="my-1 h-4 w-px bg-white/15" />
-          <Node state={AssetState.FLAGGED} current={state === AssetState.FLAGGED} />
-          <Edge label="recycle" vertical />
-          <Node state={AssetState.RECYCLED} current={state === AssetState.RECYCLED} />
+          <span className="text-gray-600">·</span>
+          <span className="text-xs font-medium uppercase tracking-wider text-orange-400/80">
+            recycle&nbsp;▶
+          </span>
+          <Node state={AssetState.RECYCLED} current={isRecycled} size="sm" />
         </div>
       </div>
 
-      <p className="mt-3 text-[10px] leading-relaxed text-gray-600">
-        Flag is valid from Bound, Activated, or Claimed (recall / theft). Resolve restores the exact
-        pre-flag state. Recycle (scrap / void / end-of-life) is valid from any live state.
+      <p className="mt-4 text-xs leading-relaxed text-gray-400">
+        <span className="text-gray-300">Flag</span> is valid from Bound, Activated, or Claimed
+        (recall / theft / lost-stolen). <span className="text-gray-300">Resolve</span> restores the
+        exact pre-flag state — never a forward skip. <span className="text-gray-300">Recycle</span>{" "}
+        (scrap / void / end-of-life) works from any live state.
       </p>
     </div>
   );

@@ -44,6 +44,23 @@ const EXPLORER: Record<number, string> = {
   421614: "https://sepolia.arbiscan.io",
 };
 
+const CHAIN_NAME: Record<number, string> = {
+  84532: "Base Sepolia",
+  11155420: "OP Sepolia",
+  421614: "Arbitrum Sepolia",
+};
+
+/** One-line, operator-facing description per lifecycle state. */
+const STATE_DESC: Record<number, string> = {
+  0: "This twin does not exist.",
+  1: "NFT minted — no physical tag bound yet.",
+  2: "NFC tag cryptographically bound to this twin.",
+  3: "QA passed — released to market.",
+  4: "Owned by an end consumer.",
+  5: "Flagged: recall, lost, or stolen — in recovery.",
+  6: "Retired — end of life (terminal).",
+};
+
 function short(a?: string) {
   return a ? `${a.slice(0, 10)}…${a.slice(-6)}` : "—";
 }
@@ -148,93 +165,108 @@ export function LifecycleConsole({ tokenId }: { tokenId: bigint }) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="animate-fadeUp space-y-5">
+      {/* Header — full width */}
       <Card>
-        <CardHeader className="flex-row items-start justify-between space-y-0">
-          <div>
-            <CardTitle className="text-xl">Digital Twin #{tokenId.toString()}</CardTitle>
-            <div className="mt-2 flex items-center gap-2">
-              <StateBadge state={asset.state} />
+        <CardContent className="py-5">
+          <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="font-syne text-2xl font-bold leading-none">
+                  Digital Twin #{tokenId.toString()}
+                </h2>
+                <StateBadge state={asset.state} className="px-3 py-1 text-sm" />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">{STATE_DESC[asset.state]}</p>
             </div>
+            <dl className="grid shrink-0 grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Owner</dt>
+              <dd>
+                <AddressBadge address={asset.owner} />
+              </dd>
+              <dt className="text-muted-foreground">Tag</dt>
+              <dd className="font-mono text-xs">{short(tagHash as string | undefined)}</dd>
+              <dt className="text-muted-foreground">Chain</dt>
+              <dd className="text-xs">{CHAIN_NAME[chainId] ?? `Chain ${chainId}`}</dd>
+            </dl>
           </div>
-          <div className="text-right text-xs text-muted-foreground">
-            <div>
-              Owner: <AddressBadge address={asset.owner} />
-            </div>
-            <div className="mt-1 font-mono">tag: {short(tagHash as string | undefined)}</div>
-          </div>
-        </CardHeader>
+        </CardContent>
       </Card>
 
-      {/* Live FSM graph */}
+      {/* Live lifecycle position — full width (horizontal graph) */}
       <LifecycleFsmGraph state={asset.state} />
 
-      {/* State-driven actions */}
-      <LifecycleActionPanel
-        state={asset.state}
-        owner={asset.owner}
-        onAction={handleAction}
-        pendingAction={pendingAction}
-      />
+      {/* Actions (+ inline form) · Audit trail */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* What you can do */}
+        <div className="space-y-5">
+          <LifecycleActionPanel
+            state={asset.state}
+            owner={asset.owner}
+            onAction={handleAction}
+            pendingAction={pendingAction}
+          />
 
-      {/* Inline address form for claim / transfer / resolve */}
-      {form && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {form.action === "claim"
-                ? "Claim — assign consumer owner"
-                : form.action === "transfer"
-                ? "Resell — new owner address"
-                : "Resolve — rightful owner (needs 2-of-3 quorum)"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              placeholder="0x… recipient address"
-              value={form.value}
-              onChange={(e) => setForm({ ...form, value: e.target.value })}
-              className="font-mono"
-            />
-            {form.action === "resolve" && (
-              <p className="text-xs text-muted-foreground">
-                Two different RESOLVER wallets must approve the same recipient before Resolve
-                executes. Approve with this wallet, switch accounts, approve again, then Resolve.
-              </p>
-            )}
-            <div className="flex gap-2">
-              {form.action === "resolve" && (
-                <Button
-                  variant="outline"
-                  disabled={!isAddress(form.value.trim()) || approveResolve.isPending}
-                  onClick={() =>
-                    approveResolve.approveResolve(tokenId, form.value.trim() as `0x${string}`)
-                  }
-                >
-                  Approve (1 of 2)
-                </Button>
-              )}
-              <Button
-                disabled={!isAddress(form.value.trim()) || !!pendingAction}
-                onClick={submitForm}
-              >
-                {form.action === "transfer"
-                  ? "Resell"
-                  : form.action === "claim"
-                  ? "Claim"
-                  : "Resolve"}
-              </Button>
-              <Button variant="ghost" onClick={() => setForm(null)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Inline address form for claim / transfer / resolve */}
+          {form && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {form.action === "claim"
+                    ? "Claim — assign consumer owner"
+                    : form.action === "transfer"
+                    ? "Resell — new owner address"
+                    : "Resolve — rightful owner (needs 2-of-3 quorum)"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  placeholder="0x… recipient address"
+                  value={form.value}
+                  onChange={(e) => setForm({ ...form, value: e.target.value })}
+                  className="font-mono"
+                />
+                {form.action === "resolve" && (
+                  <p className="text-xs text-muted-foreground">
+                    Two different RESOLVER wallets must approve the same recipient before Resolve
+                    executes. Approve with this wallet, switch accounts, approve again, then
+                    Resolve.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  {form.action === "resolve" && (
+                    <Button
+                      variant="outline"
+                      disabled={!isAddress(form.value.trim()) || approveResolve.isPending}
+                      onClick={() =>
+                        approveResolve.approveResolve(tokenId, form.value.trim() as `0x${string}`)
+                      }
+                    >
+                      Approve (1 of 2)
+                    </Button>
+                  )}
+                  <Button
+                    disabled={!isAddress(form.value.trim()) || !!pendingAction}
+                    onClick={submitForm}
+                  >
+                    {form.action === "transfer"
+                      ? "Resell"
+                      : form.action === "claim"
+                      ? "Claim"
+                      : "Resolve"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setForm(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      {/* Audit trail */}
-      <LifecycleAuditTrail tokenId={tokenId} explorerBase={explorerBase} />
+        {/* What happened */}
+        <LifecycleAuditTrail tokenId={tokenId} explorerBase={explorerBase} />
+      </div>
 
       {/* NFC bind + Program SDM (decoupled — available any time) */}
       <BindTagModal

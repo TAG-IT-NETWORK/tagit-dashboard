@@ -55,14 +55,14 @@ export function LifecycleActionPanel({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">Available actions</CardTitle>
-        <span className="text-xs text-muted-foreground">
-          state: <span className="font-medium text-foreground">{AssetStateNames[state]}</span>
+        <CardTitle className="text-base font-semibold tracking-wide">Available actions</CardTitle>
+        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-muted-foreground">
+          state <span className="font-semibold text-foreground">{AssetStateNames[state]}</span>
         </span>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2.5">
         {actions.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             No further actions — this asset is in a terminal state.
           </p>
         ) : (
@@ -71,52 +71,49 @@ export function LifecycleActionPanel({
             const isPending = pendingAction === a.key;
             const clickable = a.enabled && !isPending;
             return (
-              <div key={a.key} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div
+                key={a.key}
+                className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 transition-colors hover:border-white/20"
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3.5">
                     <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
                         a.enabled
                           ? TONE_CLASSES[a.tone]
                           : "border-white/10 bg-white/5 text-gray-500"
                       }`}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm font-medium">
+                      <div className="flex items-center gap-2 text-[15px] font-semibold">
                         {a.label}
                         {a.quorum && (
-                          <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-500">
+                          <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-yellow-500">
                             2-of-3
                           </span>
                         )}
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{a.description}</p>
+                      <p className="truncate text-[13px] text-muted-foreground">{a.description}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={!clickable}
                     onClick={() => clickable && onAction(a.key)}
-                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    className={`shrink-0 rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors ${
                       clickable
                         ? TONE_CLASSES[a.tone]
                         : "cursor-not-allowed border-white/10 bg-white/5 text-gray-500"
                     }`}
                   >
-                    {isPending ? (
-                      "Confirm…"
-                    ) : a.enabled ? (
-                      a.label
-                    ) : (
-                      <Lock className="h-3.5 w-3.5" />
-                    )}
+                    {isPending ? "Confirm…" : a.enabled ? a.label : <Lock className="h-4 w-4" />}
                   </button>
                 </div>
                 {!a.enabled && a.reason && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-yellow-500/80">
-                    <Lock className="h-3 w-3 shrink-0" />
+                  <p className="mt-2.5 flex items-center gap-1.5 text-[13px] text-yellow-500/90">
+                    <Lock className="h-3.5 w-3.5 shrink-0" />
                     {a.reason}
                   </p>
                 )}

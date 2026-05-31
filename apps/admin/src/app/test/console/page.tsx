@@ -39,7 +39,7 @@ function ConsoleInner() {
   const minting = mint.isPending || mint.isConfirming;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 py-2">
+    <div className="mx-auto max-w-6xl space-y-6 py-2">
       <div>
         <h1 className="font-syne text-2xl font-bold">Digital Twin Console</h1>
         <p className="text-sm text-muted-foreground">
