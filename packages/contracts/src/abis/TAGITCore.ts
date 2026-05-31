@@ -240,6 +240,16 @@ export const TAGITCoreABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "address", name: "to" },
+    ],
+    name: "transferAsset",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
   // Admin functions
   {
     inputs: [{ type: "address", name: "controller" }],
@@ -320,6 +330,16 @@ export const TAGITCoreABI = [
     anonymous: false,
     inputs: [
       { indexed: true, name: "tokenId", type: "uint256" },
+      { indexed: true, name: "from", type: "address" },
+      { indexed: true, name: "to", type: "address" },
+    ],
+    name: "AssetResold",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "tokenId", type: "uint256" },
       { indexed: true, name: "tagHash", type: "bytes32" },
     ],
     name: "TagBound",
@@ -351,6 +371,23 @@ export const TAGITCoreABI = [
   {
     inputs: [{ type: "uint256", name: "tokenId" }],
     name: "TokenNotFound",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "uint8", name: "current" },
+    ],
+    name: "NotFlaggable",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "tokenId" },
+      { type: "address", name: "caller" },
+      { type: "address", name: "owner" },
+    ],
+    name: "NotAssetOwner",
     type: "error",
   },
   {
