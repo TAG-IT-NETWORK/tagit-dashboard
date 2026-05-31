@@ -9,6 +9,7 @@
  * recall/recovery branches — and doubles as the compliance/custody record.
  */
 import { useEffect, useState } from "react";
+import { History } from "lucide-react";
 import { useChainId, usePublicClient } from "wagmi";
 import { AssetStateNames, getContractsForChain, type AssetStateType } from "@tagit/contracts";
 
@@ -131,14 +132,20 @@ export function LifecycleAuditTrail({
   const { entries, isLoading } = useAssetHistory(tokenId);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-      <div className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+      <div className="mb-4 text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">
         Audit trail
       </div>
       {isLoading && entries.length === 0 ? (
-        <p className="py-3 text-sm text-muted-foreground">Loading on-chain history…</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">Loading on-chain history…</p>
       ) : entries.length === 0 ? (
-        <p className="py-3 text-sm text-muted-foreground">No transitions recorded yet.</p>
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <History className="h-7 w-7 text-gray-600" />
+          <p className="text-sm text-muted-foreground">No transitions recorded yet.</p>
+          <p className="text-xs text-gray-600">
+            Lifecycle actions will appear here as they happen.
+          </p>
+        </div>
       ) : (
         <ol className="space-y-0">
           {entries.map((e, i) => {
@@ -148,7 +155,7 @@ export function LifecycleAuditTrail({
                 {/* rail */}
                 <div className="flex flex-col items-center">
                   <span
-                    className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                    className="mt-1 h-3 w-3 shrink-0 rounded-full"
                     style={{ background: hex, boxShadow: `0 0 8px ${hex}88` }}
                   />
                   {i < entries.length - 1 && <span className="w-px flex-1 bg-white/10" />}
@@ -156,7 +163,7 @@ export function LifecycleAuditTrail({
                 {/* entry */}
                 <div className="flex-1 pb-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium" style={{ color: hex }}>
+                    <span className="text-[15px] font-semibold" style={{ color: hex }}>
                       {AssetStateNames[e.from as AssetStateType]} →{" "}
                       {AssetStateNames[e.to as AssetStateType]}
                     </span>
@@ -164,7 +171,7 @@ export function LifecycleAuditTrail({
                       {relativeTime(e.timestamp)}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="mt-1 flex items-center gap-2 text-[13px] text-muted-foreground">
                     <span className="font-mono">{short(e.actor)}</span>
                     {explorerBase && e.txHash && (
                       <a
