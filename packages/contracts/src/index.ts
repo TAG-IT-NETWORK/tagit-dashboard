@@ -96,6 +96,7 @@ export {
   useResolveApprovalStatus,
   useResolveApprovers,
   useRecycle,
+  useTransferAsset,
   // TAGITAccess
   useCapabilityGate,
   useCapabilities,

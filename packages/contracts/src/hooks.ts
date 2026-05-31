@@ -686,6 +686,37 @@ export function useRecycle() {
   return { recycle, hash, isPending, isConfirming, isSuccess, error };
 }
 
+/**
+ * Secondary-market resale: transfer a CLAIMED asset to a new owner (state stays
+ * CLAIMED). Owner-gated by the contract — the connected wallet must be the
+ * current asset owner. The only sanctioned consumer-to-consumer transfer path.
+ */
+export function useTransferAsset() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
+
+  const transferAsset = (tokenId: bigint, to: `0x${string}`) => {
+    writeContract({
+      address: contracts.TAGITCore,
+      abi: TAGITCoreABI,
+      functionName: "transferAsset",
+      args: [tokenId, to],
+      chainId,
+      ...gasFor(chainId),
+    });
+  };
+
+  return { transferAsset, hash, isPending, isConfirming, isSuccess, error };
+}
+
 // ============================================================================
 // TAGITAccess Hooks
 // ============================================================================

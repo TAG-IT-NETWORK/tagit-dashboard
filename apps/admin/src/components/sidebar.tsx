@@ -42,7 +42,9 @@ const navigation = [
 ];
 
 // Testing section
-const testingNavigation = [{ name: "Lifecycle Test", href: "/test/lifecycle", icon: FlaskConical }];
+const testingNavigation = [
+  { name: "Lifecycle Console", href: "/test/console", icon: FlaskConical },
+];
 
 interface SidebarProps {
   /** Controls whether the drawer is open on mobile (below md breakpoint). */

@@ -108,20 +108,51 @@ export function parsePiccPlaintext(plain: Buffer): { tag: number; uid: Buffer; c
 }
 
 /**
- * Derive the per-tap session key KSesSDMFileRead per AN12196 §3.5.4:
+ * Derive the per-tap session key KSesSDMFileReadMAC per AN12196 §3.5.4:
  *
- *     SV2 = 3C C3 00 01 00 80 ‖ SDMReadCtr(3 LE) ‖ UID(7)
+ *     SV2 = 3C C3 00 01 00 80 ‖ UID(7) ‖ SDMReadCtr(3 LE)
  *     KSes = AES-CMAC(SDMFileReadKey, SV2)
+ *
+ * Field order is UID THEN counter (6+7+3 = 16 bytes, no padding). The worked
+ * example in AN12196 (Table at §3.5.4) is
+ *   SV2 = 3CC30001008004C767F2066180010000
+ *         └─ 6 ─┘└──── UID 04C767F2066180 ───┘└ ctr=1 ┘
+ * Getting these swapped produces a valid-looking key that round-trips against
+ * our own minter but never matches a real chip → "cmac mismatch" on every tap.
  */
 export function deriveSessionKey(sdmFileReadKey: Buffer, uid: Buffer, counter: number): Buffer {
   if (uid.length !== 7) throw new Error("uid must be 7 bytes");
   const sv2 = Buffer.alloc(16);
   sv2.set([0x3c, 0xc3, 0x00, 0x01, 0x00, 0x80], 0);
-  sv2[6] = counter & 0xff;
-  sv2[7] = (counter >> 8) & 0xff;
-  sv2[8] = (counter >> 16) & 0xff;
-  uid.copy(sv2, 9);
+  uid.copy(sv2, 6); // bytes 6..12 = UID
+  sv2[13] = counter & 0xff; // bytes 13..15 = SDMReadCtr (3-byte LE)
+  sv2[14] = (counter >> 8) & 0xff;
+  sv2[15] = (counter >> 16) & 0xff;
   return aesCmac(sdmFileReadKey, sv2);
+}
+
+/** Role byte for SDMFileRead (CMAC) key diversification — must match the bridge. */
+const ROLE_SDM_FILE_READ = 0x01;
+
+/**
+ * Derive the per-chip SDMFileRead (CMAC) key from the master secret and UID —
+ * Phase 3b. MUST byte-match the bridge's `diversifyKey(masterKey, uid, 0x01)`
+ * in tagit-nfc-bridge/src/sdm-personalize.ts:
+ *
+ *     fileReadKey = AES-CMAC(masterKey, 0x01 ‖ "TAGIT-SDM" ‖ UID(7))
+ *
+ * The SDMMetaRead key (decrypts PICCData) is NOT diversified — it stays equal
+ * to the master key so we can decrypt PICCData to learn the UID first.
+ */
+export function deriveFileReadKey(masterKey: Buffer, uid: Buffer): Buffer {
+  if (masterKey.length !== BLOCK_SIZE) throw new Error("master key must be 16 bytes");
+  if (uid.length !== 7) throw new Error("uid must be 7 bytes");
+  const sv = Buffer.concat([
+    Buffer.from([ROLE_SDM_FILE_READ]),
+    Buffer.from("TAGIT-SDM", "ascii"),
+    uid,
+  ]);
+  return aesCmac(masterKey, sv);
 }
 
 /**
@@ -173,7 +204,11 @@ export function verifySunUrl(piccHex: string, cmacHex: string, masterKey: Buffer
     return { valid: false, reason: `unexpected PICC tag 0x${tag.toString(16)}` };
   }
 
-  const sessionKey = deriveSessionKey(masterKey, uid, counter);
+  // Phase 3b: the CMAC key (SDMFileRead) is diversified per-chip; the decrypt
+  // key (SDMMetaRead) above is the global master. For factory-key chips the
+  // master is all-zeros and the derivation just produces another value off it.
+  const fileReadKey = deriveFileReadKey(masterKey, uid);
+  const sessionKey = deriveSessionKey(fileReadKey, uid, counter);
   // For URLs that only carry UID+Counter (no encrypted file data), the CMAC
   // covers an empty message under the per-tap session key.
   const fullTag = aesCmac(sessionKey, Buffer.alloc(0));
@@ -220,7 +255,7 @@ export function mintSunUrl(
   cipher.setAutoPadding(false);
   const picc = Buffer.concat([cipher.update(plain), cipher.final()]);
 
-  const sessionKey = deriveSessionKey(masterKey, uid, counter);
+  const sessionKey = deriveSessionKey(deriveFileReadKey(masterKey, uid), uid, counter);
   const fullTag = aesCmac(sessionKey, Buffer.alloc(0));
   const cmac = truncateCmac(fullTag);
 
