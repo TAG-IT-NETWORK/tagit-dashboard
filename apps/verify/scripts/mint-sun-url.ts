@@ -1,17 +1,23 @@
 #!/usr/bin/env tsx
 /**
- * Mint a valid SUN URL for testing the /sun verifier without a personalized
+ * Mint a valid SUN URL for testing the verifier without a personalized
  * NTAG 424 DNA chip. Reads SDM_MASTER_KEY from env (or accepts --key=<hex>),
  * picks a random UID + counter unless overridden, and prints the URL.
  *
- *   tsx scripts/mint-sun-url.ts
+ *   # Legacy /sun carrier:
  *   tsx scripts/mint-sun-url.ts --uid=04CC082E5F6180 --counter=42 \
  *       --base=https://verify.tagit.network/sun
+ *
+ *   # GS1 Digital Link carrier (DPP-001) — builds /01/{GTIN}/21/{serial}:
+ *   tsx scripts/mint-sun-url.ts --gtin=09506000134376 --serial=SN0000123
+ *   tsx scripts/mint-sun-url.ts --gtin=09506000134376 --serial=SN1 \
+ *       --resolver=https://id.tagit.network
  *
  * The key MUST match what the deployment's verifier expects.
  */
 import { randomBytes } from "node:crypto";
 import { mintSunUrl } from "../src/lib/sdm";
+import { buildGs1Path, normalizeGtin } from "../src/lib/gs1";
 
 function arg(name: string): string | undefined {
   const found = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -42,7 +48,26 @@ if (!Number.isInteger(counter) || counter < 0 || counter > 0xffffff) {
   process.exit(1);
 }
 
-const base = arg("base") ?? "https://verify.tagit.network/sun";
+// Carrier selection:
+//   --base=<full url>            → use verbatim (legacy /sun or any path)
+//   --gtin=<digits> [--serial=]  → build a GS1 Digital Link on the resolver host
+//   (default)                    → legacy https://verify.tagit.network/sun
+const gtinArg = arg("gtin");
+let base: string;
+if (arg("base")) {
+  base = arg("base")!;
+} else if (gtinArg) {
+  const gtin = normalizeGtin(gtinArg);
+  if (!gtin) {
+    console.error("ERROR: --gtin must be 8/12/13/14 digits, e.g. 09506000134376");
+    process.exit(1);
+  }
+  const resolver = (arg("resolver") ?? "https://id.tagit.network").replace(/\/$/, "");
+  base = resolver + buildGs1Path({ gtin, serial: arg("serial") });
+} else {
+  base = "https://verify.tagit.network/sun";
+}
+
 const url = mintSunUrl(base, key, uid, counter);
 
 console.log(url);
