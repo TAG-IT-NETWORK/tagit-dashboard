@@ -118,7 +118,7 @@ export default function TagVerifyPage() {
 
   const state = STATES[asset.state] || STATES[0];
   const isAuthentic = asset.state >= 1 && asset.state <= 4;
-  const arbiscanUrl = `https://sepolia.arbiscan.io/address/${CONTRACT_ADDRESS}`;
+  const basescanUrl = `https://sepolia.basescan.org/address/${CONTRACT_ADDRESS}`;
   const displayName = asset.productName || `Token #${asset.tokenId.toString()}`;
 
   return (
@@ -223,8 +223,8 @@ export default function TagVerifyPage() {
           <div className="flex justify-between items-center py-3">
             <span className="text-gray-500 text-sm">Chain</span>
             <span className="text-white text-sm inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: "#28A0F0", boxShadow: "0 0 6px #28A0F0" }} />
-              Arbitrum Sepolia
+              <span className="w-2 h-2 rounded-full" style={{ background: "#0052FF", boxShadow: "0 0 6px #0052FF" }} />
+              Base Sepolia
             </span>
           </div>
         </div>
@@ -233,13 +233,13 @@ export default function TagVerifyPage() {
         <div className="flex items-center justify-center gap-2 mb-5 animate-fadeUp" style={{ animationDelay: "0.45s" }}>
           <span className="text-sm">&#x1F512;</span>
           <span className="text-xs" style={{ color: "#00D68F" }}>
-            Cryptographically secured on Arbitrum
+            Cryptographically secured on Base
           </span>
         </div>
 
         {/* Arbiscan Button */}
         <a
-          href={arbiscanUrl}
+          href={basescanUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/10 text-gray-300 text-sm hover:bg-white/5 transition-colors animate-fadeUp"
@@ -248,7 +248,7 @@ export default function TagVerifyPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          View on Arbiscan
+          View on BaseScan
           <span className="text-gray-500">{"\u2197"}</span>
         </a>
 
@@ -259,15 +259,11 @@ export default function TagVerifyPage() {
           </p>
           <div className="flex items-center justify-center gap-1.5">
             <span className="text-gray-600 text-xs">Secured by</span>
-            <svg width="16" height="18" viewBox="0 0 40 46" fill="none" className="inline-block">
-              <path d="M20.0975 0.440186L39.295 11.522V33.686L20.0975 44.768L0.9 33.686V11.522L20.0975 0.440186Z" fill="#213147" />
-              <path d="M24.168 27.574L28.378 37.738L32.026 35.608L26.702 23.128L24.168 27.574Z" fill="#12AAFF" />
-              <path d="M20.0975 14.384L13.184 28.866L16.832 31.002L20.0975 23.608L24.168 27.574L26.702 23.128L20.0975 14.384Z" fill="#12AAFF" />
-              <path d="M8.168 35.608L11.816 37.738L16.026 27.574L13.492 23.128L8.168 35.608Z" fill="white" />
-              <path d="M20.0975 14.384L13.492 23.128L16.026 27.574L20.0975 23.608V14.384Z" fill="white" />
-              <path d="M5.244 33.018V13.19L20.0975 4.276L34.951 13.19V33.018L20.0975 41.932L5.244 33.018Z" stroke="#9DCCED" strokeWidth="1.2" fill="none" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="inline-block">
+              <circle cx="12" cy="12" r="12" fill="#0052FF" />
+              <path d="M12 21.6c5.302 0 9.6-4.298 9.6-9.6 0-5.302-4.298-9.6-9.6-9.6-5.034 0-9.16 3.873-9.566 8.8H15.6v1.6H2.434C2.84 17.727 6.966 21.6 12 21.6z" fill="#fff" />
             </svg>
-            <span className="text-xs font-semibold" style={{ color: "#12AAFF" }}>Arbitrum</span>
+            <span className="text-xs font-semibold" style={{ color: "#0052FF" }}>Base</span>
           </div>
         </div>
 
