@@ -19,9 +19,10 @@ import Link from "next/link";
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
 import { buildDpp, loadProduct } from "@/lib/dpp";
-import { CONTRACT_ADDRESS } from "@/lib/contract";
+import { CONTRACT_ADDRESS, getBuyConfigForToken } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
+import { BuyWidget } from "@/components/buy-widget";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
@@ -203,6 +204,16 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
       </div>
 
       <DataCard rows={rows} />
+
+      {dpp.lifecycle.stateCode === 3 && (
+        <div className="mt-5">
+          <BuyWidget
+            tokenId={res.tokenId.toString()}
+            productName={displayName}
+            priceUsdc={getBuyConfigForToken(res.tokenId.toString()).priceUsdc}
+          />
+        </div>
+      )}
 
       {product.description && (
         <div

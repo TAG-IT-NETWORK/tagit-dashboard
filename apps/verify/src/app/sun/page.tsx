@@ -10,9 +10,10 @@
  */
 import Link from "next/link";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
-import { CONTRACT_ADDRESS, getMetadataForToken } from "@/lib/contract";
+import { CONTRACT_ADDRESS, getMetadataForToken, getBuyConfigForToken } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
+import { BuyWidget } from "@/components/buy-widget";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
@@ -136,6 +137,16 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
           ["Tap counter", String(res.counter)],
         ]}
       />
+
+      {res.asset.state === 3 && (
+        <div className="mt-5">
+          <BuyWidget
+            tokenId={res.tokenId.toString()}
+            productName={displayName}
+            priceUsdc={getBuyConfigForToken(res.tokenId.toString()).priceUsdc}
+          />
+        </div>
+      )}
 
       <div className="text-center mt-5 text-xs text-gray-600 font-mono">
         <Link
