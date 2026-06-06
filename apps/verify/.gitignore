@@ -1,0 +1,6 @@
+.vercel
+
+# Local env / secrets — never commit
+.env
+.env.*
+!.env.example
