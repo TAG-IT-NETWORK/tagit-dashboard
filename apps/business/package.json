@@ -1,0 +1,36 @@
+{
+  "name": "@tagit/business",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3005",
+    "build": "next build",
+    "start": "next start --port 3005",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tagit/auth": "workspace:*",
+    "@tagit/config": "workspace:*",
+    "@tagit/contracts": "workspace:*",
+    "@tagit/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.0",
+    "lucide-react": "^0.468.0",
+    "next": "^14.2.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.21.51",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@tagit/tsconfig": "workspace:*",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2"
+  }
+}
