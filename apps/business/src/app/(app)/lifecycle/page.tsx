@@ -328,24 +328,29 @@ export default function LifecyclePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-6 py-3 font-medium">Transition</th>
-                <th className="px-6 py-3 font-medium">Authority required</th>
-                <th className="px-6 py-3 font-medium">Verification</th>
-              </tr>
-            </thead>
-            <tbody>
-              {AUTHORITY_MATRIX.map((row) => (
-                <tr key={row.transition} className="border-b last:border-0">
-                  <td className="px-6 py-3 font-mono text-xs font-medium">{row.transition}</td>
-                  <td className="px-6 py-3 text-muted-foreground">{row.authority}</td>
-                  <td className="px-6 py-3 text-muted-foreground">{row.verification}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <caption className="sr-only">State transition authority matrix</caption>
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="px-6 py-3 font-medium">Transition</th>
+                  <th className="px-6 py-3 font-medium">Authority required</th>
+                  <th className="px-6 py-3 font-medium">Verification</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {AUTHORITY_MATRIX.map((row) => (
+                  <tr key={row.transition} className="border-b last:border-0">
+                    <td className="px-6 py-3 font-mono text-xs font-medium whitespace-nowrap">
+                      {row.transition}
+                    </td>
+                    <td className="px-6 py-3 text-muted-foreground">{row.authority}</td>
+                    <td className="px-6 py-3 text-muted-foreground">{row.verification}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

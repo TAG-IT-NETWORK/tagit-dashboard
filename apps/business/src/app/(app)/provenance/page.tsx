@@ -39,7 +39,8 @@ export default function ProvenancePage() {
     [assets, address],
   );
 
-  const { forest, demoForest, chainForest, attach, loaded } = useProvenanceForest(chainAssets);
+  const { forest, demoForest, chainForest, attach, reset, hasEdges, loaded } =
+    useProvenanceForest(chainAssets);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<Set<string>>(new Set());
@@ -90,8 +91,19 @@ export default function ProvenancePage() {
             />
           ))}
 
-          <div className="pt-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Your products {chainForest.length > 0 && `(${chainForest.length})`}
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Your products {chainForest.length > 0 && `(${chainForest.length})`}
+            </span>
+            {hasEdges && (
+              <button
+                type="button"
+                onClick={reset}
+                className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Reset tree
+              </button>
+            )}
           </div>
           {isLoading || !loaded ? (
             <div className="h-16 animate-pulse rounded-xl bg-secondary" />

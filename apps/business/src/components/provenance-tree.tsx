@@ -49,11 +49,17 @@ function NodeRow({ node, highlight, depth = 0, defaultOpen = true }: TreeProps) 
         <button
           type="button"
           onClick={() => hasChildren && setOpen((o) => !o)}
+          disabled={!hasChildren}
+          aria-hidden={!hasChildren}
+          tabIndex={hasChildren ? 0 : -1}
+          aria-label={
+            hasChildren ? (open ? `Collapse ${node.label}` : `Expand ${node.label}`) : undefined
+          }
+          aria-expanded={hasChildren ? open : undefined}
           className={cn(
             "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded",
             hasChildren ? "text-muted-foreground hover:bg-secondary" : "opacity-0",
           )}
-          aria-label={open ? "Collapse" : "Expand"}
         >
           {hasChildren &&
             (open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}

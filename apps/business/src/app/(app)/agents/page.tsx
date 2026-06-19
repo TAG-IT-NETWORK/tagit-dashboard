@@ -205,9 +205,10 @@ export default function AgentsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-2">
+      <div role="group" aria-label="Filter agents" className="flex gap-2">
         <button
           type="button"
+          aria-pressed={!mineOnly}
           onClick={() => setMineOnly(false)}
           className={cn(
             "px-3 py-1.5 rounded-full text-sm font-medium",
@@ -220,6 +221,7 @@ export default function AgentsPage() {
         </button>
         <button
           type="button"
+          aria-pressed={mineOnly}
           onClick={() => setMineOnly(true)}
           className={cn(
             "px-3 py-1.5 rounded-full text-sm font-medium",
@@ -248,44 +250,47 @@ export default function AgentsPage() {
               </p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="font-medium px-6 py-3">Agent</th>
-                  <th className="font-medium px-6 py-3">Wallet</th>
-                  <th className="font-medium px-6 py-3">Status</th>
-                  <th className="font-medium px-6 py-3 text-right">Registered</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((agent) => (
-                  <tr
-                    key={agent.agentId.toString()}
-                    className="border-b last:border-0 hover:bg-secondary/40"
-                  >
-                    <td className="px-6 py-3">
-                      <Link
-                        href={`/agents/${agent.agentId.toString()}`}
-                        className="font-mono font-medium hover:underline"
-                      >
-                        #{agent.agentId.toString()}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-3">
-                      <AddressBadge address={agent.wallet} />
-                    </td>
-                    <td className="px-6 py-3">
-                      <StatusPill status={agent.status} />
-                    </td>
-                    <td className="px-6 py-3 text-right text-muted-foreground">
-                      {agent.registeredAt > 0n
-                        ? new Date(Number(agent.registeredAt) * 1000).toLocaleDateString()
-                        : "—"}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Registered agents</caption>
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="font-medium px-6 py-3">Agent</th>
+                    <th className="font-medium px-6 py-3">Wallet</th>
+                    <th className="font-medium px-6 py-3">Status</th>
+                    <th className="font-medium px-6 py-3 text-right">Registered</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visible.map((agent) => (
+                    <tr
+                      key={agent.agentId.toString()}
+                      className="border-b last:border-0 hover:bg-secondary/40"
+                    >
+                      <td className="px-6 py-3">
+                        <Link
+                          href={`/agents/${agent.agentId.toString()}`}
+                          className="font-mono font-medium hover:underline"
+                        >
+                          #{agent.agentId.toString()}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-3">
+                        <AddressBadge address={agent.wallet} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <StatusPill status={agent.status} />
+                      </td>
+                      <td className="px-6 py-3 text-right text-muted-foreground">
+                        {agent.registeredAt > 0n
+                          ? new Date(Number(agent.registeredAt) * 1000).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

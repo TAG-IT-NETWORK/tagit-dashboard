@@ -382,11 +382,22 @@ const EDGES_KEY = "tagit-provenance-edges";
 
 type EdgeMap = Record<string, string[]>; // rootTokenId -> childTokenId[]
 
+/** Parse + validate the stored edge map, dropping anything that isn't string[] keyed by string. */
 function readEdges(): EdgeMap {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(EDGES_KEY);
-    return raw ? (JSON.parse(raw) as EdgeMap) : {};
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const clean: EdgeMap = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (Array.isArray(value)) {
+        const children = value.filter((c): c is string => typeof c === "string");
+        if (children.length > 0) clean[key] = children;
+      }
+    }
+    return clean;
   } catch {
     return {};
   }
@@ -459,6 +470,13 @@ export function useProvenanceForest(assets: ChainAsset[]) {
     [persist],
   );
 
+  const reset = useCallback(() => {
+    window.localStorage.removeItem(EDGES_KEY);
+    setEdges({});
+  }, []);
+
+  const hasEdges = Object.keys(edges).length > 0;
+
   const chainForest = useMemo(() => {
     const byId = new Map(assets.map((a) => [a.tokenId.toString(), a]));
     const childIds = new Set(Object.values(edges).flat());
@@ -485,5 +503,5 @@ export function useProvenanceForest(assets: ChainAsset[]) {
 
   const forest = useMemo(() => [...DEMO_FOREST, ...chainForest], [chainForest]);
 
-  return { forest, demoForest: DEMO_FOREST, chainForest, attach, detach, loaded };
+  return { forest, demoForest: DEMO_FOREST, chainForest, attach, detach, reset, hasEdges, loaded };
 }

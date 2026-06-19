@@ -12,7 +12,16 @@ export function AgentMesh({ liveAgents }: { liveAgents: LiveAgentRef[] }) {
 
   return (
     <div className="space-y-3">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full">
+      <svg
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="w-full"
+        role="img"
+        aria-labelledby="mesh-title"
+      >
+        <title id="mesh-title">
+          Agent mesh: the Orchestrator hub with {liveAgents.length} registered agents and the
+          reference role network around it.
+        </title>
         {/* spokes: hub -> reference nodes */}
         {nodes.map((n) => (
           <line

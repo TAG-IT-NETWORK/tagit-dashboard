@@ -68,7 +68,11 @@ function ConnectGate({ children }: { children: ReactNode }) {
 
   if (!loaded || !isConnected || !profile) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div
+        role="status"
+        aria-label="Connecting wallet"
+        className="flex items-center justify-center min-h-[60vh]"
+      >
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );

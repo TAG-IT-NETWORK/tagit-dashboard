@@ -146,9 +146,10 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      <div className="flex gap-2">
+      <div role="group" aria-label="Filter products" className="flex gap-2">
         <button
           type="button"
+          aria-pressed={!mineOnly}
           onClick={() => setMineOnly(false)}
           className={cn(
             "px-3 py-1.5 rounded-full text-sm font-medium",
@@ -161,6 +162,7 @@ export default function ProductsPage() {
         </button>
         <button
           type="button"
+          aria-pressed={mineOnly}
           onClick={() => setMineOnly(true)}
           className={cn(
             "px-3 py-1.5 rounded-full text-sm font-medium",
@@ -172,6 +174,12 @@ export default function ProductsPage() {
           Mine
         </button>
       </div>
+
+      {mineOnly && totalPages > 1 && (
+        <p className="text-xs text-muted-foreground">
+          Filtering the current page only — your products on other pages aren&apos;t shown.
+        </p>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -189,44 +197,47 @@ export default function ProductsPage() {
               </p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="font-medium px-6 py-3">Token</th>
-                  <th className="font-medium px-6 py-3">Owner</th>
-                  <th className="font-medium px-6 py-3">State</th>
-                  <th className="font-medium px-6 py-3 text-right">Minted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((asset) => (
-                  <tr
-                    key={asset.tokenId.toString()}
-                    className="border-b last:border-0 hover:bg-secondary/40"
-                  >
-                    <td className="px-6 py-3">
-                      <Link
-                        href={`/products/${asset.tokenId.toString()}`}
-                        className="font-mono font-medium hover:underline"
-                      >
-                        #{asset.tokenId.toString()}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-3">
-                      <AddressBadge address={asset.owner} />
-                    </td>
-                    <td className="px-6 py-3">
-                      <StateBadge state={asset.state} />
-                    </td>
-                    <td className="px-6 py-3 text-right text-muted-foreground">
-                      {asset.timestamp > 0n
-                        ? new Date(Number(asset.timestamp) * 1000).toLocaleDateString()
-                        : "—"}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Registered products</caption>
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="font-medium px-6 py-3">Token</th>
+                    <th className="font-medium px-6 py-3">Owner</th>
+                    <th className="font-medium px-6 py-3">State</th>
+                    <th className="font-medium px-6 py-3 text-right">Minted</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visible.map((asset) => (
+                    <tr
+                      key={asset.tokenId.toString()}
+                      className="border-b last:border-0 hover:bg-secondary/40"
+                    >
+                      <td className="px-6 py-3">
+                        <Link
+                          href={`/products/${asset.tokenId.toString()}`}
+                          className="font-mono font-medium hover:underline"
+                        >
+                          #{asset.tokenId.toString()}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-3">
+                        <AddressBadge address={asset.owner} />
+                      </td>
+                      <td className="px-6 py-3">
+                        <StateBadge state={asset.state} />
+                      </td>
+                      <td className="px-6 py-3 text-right text-muted-foreground">
+                        {asset.timestamp > 0n
+                          ? new Date(Number(asset.timestamp) * 1000).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -19,7 +19,12 @@ export function ReputationRadar({ values, size = 240 }: { values: number[]; size
   const dataPath = dataPoints.map((p) => p.join(",")).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[280px]">
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="w-full max-w-[280px]"
+      role="img"
+      aria-label="Reputation radar across six scoring dimensions"
+    >
       {/* grid rings */}
       {rings.map((ring) => (
         <polygon
