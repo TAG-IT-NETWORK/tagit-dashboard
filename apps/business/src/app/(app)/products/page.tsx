@@ -18,9 +18,9 @@ import {
   Label,
   StateBadge,
   AddressBadge,
-  cn,
 } from "@tagit/ui";
 import { Package, Plus } from "lucide-react";
+import { ScopeToggle } from "@/components/scope-toggle";
 
 function MintDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { address } = useAccount();
@@ -146,34 +146,7 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      <div role="group" aria-label="Filter products" className="flex gap-2">
-        <button
-          type="button"
-          aria-pressed={!mineOnly}
-          onClick={() => setMineOnly(false)}
-          className={cn(
-            "px-3 py-1.5 rounded-full text-sm font-medium",
-            !mineOnly
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground hover:bg-accent",
-          )}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          aria-pressed={mineOnly}
-          onClick={() => setMineOnly(true)}
-          className={cn(
-            "px-3 py-1.5 rounded-full text-sm font-medium",
-            mineOnly
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground hover:bg-accent",
-          )}
-        >
-          Mine
-        </button>
-      </div>
+      <ScopeToggle value={mineOnly} onChange={setMineOnly} label="Filter products" />
 
       {mineOnly && totalPages > 1 && (
         <p className="text-xs text-muted-foreground">

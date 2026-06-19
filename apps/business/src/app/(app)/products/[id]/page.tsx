@@ -57,6 +57,11 @@ function BindTagPanel({ tokenId, onDone }: { tokenId: bigint; onDone: () => void
           The UID is hashed on-device; only the hash goes on-chain.
         </p>
       </div>
+      <p className="rounded-lg border border-dashed bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
+        Binding requires an authorized oracle signature. On this testnet build the attestation is
+        signed by your connected wallet, so it only succeeds if that wallet is the contract&apos;s
+        trusted oracle — production routes this through the oracle service.
+      </p>
       {error && <p className="text-sm text-destructive">{error.message.split("\n")[0]}</p>}
       <Button
         onClick={() => bindTag(tokenId, keccak256(toBytes(tagUid.trim())))}

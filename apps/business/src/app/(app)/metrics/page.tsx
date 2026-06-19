@@ -1,13 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useChainId, useReadContracts } from "wagmi";
-import {
-  useAllAssets,
-  AssetState,
-  TAGITAgentReputationABI,
-  getAgentContractsForChain,
-} from "@tagit/contracts";
+import { useAllAssets, AssetState } from "@tagit/contracts";
 import {
   Card,
   CardContent,
@@ -19,8 +13,8 @@ import {
 } from "@tagit/ui";
 import { Activity, Boxes, Bot, Radio, ShieldCheck, TrendingUp } from "lucide-react";
 import { PRIMARY_STATES, useLiveStateChanges } from "@/lib/lifecycle";
-import { useAgentList, type ReputationSummary } from "@/lib/agents";
-import { TRUST_TIERS, deriveAgentScore } from "@/lib/mesh";
+import { useAgentList } from "@/lib/agents";
+import { TRUST_TIERS, tierCounts as buildTierCounts, useAgentScores } from "@/lib/mesh";
 import {
   FRAUD_DOMAINS,
   FRAUD_MAX,
@@ -62,22 +56,10 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function MetricsPage() {
-  const chainId = useChainId();
   const { assets, totalSupply } = useAllAssets({ pageSize: 100, refetchInterval: 15_000 });
   const { agents, totalAgents } = useAgentList({ refetchInterval: 20_000 });
   const liveEvents = useLiveStateChanges(12);
-  const agentContracts = getAgentContractsForChain(chainId);
-
-  const { data: repData } = useReadContracts({
-    contracts: agents.map((a) => ({
-      address: agentContracts.TAGITAgentReputation,
-      abi: TAGITAgentReputationABI,
-      functionName: "getSummary" as const,
-      args: [a.agentId],
-      chainId,
-    })),
-    query: { enabled: agents.length > 0 },
-  });
+  const scored = useAgentScores(agents);
 
   const transitions = useMemo(() => countTransitions(assets), [assets]);
   const flagged = useMemo(() => countFlagged(assets), [assets]);
@@ -94,17 +76,7 @@ export default function MetricsPage() {
     return map;
   }, [assets]);
 
-  const tierCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const t of TRUST_TIERS) counts.set(t.key, 0);
-    agents.forEach((a, i) => {
-      const summary =
-        repData?.[i]?.status === "success" ? (repData[i].result as ReputationSummary) : undefined;
-      const { tier } = deriveAgentScore(a.agentId, summary);
-      counts.set(tier.key, (counts.get(tier.key) ?? 0) + 1);
-    });
-    return counts;
-  }, [agents, repData]);
+  const tierCounts = useMemo(() => buildTierCounts(scored), [scored]);
 
   const recent = useMemo(
     () => [...assets].sort((a, b) => Number(b.timestamp - a.timestamp)).slice(0, 10),

@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReputationSummary } from "@/lib/agents";
+import { useChainId, useReadContracts } from "wagmi";
+import { TAGITAgentReputationABI, getAgentContractsForChain } from "@tagit/contracts";
+import type { AgentRecord, ReputationSummary } from "@/lib/agents";
 
 /*
  * Agent Mesh + Trust Economy model (whitepaper §3, §5).
@@ -272,4 +274,44 @@ export function buildMeshLayout(
   });
 
   return { hub: { x: cx, y: cy }, nodes, live };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Shared reputation pipeline (used by the mesh + metrics pages)
+// ─────────────────────────────────────────────────────────────
+
+export interface ScoredAgent {
+  agent: AgentRecord;
+  score: AgentScore;
+}
+
+/** Batch-read every agent's reputation summary and derive its trust score. */
+export function useAgentScores(agents: AgentRecord[]): ScoredAgent[] {
+  const chainId = useChainId();
+  const agentContracts = getAgentContractsForChain(chainId);
+
+  const { data } = useReadContracts({
+    contracts: agents.map((a) => ({
+      address: agentContracts.TAGITAgentReputation,
+      abi: TAGITAgentReputationABI,
+      functionName: "getSummary" as const,
+      args: [a.agentId],
+      chainId,
+    })),
+    query: { enabled: agents.length > 0 },
+  });
+
+  return agents.map((agent, i) => {
+    const summary =
+      data?.[i]?.status === "success" ? (data[i].result as ReputationSummary) : undefined;
+    return { agent, score: deriveAgentScore(agent.agentId, summary) };
+  });
+}
+
+/** Bucket scored agents into a TRUST_TIERS-seeded count map. */
+export function tierCounts(scored: ScoredAgent[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const t of TRUST_TIERS) counts.set(t.key, 0);
+  for (const s of scored) counts.set(s.score.tier.key, (counts.get(s.score.tier.key) ?? 0) + 1);
+  return counts;
 }

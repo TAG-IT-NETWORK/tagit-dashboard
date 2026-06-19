@@ -2,8 +2,6 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useReadContracts, useChainId } from "wagmi";
-import { TAGITAgentReputationABI, getAgentContractsForChain } from "@tagit/contracts";
 import {
   Card,
   CardContent,
@@ -14,36 +12,19 @@ import {
   cn,
 } from "@tagit/ui";
 import { Bot, Network, ShieldCheck, Trophy } from "lucide-react";
-import { useAgentList, type ReputationSummary } from "@/lib/agents";
-import { MESH_CATEGORIES, TRUST_TIERS, deriveAgentScore, type LiveAgentRef } from "@/lib/mesh";
+import { useAgentList } from "@/lib/agents";
+import {
+  MESH_CATEGORIES,
+  TRUST_TIERS,
+  tierCounts as buildTierCounts,
+  useAgentScores,
+  type LiveAgentRef,
+} from "@/lib/mesh";
 import { AgentMesh } from "@/components/agent-mesh";
 
 export default function MeshPage() {
-  const chainId = useChainId();
   const { agents, totalAgents, isLoading } = useAgentList({ refetchInterval: 20_000 });
-  const agentContracts = getAgentContractsForChain(chainId);
-
-  // Batch-read reputation summaries for every registered agent.
-  const { data: repData } = useReadContracts({
-    contracts: agents.map((a) => ({
-      address: agentContracts.TAGITAgentReputation,
-      abi: TAGITAgentReputationABI,
-      functionName: "getSummary" as const,
-      args: [a.agentId],
-      chainId,
-    })),
-    query: { enabled: agents.length > 0 },
-  });
-
-  const scored = useMemo(
-    () =>
-      agents.map((a, i) => {
-        const summary =
-          repData?.[i]?.status === "success" ? (repData[i].result as ReputationSummary) : undefined;
-        return { agent: a, score: deriveAgentScore(a.agentId, summary) };
-      }),
-    [agents, repData],
-  );
+  const scored = useAgentScores(agents);
 
   const liveAgents: LiveAgentRef[] = useMemo(
     () =>
@@ -55,12 +36,7 @@ export default function MeshPage() {
     [scored],
   );
 
-  const tierCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const t of TRUST_TIERS) counts.set(t.key, 0);
-    for (const s of scored) counts.set(s.score.tier.key, (counts.get(s.score.tier.key) ?? 0) + 1);
-    return counts;
-  }, [scored]);
+  const tierCounts = useMemo(() => buildTierCounts(scored), [scored]);
 
   const topAgents = useMemo(
     () => [...scored].sort((a, b) => b.score.score - a.score.score).slice(0, 5),

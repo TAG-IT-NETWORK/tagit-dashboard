@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -109,43 +109,97 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Mobile navigation as a modal dialog: Escape close, focus trap + return, body scroll lock. */
+function MobileNav({
+  open,
+  onClose,
+  triggerRef,
+}: {
+  open: boolean;
+  onClose: () => void;
+  triggerRef: RefObject<HTMLButtonElement>;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeBtnRef.current?.focus();
+
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "Tab" && panelRef.current) {
+        const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+      triggerRef.current?.focus();
+    };
+  }, [open, onClose, triggerRef]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 md:hidden">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className="absolute inset-y-0 left-0 flex w-64 flex-col border-r bg-background"
+      >
+        <div className="flex h-16 items-center justify-between border-b px-5">
+          <div className="flex items-center gap-2">
+            <Image src="/tagit_logo.png" alt="TAG IT" width={28} height={28} />
+            <span className="font-semibold tracking-tight">TAG IT</span>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-secondary"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <NavList onNavigate={onClose} />
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { profile } = useBusinessProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   return (
     <div className="flex min-h-screen">
-      {/* Mobile navigation drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden
-          />
-          <div
-            role="dialog"
-            aria-label="Navigation menu"
-            className="absolute inset-y-0 left-0 flex w-64 flex-col border-r bg-background"
-          >
-            <div className="flex h-16 items-center justify-between border-b px-5">
-              <div className="flex items-center gap-2">
-                <Image src="/tagit_logo.png" alt="TAG IT" width={28} height={28} />
-                <span className="font-semibold tracking-tight">TAG IT</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                aria-label="Close navigation menu"
-                className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-secondary"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <NavList onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </div>
-      )}
+      <MobileNav open={mobileOpen} onClose={closeMobile} triggerRef={menuTriggerRef} />
 
       <aside className="hidden md:flex w-60 flex-col border-r bg-background fixed inset-y-0">
         <div className="flex items-center gap-3 px-5 h-16 border-b">
@@ -182,6 +236,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="flex items-center justify-between h-16 px-6 border-b bg-background sticky top-0 z-10">
           <div className="md:hidden flex items-center gap-2">
             <button
+              ref={menuTriggerRef}
               type="button"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation menu"

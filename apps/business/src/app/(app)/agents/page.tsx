@@ -22,6 +22,7 @@ import {
 } from "@tagit/ui";
 import { Bot, Plus } from "lucide-react";
 import { AGENT_STATUS_LABELS, useAgentList, useRegistrationFee } from "@/lib/agents";
+import { ScopeToggle } from "@/components/scope-toggle";
 
 function StatusPill({ status }: { status: number }) {
   const label = AGENT_STATUS_LABELS[status] ?? `Unknown (${status})`;
@@ -205,34 +206,7 @@ export default function AgentsPage() {
         </Button>
       </div>
 
-      <div role="group" aria-label="Filter agents" className="flex gap-2">
-        <button
-          type="button"
-          aria-pressed={!mineOnly}
-          onClick={() => setMineOnly(false)}
-          className={cn(
-            "px-3 py-1.5 rounded-full text-sm font-medium",
-            !mineOnly
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground hover:bg-accent",
-          )}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          aria-pressed={mineOnly}
-          onClick={() => setMineOnly(true)}
-          className={cn(
-            "px-3 py-1.5 rounded-full text-sm font-medium",
-            mineOnly
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground hover:bg-accent",
-          )}
-        >
-          Mine
-        </button>
-      </div>
+      <ScopeToggle value={mineOnly} onChange={setMineOnly} label="Filter agents" />
 
       <Card>
         <CardContent className="p-0">
