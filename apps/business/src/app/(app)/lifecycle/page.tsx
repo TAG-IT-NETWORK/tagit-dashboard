@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useAllAssets } from "@tagit/contracts";
 import {
@@ -61,6 +61,22 @@ export default function LifecyclePage() {
     [lcAssets],
   );
 
+  // Roving-tabindex keyboard nav for the pipeline tab strip.
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const focusTab = (index: number) => {
+    const next = (index + PRIMARY_STATES.length) % PRIMARY_STATES.length;
+    setSelectedState(PRIMARY_STATES[next].id);
+    tabRefs.current[next]?.focus();
+  };
+  const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const current = PRIMARY_STATES.findIndex((s) => s.id === selectedState);
+    if (e.key === "ArrowRight") (e.preventDefault(), focusTab(current + 1));
+    else if (e.key === "ArrowLeft") (e.preventDefault(), focusTab(current - 1));
+    else if (e.key === "Home") (e.preventDefault(), focusTab(0));
+    else if (e.key === "End") (e.preventDefault(), focusTab(PRIMARY_STATES.length - 1));
+  };
+  const selectedStateMeta = PRIMARY_STATES.find((s) => s.id === selectedState) ?? PRIMARY_STATES[0];
+
   return (
     <div className="space-y-6">
       <div>
@@ -110,8 +126,13 @@ export default function LifecyclePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {PRIMARY_STATES.map((s) => {
+          <div
+            role="tablist"
+            aria-label="Lifecycle stages"
+            onKeyDown={onTabKeyDown}
+            className="flex gap-3 overflow-x-auto pb-2"
+          >
+            {PRIMARY_STATES.map((s, i) => {
               const items = byState.get(s.id) ?? [];
               const active = selectedState === s.id;
               return (
@@ -124,6 +145,14 @@ export default function LifecyclePage() {
                 >
                   <button
                     type="button"
+                    role="tab"
+                    id={`lifecycle-tab-${s.id}`}
+                    aria-selected={active}
+                    aria-controls="lifecycle-substates"
+                    tabIndex={active ? 0 : -1}
+                    ref={(el) => {
+                      tabRefs.current[i] = el;
+                    }}
                     onClick={() => setSelectedState(s.id)}
                     className={cn(
                       "flex items-center justify-between rounded-t-xl px-3 py-2.5 text-left transition-colors",
@@ -179,14 +208,20 @@ export default function LifecyclePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Sub-state drilldown */}
-        <Card>
+        <Card
+          id="lifecycle-substates"
+          role="tabpanel"
+          aria-labelledby={`lifecycle-tab-${selectedState}`}
+        >
           <CardHeader>
-            <CardTitle className="text-base">
-              {PRIMARY_STATES[selectedState].name} sub-states
+            <CardTitle className="flex items-center gap-2 text-base">
+              {selectedStateMeta.name} sub-states
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Off-chain · Reference
+              </span>
             </CardTitle>
             <CardDescription>
-              {PRIMARY_STATES[selectedState].description} Sub-states are managed off-chain by domain
-              agents.
+              {selectedStateMeta.description} Sub-states are managed off-chain by domain agents.
             </CardDescription>
           </CardHeader>
           <CardContent>

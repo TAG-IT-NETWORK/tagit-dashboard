@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,11 +11,13 @@ import {
   Bot,
   GitBranch,
   LayoutDashboard,
+  Menu,
   Network,
   Package,
   Settings,
   TrendingUp,
   Workflow,
+  X,
 } from "lucide-react";
 import { WagmiGuard } from "./wagmi-guard";
 import { useBusinessProfile } from "@/lib/profile";
@@ -75,12 +77,72 @@ function ConnectGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  return (
+    <nav className="flex-1 px-3 py-4 space-y-1">
+      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(`${href}/`);
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
   const { profile } = useBusinessProfile();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen">
+      {/* Mobile navigation drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-label="Navigation menu"
+            className="absolute inset-y-0 left-0 flex w-64 flex-col border-r bg-background"
+          >
+            <div className="flex h-16 items-center justify-between border-b px-5">
+              <div className="flex items-center gap-2">
+                <Image src="/tagit_logo.png" alt="TAG IT" width={28} height={28} />
+                <span className="font-semibold tracking-tight">TAG IT</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close navigation menu"
+                className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-secondary"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <NavList onNavigate={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
+
       <aside className="hidden md:flex w-60 flex-col border-r bg-background fixed inset-y-0">
         <div className="flex items-center gap-3 px-5 h-16 border-b">
           <Image
@@ -99,26 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        <NavList />
 
         <div className="px-5 py-4 border-t">
           {profile && (
@@ -134,6 +177,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex-1 md:ml-60 flex flex-col">
         <header className="flex items-center justify-between h-16 px-6 border-b bg-background sticky top-0 z-10">
           <div className="md:hidden flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={mobileOpen}
+              className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-secondary"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <Image src="/tagit_logo.png" alt="TAG IT" width={28} height={28} />
             <span className="font-semibold">TAG IT Business</span>
           </div>

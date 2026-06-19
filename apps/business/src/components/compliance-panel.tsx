@@ -5,6 +5,7 @@ import { Button, cn } from "@tagit/ui";
 import { CheckCircle2, Globe, Leaf, Radiation, ShieldAlert, Siren } from "lucide-react";
 import {
   COUNTRIES,
+  GRADE_RANK,
   carbonFootprint,
   gradeAudit,
   originAudit,
@@ -33,17 +34,30 @@ interface Result {
 function runQuery(key: QueryKey, root: ProvNode): Result {
   switch (key) {
     case "origin": {
-      const { nonUS, byCountry } = originAudit(root);
+      const { nonUS, unknown, byCountry } = originAudit(root);
+      // For DEFENSE-grade and above, "unverified" cannot count as clean.
+      const isCritical = GRADE_RANK[root.grade] >= GRADE_RANK.DEFENSE;
+      const unverifiedBlocks = isCritical && unknown.length > 0;
+      const ok = nonUS.length === 0 && !unverifiedBlocks;
+      const parts: string[] = [];
+      if (nonUS.length > 0)
+        parts.push(`${nonUS.length} non-U.S. component${nonUS.length > 1 ? "s" : ""}`);
+      if (unknown.length > 0) parts.push(`${unknown.length} with unverified origin`);
+      const headline =
+        parts.length === 0
+          ? "All components are verified U.S.-origin."
+          : unverifiedBlocks && nonUS.length === 0
+            ? `${unknown.length} component${unknown.length > 1 ? "s" : ""} have unverified origin — not permitted at ${root.grade} grade.`
+            : `${parts.join(" · ")}.`;
+      const flagged = isCritical ? [...nonUS, ...unknown] : nonUS;
       return {
-        ok: nonUS.length === 0,
-        headline:
-          nonUS.length === 0
-            ? "All components are U.S.-origin (or unverified)."
-            : `${nonUS.length} non-U.S. component${nonUS.length > 1 ? "s" : ""} found.`,
+        ok,
+        headline,
         detail: (
           <div className="flex flex-wrap gap-2">
             {byCountry.map(({ code, count }) => {
               const c = COUNTRIES[code] ?? COUNTRIES["—"];
+              const isUnknown = code === "—";
               return (
                 <span
                   key={code}
@@ -54,13 +68,13 @@ function runQuery(key: QueryKey, root: ProvNode): Result {
                       : "bg-amber-500/10 text-amber-700",
                   )}
                 >
-                  {c.flag} {c.name} · {count}
+                  {c.flag} {isUnknown ? "Unverified origin" : c.name} · {count}
                 </span>
               );
             })}
           </div>
         ),
-        ids: new Set(nonUS.map((n) => n.id)),
+        ids: new Set(flagged.map((n) => n.id)),
       };
     }
     case "recall": {
@@ -166,8 +180,15 @@ export function CompliancePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 
+  const isSample = root.id.startsWith("demo:");
+
   return (
     <div className="space-y-3">
+      {isSample && (
+        <div className="rounded-lg border border-dashed bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+          Sample data — illustrative fixtures, not on-chain facts.
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {QUERIES.map(({ key, label, icon: Icon }) => (
           <Button
@@ -201,8 +222,10 @@ export function CompliancePanel({
             </div>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
-            Computed in one pass from the asset&apos;s provenance tree — instant, cryptographically
-            backed once on-chain composition is live.
+            Computed in one pass from the provenance tree.{" "}
+            {isSample
+              ? "Sample fixtures shown for illustration."
+              : "On real assets these become cryptographically backed once on-chain composition ships."}
           </p>
         </div>
       )}

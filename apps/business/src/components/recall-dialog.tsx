@@ -47,10 +47,14 @@ export function RecallDialog({
           <DialogTitle className="flex items-center gap-2">
             <Siren className="h-5 w-5 text-red-600" />
             Recall command
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Simulated
+            </span>
           </DialogTitle>
           <DialogDescription>
             Select a component batch. Every product containing it is identified across the entire
-            forest in one pass — the whitepaper&apos;s 60-second recall.
+            forest in one pass — the whitepaper&apos;s 60-second recall. The notification step below
+            is a preview; no transaction is sent.
           </DialogDescription>
         </DialogHeader>
 
@@ -117,10 +121,13 @@ export function RecallDialog({
           )}
 
           {notified && (
-            <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/5 p-3 text-sm text-green-700">
-              <CheckCircle2 className="h-4 w-4" />
-              {ownerCount} owner agent{ownerCount === 1 ? "" : "s"} notified on-chain. Affected
-              products routed to FLAGGED.
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Preview only — no transaction was sent. In production this routes the {ownerCount}{" "}
+                affected product{ownerCount === 1 ? "" : "s"} to FLAGGED via an on-chain{" "}
+                <code>flag()</code> call and notifies each owner agent.
+              </span>
             </div>
           )}
         </div>
@@ -135,7 +142,7 @@ export function RecallDialog({
             onClick={() => setNotified(true)}
           >
             <Bell className="mr-2 h-4 w-4" />
-            Notify {ownerCount} owner{ownerCount === 1 ? "" : "s"}
+            Preview recall notice ({ownerCount})
           </Button>
         </DialogFooter>
       </DialogContent>

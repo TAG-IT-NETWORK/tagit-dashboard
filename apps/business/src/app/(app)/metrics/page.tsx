@@ -2,7 +2,12 @@
 
 import { useMemo } from "react";
 import { useChainId, useReadContracts } from "wagmi";
-import { useAllAssets, TAGITAgentReputationABI, getAgentContractsForChain } from "@tagit/contracts";
+import {
+  useAllAssets,
+  AssetState,
+  TAGITAgentReputationABI,
+  getAgentContractsForChain,
+} from "@tagit/contracts";
 import {
   Card,
   CardContent,
@@ -77,6 +82,10 @@ export default function MetricsPage() {
   const transitions = useMemo(() => countTransitions(assets), [assets]);
   const flagged = useMemo(() => countFlagged(assets), [assets]);
   const valueSecured = totalSupply * NOTIONAL_VALUE_USD;
+  const activated = useMemo(
+    () => assets.filter((a) => a.state >= AssetState.ACTIVATED).length,
+    [assets],
+  );
 
   const stateCounts = useMemo(() => {
     const map = new Map<number, number>();
@@ -118,15 +127,15 @@ export default function MetricsPage() {
       {/* Hero band */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <HeroStat
-          label="Assets verified"
+          label="Products registered"
           value={totalSupply.toLocaleString()}
-          sub="on Base"
+          sub={`on Base · ${activated.toLocaleString()} activated+`}
           icon={<Boxes className="h-5 w-5" />}
         />
         <HeroStat
           label="On-chain transitions"
           value={transitions.toLocaleString()}
-          sub="custody + state events"
+          sub="estimated from current states"
           icon={<Activity className="h-5 w-5" />}
         />
         <HeroStat
@@ -248,6 +257,10 @@ export default function MetricsPage() {
                 );
               })}
             </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Tiers are derived from the on-chain reputation composite; per-dimension scoring and
+              on-chain tier gating ship in the reputation phase.
+            </p>
           </CardContent>
         </Card>
       </div>

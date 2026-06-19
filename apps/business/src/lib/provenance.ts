@@ -77,15 +77,21 @@ export function treeDepth(node: ProvNode): number {
 
 export interface OriginResult {
   nonUS: ProvNode[];
+  /** Components whose origin is unverified ("—") — must not be treated as clean. */
+  unknown: ProvNode[];
   byCountry: { code: string; count: number }[];
 }
 
 export function originAudit(root: ProvNode): OriginResult {
-  const nodes = flatten(root).filter((n) => n.origin !== "—");
+  const all = flatten(root);
+  const known = all.filter((n) => n.origin !== "—");
   const counts = new Map<string, number>();
-  for (const n of nodes) counts.set(n.origin, (counts.get(n.origin) ?? 0) + 1);
+  for (const n of known) counts.set(n.origin, (counts.get(n.origin) ?? 0) + 1);
+  const unknown = all.filter((n) => n.origin === "—");
+  if (unknown.length > 0) counts.set("—", unknown.length);
   return {
-    nonUS: nodes.filter((n) => n.origin !== "US"),
+    nonUS: known.filter((n) => n.origin !== "US"),
+    unknown,
     byCountry: [...counts.entries()]
       .map(([code, count]) => ({ code, count }))
       .sort((a, b) => b.count - a.count),
