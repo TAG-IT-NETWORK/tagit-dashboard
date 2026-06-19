@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { keccak256, toBytes } from "viem";
 import { useAccount, useChainId } from "wagmi";
 import {
   useAsset,
   useTagByToken,
-  useBindTag,
   useActivate,
   useClaim,
   useFlag,
@@ -16,6 +14,7 @@ import {
   getExplorerAddressUrl,
   getContractsForChain,
 } from "@tagit/contracts";
+import { useBindViaRelayer } from "@/lib/bind";
 import {
   Button,
   Card,
@@ -33,14 +32,12 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 const ZERO_TAG = `0x${"0".repeat(64)}` as const;
 
 function BindTagPanel({ tokenId, onDone }: { tokenId: bigint; onDone: () => void }) {
-  const { bindTag, isPending, isConfirming, isSuccess, error } = useBindTag();
+  const { bind, isPending, result, error } = useBindViaRelayer();
   const [tagUid, setTagUid] = useState("");
 
   useEffect(() => {
-    if (isSuccess) onDone();
-  }, [isSuccess, onDone]);
-
-  const busy = isPending || isConfirming;
+    if (result?.ok) onDone();
+  }, [result, onDone]);
 
   return (
     <div className="space-y-3">
@@ -51,23 +48,20 @@ function BindTagPanel({ tokenId, onDone }: { tokenId: bigint; onDone: () => void
           placeholder="04:A3:2F:..."
           value={tagUid}
           onChange={(e) => setTagUid(e.target.value)}
-          disabled={busy}
+          disabled={isPending}
         />
         <p className="text-xs text-muted-foreground">
-          The UID is hashed on-device; only the hash goes on-chain.
+          The UID is hashed before it goes on-chain; only the hash is stored.
         </p>
       </div>
       <p className="rounded-lg border border-dashed bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
-        Binding requires an authorized oracle signature. On this testnet build the attestation is
-        signed by your connected wallet, so it only succeeds if that wallet is the contract&apos;s
-        trusted oracle — production routes this through the oracle service.
+        Binding is performed by the oracle relayer service — it signs the attestation with the
+        trusted-oracle key and submits the transaction, so your wallet signs nothing. The NFC
+        challenge-response is still a placeholder pending physical reader integration.
       </p>
-      {error && <p className="text-sm text-destructive">{error.message.split("\n")[0]}</p>}
-      <Button
-        onClick={() => bindTag(tokenId, keccak256(toBytes(tagUid.trim())))}
-        disabled={busy || !tagUid.trim()}
-      >
-        {isPending ? "Confirm in wallet..." : isConfirming ? "Binding..." : "Bind tag"}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <Button onClick={() => bind(tokenId, tagUid.trim())} disabled={isPending || !tagUid.trim()}>
+        {isPending ? "Binding..." : "Bind tag"}
       </Button>
     </div>
   );
