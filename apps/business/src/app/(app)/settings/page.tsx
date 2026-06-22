@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useAccount, useChainId, useDisconnect } from "wagmi";
 import {
   getContractsForChain,
@@ -17,9 +17,11 @@ import {
   Input,
   Label,
   AddressBadge,
+  cn,
 } from "@tagit/ui";
-import { ExternalLink } from "lucide-react";
+import { CheckCircle2, ExternalLink, RefreshCw, XCircle } from "lucide-react";
 import { useBusinessProfile, type BusinessProfile } from "@/lib/profile";
+import { isBindReady, useBindReadiness } from "@/lib/bind";
 
 const BUSINESS_TYPES: BusinessProfile["type"][] = [
   "manufacturer",
@@ -28,6 +30,104 @@ const BUSINESS_TYPES: BusinessProfile["type"][] = [
   "recycler",
   "other",
 ];
+
+function StatusRow({ label, ok, detail }: { label: string; ok?: boolean; detail?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between py-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2">
+        {detail}
+        {ok === undefined ? null : ok ? (
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+        ) : (
+          <XCircle className="h-4 w-4 text-red-500" />
+        )}
+      </span>
+    </div>
+  );
+}
+
+function BindRelayerCard() {
+  const { data, loading, error, refresh } = useBindReadiness();
+  const ready = isBindReady(data);
+  const offline = !!error && !data?.configured;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Bind relayer</CardTitle>
+            <CardDescription>
+              Readiness of the oracle relayer that binds NFC tags (MINTED → BOUND).
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+                offline
+                  ? "bg-secondary text-muted-foreground"
+                  : ready
+                    ? "bg-green-500/10 text-green-600"
+                    : "bg-amber-500/10 text-amber-600",
+              )}
+            >
+              {offline ? "Offline" : ready ? "Ready" : "Not ready"}
+            </span>
+            <button
+              type="button"
+              onClick={refresh}
+              aria-label="Refresh bind status"
+              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary"
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading && !data ? (
+          <div className="h-24 animate-pulse rounded-lg bg-secondary" />
+        ) : offline ? (
+          <p className="text-sm text-muted-foreground">
+            Bind service unreachable. Set <code>TAGIT_SERVICES_URL</code> /{" "}
+            <code>TAGIT_SERVICES_API_KEY</code> and start tagit-services.
+          </p>
+        ) : !data?.configured ? (
+          <p className="text-sm text-muted-foreground">
+            Relayer not configured — set <code>SIGNER_PRIVATE_KEY</code> on the service (chain
+            84532).
+          </p>
+        ) : (
+          <div className="divide-y">
+            <StatusRow
+              label="Relayer"
+              detail={data.relayer ? <AddressBadge address={data.relayer} /> : "—"}
+            />
+            <StatusRow
+              label="Gas balance"
+              ok={Number(data.gasEth ?? "0") > 0}
+              detail={
+                <span className="text-xs text-muted-foreground">
+                  {Number(data.gasEth ?? 0).toFixed(4)} ETH
+                </span>
+              }
+            />
+            <StatusRow label="BINDER capability" ok={!!data.hasBinderCapability} />
+            <StatusRow label="Oracle = trustedOracle" ok={!!data.oracleMatchesTrusted} />
+          </div>
+        )}
+        {data?.configured && !ready && !offline && (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            To enable binding: fund the relayer, grant it BINDER via TAGITAccess, and set the
+            contract&apos;s trustedOracle to the oracle key&apos;s address.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { address } = useAccount();
@@ -162,6 +262,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <BindRelayerCard />
     </div>
   );
 }

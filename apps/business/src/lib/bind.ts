@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface BindRelayResult {
   ok: boolean;
@@ -50,4 +50,55 @@ export function useBindViaRelayer() {
   }, []);
 
   return { bind, isPending, result, error };
+}
+
+export interface BindReadiness {
+  configured: boolean;
+  chainId?: number;
+  relayer?: `0x${string}`;
+  gasEth?: string;
+  hasBinderCapability?: boolean;
+  oracleMatchesTrusted?: boolean;
+  core?: `0x${string}`;
+  error?: string;
+}
+
+/** Whether the bind relayer is fully ready to bind tags on-chain. */
+export function isBindReady(s: BindReadiness | null): boolean {
+  return (
+    !!s &&
+    s.configured &&
+    !!s.hasBinderCapability &&
+    !!s.oracleMatchesTrusted &&
+    Number(s.gasEth ?? "0") > 0
+  );
+}
+
+/** Fetch the bind relayer readiness from the server-side proxy. */
+export function useBindReadiness() {
+  const [data, setData] = useState<BindReadiness | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/bind/status", { cache: "no-store" });
+      const json = (await res.json()) as BindReadiness;
+      setData(json);
+      if (!res.ok && json.error) setError(json.error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed to load bind status");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { data, loading, error, refresh };
 }
