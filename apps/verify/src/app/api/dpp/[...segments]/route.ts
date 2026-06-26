@@ -28,7 +28,10 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   });
 }
 
-export async function GET(req: Request, { params }: { params: { segments: string[] } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: { segments: string[] } },
+) {
   const url = new URL(req.url);
   const picc = url.searchParams.get("picc") ?? undefined;
   const cmac = url.searchParams.get("cmac") ?? undefined;
@@ -43,10 +46,7 @@ export async function GET(req: Request, { params }: { params: { segments: string
     case "bad-params":
       return json({ verified: false, error: "missing picc or cmac query params" }, 400);
     case "not-configured":
-      return json(
-        { verified: false, error: "verifier not configured (SDM_MASTER_KEY unset)" },
-        503,
-      );
+      return json({ verified: false, error: "verifier not configured (SDM_MASTER_KEY unset)" }, 503);
     case "counterfeit":
       return json({ verified: false, reason: res.reason });
     case "authentic-unbound":

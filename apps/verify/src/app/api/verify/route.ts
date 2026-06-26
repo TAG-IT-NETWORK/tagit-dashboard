@@ -44,10 +44,7 @@ export async function GET(req: Request) {
     case "bad-params":
       return json({ verified: false, error: "missing picc or cmac query params" }, 400);
     case "not-configured":
-      return json(
-        { verified: false, error: "verifier not configured (SDM_MASTER_KEY unset)" },
-        503,
-      );
+      return json({ verified: false, error: "verifier not configured (SDM_MASTER_KEY unset)" }, 503);
     case "counterfeit":
       return json({ verified: false, reason: res.reason, chain });
     case "authentic-unbound":
@@ -60,10 +57,7 @@ export async function GET(req: Request) {
         chain,
       });
     case "lookup-failed":
-      return json(
-        { verified: false, error: res.reason, uid: res.uid, tapCounter: res.counter, chain },
-        502,
-      );
+      return json({ verified: false, error: res.reason, uid: res.uid, tapCounter: res.counter, chain }, 502);
     case "resolved": {
       const product = await loadProduct(res.tokenId.toString(), meta);
       return json({

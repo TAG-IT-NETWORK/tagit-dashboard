@@ -14,7 +14,11 @@ import { BuyButton } from "./buy-button";
  * → "Buy now" flips ownership to that wallet via the backend relayer. No app, no
  * seed phrase, no gas. Renders nothing until NEXT_PUBLIC_PRIVY_APP_ID is set.
  */
-export function BuyWidget(props: { tokenId: string; productName: string; priceUsdc: number }) {
+export function BuyWidget(props: {
+  tokenId: string;
+  productName: string;
+  priceUsdc: number;
+}) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   if (!appId) return null;
 

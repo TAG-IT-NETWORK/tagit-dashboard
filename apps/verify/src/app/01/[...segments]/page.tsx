@@ -127,12 +127,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   if (res.kind !== "resolved") {
     return (
       <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="?"
-          title="Bad SUN URL"
-          sub="Missing picc or cmac parameters."
-        />
+        <StatusHero tone="warn" glyph="?" title="Bad SUN URL" sub="Missing picc or cmac parameters." />
       </Shell>
     );
   }
@@ -166,9 +161,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   const rows: [string, string][] = [
     ["Product", displayName],
-    ...(link.gtin
-      ? ([["GTIN", `${link.gtin}${link.gtinValid ? "" : " ⚠"}`]] as [string, string][])
-      : []),
+    ...(link.gtin ? ([["GTIN", `${link.gtin}${link.gtinValid ? "" : " ⚠"}`]] as [string, string][]) : []),
     ...(link.serial ? ([["Serial", link.serial]] as [string, string][]) : []),
     ...(product.brand ? ([["Brand", product.brand]] as [string, string][]) : []),
     ...(product.origin ? ([["Origin", product.origin]] as [string, string][]) : []),
@@ -177,10 +170,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
     ["UID", formatUid(res.uid)],
     ["Tap counter", String(res.counter)],
     ["Token ID", res.tokenId.toString()],
-    [
-      "Anchor",
-      dpp.integrity.metadataHash ? `${dpp.integrity.metadataHash.slice(0, 10)}…` : "not set",
-    ],
+    ["Anchor", dpp.integrity.metadataHash ? `${dpp.integrity.metadataHash.slice(0, 10)}…` : "not set"],
   ];
 
   return (
@@ -192,10 +182,10 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
           authentic
             ? "Authentic"
             : dpp.lifecycle.stateCode === 5
-            ? "Flagged"
-            : dpp.lifecycle.stateCode === 6
-            ? "Retired"
-            : "Not Bound"
+              ? "Flagged"
+              : dpp.lifecycle.stateCode === 6
+                ? "Retired"
+                : "Not Bound"
         }
         sub={
           authentic

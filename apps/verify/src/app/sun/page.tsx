@@ -32,12 +32,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "bad-params") {
     return (
       <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="?"
-          title="Bad SUN URL"
-          sub="Missing picc or cmac parameters."
-        />
+        <StatusHero tone="warn" glyph="?" title="Bad SUN URL" sub="Missing picc or cmac parameters." />
         <p className="text-center text-xs text-gray-500 font-mono">
           Expected: /sun?picc=&lt;hex&gt;&amp;cmac=&lt;hex&gt;
         </p>
@@ -64,12 +59,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "counterfeit") {
     return (
       <Shell>
-        <StatusHero
-          tone="bad"
-          glyph="✗"
-          title="Counterfeit"
-          sub="This tap failed cryptographic verification."
-        />
+        <StatusHero tone="bad" glyph="✗" title="Counterfeit" sub="This tap failed cryptographic verification." />
         <div
           className="rounded-2xl border border-red-500/30 p-5 mb-5 animate-fadeUp"
           style={{ background: "rgba(239,68,68,0.08)", animationDelay: "0.35s" }}
@@ -94,12 +84,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
           title="Chip Authentic"
           sub="Cryptographically verified, but not yet bound on-chain."
         />
-        <DataCard
-          rows={[
-            ["UID", formatUid(res.uid)],
-            ["Tap counter", String(res.counter)],
-          ]}
-        />
+        <DataCard rows={[["UID", formatUid(res.uid)], ["Tap counter", String(res.counter)]]} />
       </Shell>
     );
   }
@@ -127,16 +112,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
           authentic
             ? "Authentic"
             : res.asset.state === 5
-            ? "Flagged"
-            : res.asset.state === 6
-            ? "Retired"
-            : "Not Bound"
+              ? "Flagged"
+              : res.asset.state === 6
+                ? "Retired"
+                : "Not Bound"
         }
-        sub={
-          authentic
-            ? "Verified on-chain via NTAG 424 DNA SUN"
-            : STATE_DESCRIPTIONS[res.asset.state] ?? ""
-        }
+        sub={authentic ? "Verified on-chain via NTAG 424 DNA SUN" : STATE_DESCRIPTIONS[res.asset.state] ?? ""}
       />
 
       <div className="flex justify-center mb-8 animate-fadeUp" style={{ animationDelay: "0.25s" }}>

@@ -11,7 +11,8 @@ import { NextResponse } from "next/server";
  */
 
 const SERVICES_URL =
-  process.env.SERVICES_URL || "https://tagit-services-31154571939.us-central1.run.app";
+  process.env.SERVICES_URL ||
+  "https://tagit-services-31154571939.us-central1.run.app";
 const SERVICES_API_KEY = process.env.SERVICES_API_KEY;
 
 export const runtime = "nodejs";

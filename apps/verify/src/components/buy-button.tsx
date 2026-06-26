@@ -109,9 +109,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
           // Most common cause: the fresh wallet has no test USDC yet.
           setError(
             /insufficient|balance|funds/i.test(msg)
-              ? `Not enough test USDC. Fund ${shortAddr(
-                  buyerWallet,
-                )} at faucet.circle.com, then try again.`
+              ? `Not enough test USDC. Fund ${shortAddr(buyerWallet)} at faucet.circle.com, then try again.`
               : `Payment failed: ${msg}`,
           );
           setPhase("error");
@@ -144,7 +142,8 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
     }
   }, [buyerWallet, tokenId, priceUsdc, sendTransaction]);
 
-  const wrap = "rounded-2xl border border-[#00D68F]/30 p-5 mb-5 animate-fadeUp";
+  const wrap =
+    "rounded-2xl border border-[#00D68F]/30 p-5 mb-5 animate-fadeUp";
   const wrapStyle = { background: "rgba(0,214,143,0.07)", animationDelay: "0.45s" };
   const primaryBtn =
     "w-full rounded-xl bg-[#00D68F] py-3.5 text-center text-sm font-bold text-black transition active:scale-[0.98] disabled:opacity-50";
@@ -208,10 +207,10 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
           {phase === "paying"
             ? "Paying USDC…"
             : phase === "settling"
-            ? "Transferring…"
-            : !buyerWallet
-            ? "Preparing wallet…"
-            : `Buy now · ${formatPrice(priceUsdc)}`}
+              ? "Transferring…"
+              : !buyerWallet
+                ? "Preparing wallet…"
+                : `Buy now · ${formatPrice(priceUsdc)}`}
         </button>
       )}
 
@@ -221,12 +220,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
             <>
               pay {formatPrice(priceUsdc)} USDC from {shortAddr(buyerWallet)} · gas sponsored
               <br />
-              <a
-                href={CIRCLE_FAUCET}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#00D68F] hover:underline"
-              >
+              <a href={CIRCLE_FAUCET} target="_blank" rel="noopener noreferrer" className="text-[#00D68F] hover:underline">
                 need test USDC? faucet.circle.com
               </a>
             </>

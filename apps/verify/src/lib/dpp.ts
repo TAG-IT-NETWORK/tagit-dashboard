@@ -250,9 +250,7 @@ export function buildDpp(input: BuildDppInput): DigitalProductPassport {
 export function dppToVerifiableCredential(dpp: DigitalProductPassport): Record<string, unknown> {
   const subjectId =
     dpp.identifiers.gtin && dpp.identifiers.serial
-      ? `${RESOLVER_BASE}/01/${dpp.identifiers.gtin}/21/${encodeURIComponent(
-          dpp.identifiers.serial,
-        )}`
+      ? `${RESOLVER_BASE}/01/${dpp.identifiers.gtin}/21/${encodeURIComponent(dpp.identifiers.serial)}`
       : `${RESOLVER_BASE}/token/${dpp.identifiers.tokenId}`;
 
   return {
