@@ -40,4 +40,12 @@ export const TAGITCoreABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    // keccak256 of the off-chain metadata JSON — the DPP integrity anchor.
+    inputs: [{ type: "uint256", name: "" }],
+    name: "metadataHash",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;

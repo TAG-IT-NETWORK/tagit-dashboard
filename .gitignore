@@ -37,3 +37,8 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 .vercel
+
+# Local tooling / backups (not for git)
+.serena/
+.vercel-backup/
+.vercel-verify/

@@ -1,12 +1,17 @@
 # ═══════════════════════════════════════════════════════════════
-# SUDO AI — CI Failure Feedback Loop
-# When any workflow fails, create a Notion task for SUDO AI to fix
+# CI Failure → Notion task queue
+# When any workflow fails, create a Notion task that the autonomous
+# build agent (tagit-agent) will pick up on its next cycle.
+#
+# History: originally written for SUDO AI (decommissioned 2026-05-19).
+#          Owner Type and Status values are preserved so the tagit-agent
+#          replacement can inherit the same task queue with no schema change.
 #
 # DEPLOY: Copy this file to each repo's .github/workflows/
 # REQUIRES: NOTION_API_KEY secret set in GitHub repo/org settings
 # ═══════════════════════════════════════════════════════════════
 
-name: CI Failure → SUDO AI
+name: CI Failure → Notion task queue
 
 on:
   workflow_run:
@@ -30,7 +35,7 @@ jobs:
           echo "actor=${{ github.event.workflow_run.actor.login }}" >> $GITHUB_OUTPUT
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
-      - name: Create Notion task for SUDO AI
+      - name: Create Notion task
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           TASKS_DB: "8020faaf-b79a-4825-95e6-100313bba423"
@@ -41,13 +46,17 @@ jobs:
             exit 0
           fi
 
-          # Skip if failure is on a sudo/ branch (avoid infinite loops)
-          if [[ "${{ steps.details.outputs.branch }}" == sudo/* ]]; then
-            echo "⚠️ Failure on sudo/ branch — skipping to avoid loop"
+          # Skip if failure is on an agent-owned branch (avoid infinite loops).
+          # Includes legacy `sudo/` prefix and new `agent/` prefix (tagit-agent default).
+          BRANCH="${{ steps.details.outputs.branch }}"
+          if [[ "$BRANCH" == sudo/* ]] || [[ "$BRANCH" == agent/* ]]; then
+            echo "⚠️ Failure on agent-owned branch ($BRANCH) — skipping to avoid loop"
             exit 0
           fi
 
-          # Create the task
+          # Create the task.
+          # Owner Type "🦾 SUDO AI" + Status "Sent to SUDO" are preserved so
+          # tagit-agent inherits the queue. Rename later via a Notion schema migration.
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.notion.com/v1/pages" \
             -H "Authorization: Bearer $NOTION_API_KEY" \
             -H "Notion-Version: 2022-06-28" \

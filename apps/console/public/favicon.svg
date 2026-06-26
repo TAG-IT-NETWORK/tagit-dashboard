@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Hexagon outline -->
+  <path d="M50 5 L91 28 L91 72 L50 95 L9 72 L9 28 Z"
+        stroke="#00D4FF" stroke-width="3" fill="#0A0E14"/>
+
+  <!-- Chip body -->
+  <rect x="28" y="32" width="44" height="36" rx="5"
+        stroke="#00D4FF" stroke-width="2.5" fill="#0A0E14"/>
+
+  <!-- Chip pins - top -->
+  <line x1="35" y1="25" x2="35" y2="32" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="45" y1="25" x2="45" y2="32" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="55" y1="25" x2="55" y2="32" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="65" y1="25" x2="65" y2="32" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Chip pins - bottom -->
+  <line x1="35" y1="68" x2="35" y2="75" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="45" y1="68" x2="45" y2="75" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="55" y1="68" x2="55" y2="75" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="65" y1="68" x2="65" y2="75" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Chip pins - left -->
+  <line x1="21" y1="40" x2="28" y2="40" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="21" y1="50" x2="28" y2="50" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="21" y1="60" x2="28" y2="60" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Chip pins - right -->
+  <line x1="72" y1="40" x2="79" y2="40" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="72" y1="50" x2="79" y2="50" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="72" y1="60" x2="79" y2="60" stroke="#00D4FF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- NFC waves -->
+  <path d="M44 58 Q50 52 56 58" stroke="#00FF88" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M38 54 Q50 44 62 54" stroke="#00FF88" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M32 50 Q50 36 68 50" stroke="#00FF88" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

@@ -8,6 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "TAG IT Console",
   description: "B2B portal for manufacturers, retailers, and recyclers",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({

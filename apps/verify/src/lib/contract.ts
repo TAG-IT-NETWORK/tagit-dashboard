@@ -15,24 +15,50 @@ export const publicClient = createPublicClient({
 });
 
 /** Static metadata for known demo tokens (fallback when ?meta= IPFS URL is missing).
- * `meta` field is an ipfs://Qm... URL the page auto-fetches if no ?meta= query param. */
-const ASSET_METADATA: Record<string, { productName?: string; msrp?: string; meta?: string }> = {
+ * `meta` field is an ipfs://Qm... URL the page auto-fetches if no ?meta= query param.
+ * `priceUsdc` is the "tap to buy" price (USDC, 6-decimal token) shown on the Buy button. */
+const ASSET_METADATA: Record<
+  string,
+  { productName?: string; msrp?: string; meta?: string; priceUsdc?: number }
+> = {
   "5": {
     productName: "PDRN Capsule Cream 100",
     msrp: "$22.00",
+    priceUsdc: 22,
     meta: "ipfs://QmZLqbsFDKpHc4BsnP4fVcNd4PEi6JriR9MUmJ9bia6oKQ",
   },
-  "18": { productName: "TAG IT Sneaker", msrp: "$199.99" },
-  "19": { productName: "Nike Air Max 90", msrp: "$149.99" },
-  "20": { productName: "DI0R Eye Cream", msrp: "$77.73" },
+  "18": { productName: "TAG IT Sneaker", msrp: "$199.99", priceUsdc: 199.99 },
+  "19": { productName: "Nike Air Max 90", msrp: "$149.99", priceUsdc: 149.99 },
+  "20": { productName: "DI0R Eye Cream", msrp: "$77.73", priceUsdc: 77.73 },
 };
+
+/** Fallback "tap to buy" price for demo tokens minted on the fly (unknown id). */
+const DEFAULT_PRICE_USDC = 1;
 
 export function getMetadataForToken(tokenId: string): {
   productName?: string;
   msrp?: string;
   meta?: string;
+  priceUsdc?: number;
 } {
   return ASSET_METADATA[tokenId] || {};
+}
+
+/**
+ * Buy config for the "tap to buy" flow. Every token is purchasable (the page
+ * only renders the Buy button when state === ACTIVATED); price comes from the
+ * token's metadata or a small default so freshly pre-minted demo tokens still
+ * show a sensible price.
+ */
+export function getBuyConfigForToken(tokenId: string): {
+  productName?: string;
+  priceUsdc: number;
+} {
+  const meta = ASSET_METADATA[tokenId];
+  return {
+    productName: meta?.productName,
+    priceUsdc: meta?.priceUsdc ?? DEFAULT_PRICE_USDC,
+  };
 }
 
 export async function getAsset(tokenId: bigint) {
@@ -62,6 +88,23 @@ export async function getTagByToken(tokenId: bigint) {
     functionName: "getTagByToken",
     args: [tokenId],
   });
+}
+
+/**
+ * Read the on-chain metadata content hash — keccak256 of the off-chain DPP
+ * metadata JSON. This is the integrity anchor: if the off-chain passport bytes
+ * change, their keccak256 no longer matches this value, so tampering is
+ * detectable. Returns null (not a throw) for the zero hash / unset.
+ */
+export async function getMetadataHash(tokenId: bigint): Promise<`0x${string}` | null> {
+  const hash = (await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: TAGITCoreABI,
+    functionName: "metadataHash",
+    args: [tokenId],
+  })) as `0x${string}`;
+  if (!hash || /^0x0{64}$/.test(hash)) return null;
+  return hash;
 }
 
 /** Convert a raw NFC UID (hex string, no colons) to a tag hash */
