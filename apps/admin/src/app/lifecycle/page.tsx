@@ -266,7 +266,7 @@ export default function LifecyclePage() {
 
       {/* Testnet Banner */}
       <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-sm text-amber-400">
-        Arbitrum Sepolia — TAGITCore: {shortenAddress(contracts.TAGITCore)}
+        Base Sepolia — TAGITCore: {shortenAddress(contracts.TAGITCore)}
       </div>
 
       {/* Stats Bar */}
@@ -489,7 +489,7 @@ export default function LifecyclePage() {
         <p>
           Contract:{" "}
           <a
-            href={`https://sepolia.arbiscan.io/address/${contracts.TAGITCore}`}
+            href={`https://sepolia.basescan.org/address/${contracts.TAGITCore}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#D4AF37] hover:underline"
@@ -497,7 +497,7 @@ export default function LifecyclePage() {
             {shortenAddress(contracts.TAGITCore)}
           </a>
         </p>
-        <p>Powered by TAG IT Network on Arbitrum Sepolia</p>
+        <p>Powered by TAG IT Network on Base Sepolia</p>
       </div>
     </div>
   );

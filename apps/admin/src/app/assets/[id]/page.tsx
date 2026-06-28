@@ -543,7 +543,7 @@ function AssetDetailContent({ id }: { id: string }) {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Network</div>
-                <Badge variant="outline">OP Sepolia</Badge>
+                <Badge variant="outline">Base Sepolia</Badge>
               </div>
             </CardContent>
           </Card>

@@ -3,14 +3,14 @@ schema:
   file: ./schema.graphql
 dataSources:
   # TAGITCore - Asset lifecycle events
-  # Updated Feb 24, 2026 — UUPS proxy (T20)
+  # Migrated to Base Sepolia 2026-06-27 (OP/Arb Sepolia archived; history in tagit-contracts)
   - kind: ethereum
     name: TAGITCore
-    network: optimism-sepolia
+    network: base-sepolia
     source:
-      address: "0x8bde22da889306d422802728cb98b6da42ed8e1a"
+      address: "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d"
       abi: TAGITCore
-      startBlock: 40045836
+      startBlock: 39611546
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -37,11 +37,11 @@ dataSources:
   # TAGITAccess - Capability events
   - kind: ethereum
     name: TAGITAccess
-    network: optimism-sepolia
+    network: base-sepolia
     source:
-      address: "0x0611FE60f6E37230bDaf04c5F2Ac2dc9012130a9"
+      address: "0xb56A1D91995C212342FaA843468F03521340A1D6"
       abi: TAGITAccess
-      startBlock: 37959312
+      startBlock: 39611546
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -62,11 +62,11 @@ dataSources:
   # IdentityBadge - Badge events
   - kind: ethereum
     name: IdentityBadge
-    network: optimism-sepolia
+    network: base-sepolia
     source:
-      address: "0x26F2EBb84664EF1eF8554e15777EBEc6611256A6"
+      address: "0xebdAC9A0663c02a7297681b078aaD893EF345030"
       abi: IdentityBadge
-      startBlock: 37959311
+      startBlock: 39611546
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

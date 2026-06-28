@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import { cn } from "../lib/utils";
 
-/** Inline explorer URL map — avoids importing @tagit/config into the UI package */
+/**
+ * Inline explorer URL map — avoids importing @tagit/config into the UI package.
+ * Base Sepolia canonical (OP/Arb archived 2026-06-27).
+ */
 const explorerUrls: Record<number, string> = {
-  421614: "https://sepolia.arbiscan.io",
-  11155420: "https://optimism-sepolia.blockscout.com",
   84532: "https://sepolia.basescan.org",
 };
 
 export interface AddressBadgeProps {
   address: string;
-  /** Chain ID for explorer links (default: 11155420 / OP Sepolia) */
+  /** Chain ID for explorer links (default: 84532 / Base Sepolia) */
   chainId?: number;
   showCopy?: boolean;
   showEtherscan?: boolean;
@@ -28,7 +29,7 @@ function truncateAddress(address: string, chars = 4): string {
 
 export function AddressBadge({
   address,
-  chainId = 11155420,
+  chainId = 84532,
   showCopy = true,
   showEtherscan = true,
   truncate = true,
@@ -42,7 +43,7 @@ export function AddressBadge({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const baseUrl = explorerUrls[chainId] ?? explorerUrls[11155420];
+  const baseUrl = explorerUrls[chainId] ?? explorerUrls[84532];
   const etherscanUrl = `${baseUrl}/address/${address}`;
 
   return (
@@ -69,7 +70,7 @@ export function AddressBadge({
           target="_blank"
           rel="noopener noreferrer"
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="View on Blockscout"
+          title="View on Basescan"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </a>

@@ -505,7 +505,7 @@ function DashboardContent() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Network</span>
-                <span className="text-sm">{chainId === 421614 ? "Arbitrum Sepolia" : "OP Sepolia"}</span>
+                <span className="text-sm">{chainId === 84532 ? "Base Sepolia" : chainId === 421614 ? "Arbitrum Sepolia" : "OP Sepolia"}</span>
               </div>
             </div>
           </CardContent>

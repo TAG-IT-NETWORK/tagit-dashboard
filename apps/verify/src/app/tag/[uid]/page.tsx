@@ -237,7 +237,7 @@ export default function TagVerifyPage() {
           </span>
         </div>
 
-        {/* Arbiscan Button */}
+        {/* Basescan Button */}
         <a
           href={basescanUrl}
           target="_blank"

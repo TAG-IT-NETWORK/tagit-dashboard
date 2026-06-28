@@ -119,7 +119,7 @@ function parseContractError(error: Error): string {
   }
 
   if (message.includes("chain") || message.includes("wrong network")) {
-    return "Wrong network. Please switch to OP Sepolia in your wallet.";
+    return "Wrong network. Please switch to Base Sepolia in your wallet.";
   }
 
   if (message.includes("not connected")) {

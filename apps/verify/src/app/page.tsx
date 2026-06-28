@@ -56,7 +56,7 @@ export default function VerifyHome() {
         <div className="mt-12 space-y-1">
           <p className="text-gray-600 text-xs">No wallet required</p>
           <p className="text-gray-600 text-xs">
-            Reads directly from Arbitrum Sepolia
+            Reads directly from Base Sepolia
           </p>
         </div>
       </div>
