@@ -39,7 +39,9 @@ const BASE_SEPOLIA_CONTRACTS = {
   TAGITBurner: "0xCB8AbCe0770C499B789481F8c6C20Fa0d6980d2a" as `0x${string}`,
   TAGITVesting: "0x7dd4c98a2aFE60eE06bA5c136dBeb7f93DD2699D" as `0x${string}`,
   IntegrationFactory: "0xd68919371c26700dDb8252aD1825Aa02a0381a86" as `0x${string}`,
-  VerificationEscrow: "0x4c9aACfcb64169E3BC187c227c4C0e0a5CFDA1cF" as `0x${string}`,
+  // VerificationEscrow is NOT yet deployed on Base (pending). The prior value
+  // 0x4c9aACfcb6… was an Arbitrum Paymaster impl, never a Base escrow. Zero = sentinel.
+  VerificationEscrow: "0x0000000000000000000000000000000000000000" as `0x${string}`,
 } as const;
 
 // ──────────────────────────────────────────────
