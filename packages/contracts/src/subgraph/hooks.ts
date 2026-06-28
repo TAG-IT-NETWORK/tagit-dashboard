@@ -294,7 +294,7 @@ function mergeSubgraphEvents(
  *  3. If both fail → empty (mock) state
  *
  * Returns `effectiveChainId` so the UI can build correct explorer links
- * (e.g. when connected to Arbitrum but events come from OP Sepolia).
+ * (e.g. when the connected chain differs from where TAGITCore is deployed — Base Sepolia).
  */
 export function useEventFeedWithFallback(
   chainId: number,

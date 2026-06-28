@@ -69,7 +69,7 @@ export function EventFeed() {
       <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
         <Radio className="h-4 w-4 text-blue-500 animate-pulse" />
         <span className="text-sm font-medium text-blue-500">
-          OP SEPOLIA TESTNET — LIVE FEED
+          BASE SEPOLIA TESTNET — LIVE FEED
         </span>
         <Badge variant="outline" className={`ml-auto text-xs gap-1 ${badge.className}`}>
           {badge.label}

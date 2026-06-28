@@ -818,7 +818,7 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
                     rel="noopener noreferrer"
                     className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
                   >
-                    View on Blockscout <ExternalLink className="h-3 w-3" />
+                    View on Basescan <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
               </CardContent>

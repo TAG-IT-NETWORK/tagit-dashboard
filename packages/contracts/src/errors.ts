@@ -54,7 +54,7 @@ export const TRANSACTION_ERRORS: Record<string, string> = {
   "InsufficientFundsError": "Insufficient funds in your wallet.",
   "NonceError": "Transaction nonce error. Please refresh and try again.",
   "GasEstimationError": "Gas estimation failed. The transaction may revert.",
-  "ChainMismatchError": "Please switch to OP Sepolia network.",
+  "ChainMismatchError": "Please switch to Base Sepolia network.",
   "ConnectorNotConnectedError": "Wallet not connected.",
 };
 
@@ -85,7 +85,7 @@ export function parseContractError(error: unknown): {
   // Check for network errors
   if (lowerError.includes("network") || lowerError.includes("chain") || lowerError.includes("wrong network")) {
     return {
-      message: "Network error. Please switch to OP Sepolia and try again.",
+      message: "Network error. Please switch to Base Sepolia and try again.",
       code: "NETWORK_ERROR",
       isUserRejection: false,
       isCapabilityError: false,

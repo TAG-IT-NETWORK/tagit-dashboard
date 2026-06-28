@@ -13,7 +13,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "TAG IT Verify - Product Authenticity",
   description:
-    "Verify product authenticity on-chain. Tap an NFC tag to check lifecycle state on Arbitrum.",
+    "Verify product authenticity on-chain. Tap an NFC tag to check lifecycle state on Base.",
 };
 
 export default function RootLayout({

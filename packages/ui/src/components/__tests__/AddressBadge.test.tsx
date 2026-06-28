@@ -65,24 +65,24 @@ describe("AddressBadge", () => {
     });
   });
 
-  it("shows Blockscout link by default", () => {
+  it("shows Basescan link by default", () => {
     render(<AddressBadge address={mockAddress} />);
-    const link = screen.getByTitle("View on Blockscout");
+    const link = screen.getByTitle("View on Basescan");
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute(
       "href",
-      `https://optimism-sepolia.blockscout.com/address/${mockAddress}`
+      `https://sepolia.basescan.org/address/${mockAddress}`
     );
   });
 
-  it("hides Blockscout link when showEtherscan is false", () => {
+  it("hides Basescan link when showEtherscan is false", () => {
     render(<AddressBadge address={mockAddress} showEtherscan={false} />);
-    expect(screen.queryByTitle("View on Blockscout")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("View on Basescan")).not.toBeInTheDocument();
   });
 
-  it("Blockscout link opens in new tab", () => {
+  it("Basescan link opens in new tab", () => {
     render(<AddressBadge address={mockAddress} />);
-    const link = screen.getByTitle("View on Blockscout");
+    const link = screen.getByTitle("View on Basescan");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });

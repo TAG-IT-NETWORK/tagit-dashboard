@@ -161,10 +161,15 @@ export async function writeNFCTag(
   }
 
   const verifyUrl = options?.verifyUrl ?? "https://verify.tagit.network";
-  const chainId = options?.chainId ?? 421614;
-  const contract = options?.contractAddress ?? "0x2cb1E0ecE274217F214057c0a829582834Aeaf7f";
+  const chainId = options?.chainId ?? 84532;
+  const contract = options?.contractAddress ?? "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d";
 
-  const chainName = chainId === 421614 ? "arbitrum-sepolia" : "optimism-sepolia";
+  const chainName =
+    chainId === 84532
+      ? "base-sepolia"
+      : chainId === 421614
+        ? "arbitrum-sepolia"
+        : "optimism-sepolia";
 
   const ndef = new NDEFReader();
   await ndef.write({

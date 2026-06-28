@@ -122,7 +122,7 @@ export function TransferModal({ open, onOpenChange, tokenId, onSuccess }: Transf
                       rel="noopener noreferrer"
                       className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
                     >
-                      View on Blockscout
+                      View on Basescan
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
