@@ -8,8 +8,7 @@
     "build": "next build",
     "start": "next start --port 3005",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tagit/auth": "workspace:*",
@@ -25,7 +24,6 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
     "@tagit/tsconfig": "workspace:*",
     "@types/node": "^20",
     "@types/react": "^18",
