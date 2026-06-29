@@ -1,0 +1,18 @@
+# TAG IT — gitleaks configuration (tagit-dashboard)
+# Extends the built-in ruleset and allowlists known non-secrets.
+title = "TAG IT gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "TAG IT known false positives"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)[^/]*\.example$''',
+  '''(^|/)[^/]*\.local\.example$''',
+]
+regexes = [
+  # Public NEXT_PUBLIC_* values and on-chain addresses (40 hex) are not secrets
+  '''0x9a2f77c9[0-9a-fA-F]{56}''',
+]
