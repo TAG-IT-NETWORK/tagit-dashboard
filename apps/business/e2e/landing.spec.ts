@@ -47,6 +47,15 @@ test.describe("P1 landing", () => {
   });
 
   test("request-access form validates and reaches the success state", async ({ page }) => {
+    // Make the success path deterministic — don't hit real tagit-services.
+    await page.route("**/api/demo-request", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, id: "lead_test_1" }),
+      }),
+    );
+
     await page.goto("/");
 
     const form = page.locator("#get-started");
@@ -62,6 +71,35 @@ test.describe("P1 landing", () => {
     await submit.click();
 
     await expect(page.getByText("You're on the list")).toBeVisible();
+  });
+
+  test("request-access form surfaces an error when the proxy fails", async ({ page }) => {
+    // Simulate the dashboard proxy reporting that tagit-services is unreachable.
+    await page.route("**/api/demo-request", (route) =>
+      route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "upstream_unavailable" }),
+      }),
+    );
+
+    await page.goto("/");
+
+    const form = page.locator("#get-started");
+    const submit = form.getByRole("button", { name: "Request a demo" });
+
+    await form.getByRole("textbox", { name: "Your name" }).fill("Jane Doe");
+    await form.getByRole("textbox", { name: "Work email" }).fill("jane@acme.com");
+    await form.getByRole("textbox", { name: "Company" }).fill("Acme Goods Inc.");
+
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
+    await expect(form.getByRole("alert")).toBeVisible();
+    await expect(form.getByText(/something went wrong/i)).toBeVisible();
+    // The form stays put so the user can retry.
+    await expect(submit).toBeVisible();
+    await expect(page.getByText("You're on the list")).toHaveCount(0);
   });
 
   test("collapses the desktop nav on mobile widths", async ({ page }) => {

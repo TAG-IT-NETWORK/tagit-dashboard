@@ -104,9 +104,45 @@ function RequestAccessForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
+  const [website, setWebsite] = useState(""); // honeypot — hidden from real users
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const valid = name.trim() && /.+@.+\..+/.test(email) && company.trim();
+
+  async function handleSubmit() {
+    if (!valid || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/demo-request", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          company: company.trim(),
+          source: "pro-landing",
+          website,
+        }),
+      });
+      const data = await res.json().catch(() => ({ ok: false }));
+      if (res.ok && data?.ok) {
+        setSubmitted(true);
+      } else {
+        setError(
+          data?.error === "rate_limited"
+            ? "Too many requests. Please try again in a moment."
+            : "Something went wrong. Please try again.",
+        );
+      }
+    } catch {
+      setError("Couldn't reach the server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (submitted) {
     return (
@@ -157,10 +193,37 @@ function RequestAccessForm() {
             onChange={(e) => setCompany(e.target.value)}
           />
         </div>
-        <Button className="w-full" disabled={!valid} onClick={() => setSubmitted(true)}>
-          Request a demo
-          <ArrowRight className="ml-2 h-4 w-4" />
+        {/* Honeypot: hidden from humans; bots that fill it are silently dropped server-side. */}
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          className="hidden"
+        />
+        <Button
+          className="w-full"
+          disabled={!valid || loading}
+          aria-busy={loading}
+          onClick={handleSubmit}
+        >
+          {loading ? (
+            "Requesting…"
+          ) : (
+            <>
+              Request a demo
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
         </Button>
+        {error ? (
+          <p role="alert" className="text-center text-xs text-destructive">
+            {error}
+          </p>
+        ) : null}
         <p className="text-center text-xs text-muted-foreground">
           Already have a wallet? Use “Launch app” above to start now.
         </p>
