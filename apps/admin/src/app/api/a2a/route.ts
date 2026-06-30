@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GATEWAY_URL = process.env.A2A_GATEWAY_URL || "https://api.tagit.network";
-const API_KEY = process.env.API_KEY || process.env.A2A_API_KEY || "dev-api-key-change-me";
+// No dev-key fallback — fail closed if the gateway key isn't configured.
+const API_KEY = process.env.API_KEY ?? process.env.A2A_API_KEY;
 
 export async function POST(req: NextRequest) {
   try {
+    if (!API_KEY) {
+      return NextResponse.json(
+        { error: "A2A gateway not configured" },
+        { status: 500 },
+      );
+    }
+
     const body = await req.json();
 
     // Always use the TAG IT gateway — agentUrl from the agent's tokenURI
