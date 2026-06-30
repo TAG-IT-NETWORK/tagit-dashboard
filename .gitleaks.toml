@@ -1,5 +1,7 @@
 # TAG IT — gitleaks configuration (tagit-dashboard)
-# Extends the built-in ruleset and allowlists known non-secrets.
+# Extends the built-in ruleset; allowlists public on-chain data the default rules misflag
+# as secrets. (An EVM address is 40 hex; a private key is 64 — allowlisting 40-hex never
+# hides a leaked key.)
 title = "TAG IT gitleaks config"
 
 [extend]
@@ -11,8 +13,14 @@ paths = [
   '''(^|/)\.env\.example$''',
   '''(^|/)[^/]*\.example$''',
   '''(^|/)[^/]*\.local\.example$''',
+  # Workspace contract address maps hold PUBLIC addresses
+  '''(^|/).*[Aa]ddress(es)?.*\.(ts|json)$''',
+  # Contract error-message maps ("...Token": "<message>") trip the generic-api-key rule
+  '''(^|/)packages/contracts/src/errors\.ts$''',
 ]
 regexes = [
-  # Public NEXT_PUBLIC_* values and on-chain addresses (40 hex) are not secrets
+  # EVM addresses (40 hex) — public identifiers, never a 64-hex private key
+  '''0x[a-fA-F0-9]{40}\b''',
+  # GOV_MIL badge keccak constant
   '''0x9a2f77c9[0-9a-fA-F]{56}''',
 ]
