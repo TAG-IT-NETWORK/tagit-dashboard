@@ -25,7 +25,7 @@ import {
 const NAV = [
   { href: "#how", label: "How it works" },
   { href: "#features", label: "Features" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 const LIFECYCLE = [
@@ -220,7 +220,7 @@ export function MarketingLanding() {
             </a>
           </div>
           <a
-            href="#pricing"
+            href="/pricing"
             className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -331,6 +331,15 @@ export function MarketingLanding() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+            <div className="mt-8 text-center">
+              <a
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 text-sm font-medium hover:text-muted-foreground transition-colors"
+              >
+                See full pricing &amp; FAQ
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
             </div>
           </div>
         </section>
