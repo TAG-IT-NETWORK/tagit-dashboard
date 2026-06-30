@@ -18,6 +18,7 @@ import {
 import { ArrowRight } from "lucide-react";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { MarketingLanding } from "@/components/marketing-landing";
+import { SignIn } from "@/components/sign-in";
 import { useBusinessProfile, type BusinessProfile } from "@/lib/profile";
 
 const BUSINESS_TYPES: { value: BusinessProfile["type"]; label: string }[] = [
@@ -131,12 +132,19 @@ function Landing() {
     return <MarketingLanding />;
   }
 
-  // Connected (but no profile yet, or about to redirect): the onboarding step.
+  // Connected: sign in (SIWE → server session), then the business-profile step.
   return (
     <OnboardingShell>
-      <ProfileForm />
+      <Onboarding />
     </OnboardingShell>
   );
+}
+
+/** SIWE sign-in establishes the server session; ProfileForm then completes onboarding. */
+function Onboarding() {
+  const [signedIn, setSignedIn] = useState(false);
+  if (!signedIn) return <SignIn onSignedIn={() => setSignedIn(true)} />;
+  return <ProfileForm />;
 }
 
 export default function Home() {
