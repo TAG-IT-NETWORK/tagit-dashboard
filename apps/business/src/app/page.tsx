@@ -36,9 +36,9 @@ function ProfileForm() {
   const [type, setType] = useState<BusinessProfile["type"]>("manufacturer");
   const [website, setWebsite] = useState("");
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim()) return;
-    save({ name: name.trim(), type, website: website.trim() || undefined });
+    await save({ name: name.trim(), type, website: website.trim() || undefined });
     router.push("/dashboard");
   };
 
