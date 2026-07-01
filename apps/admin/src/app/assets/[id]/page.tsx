@@ -291,9 +291,7 @@ function AssetDetailContent({ id }: { id: string }) {
             <AddressBadge address={asset!.owner} chainId={chainId} />
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {renderActions()}
-        </div>
+        <div className="flex items-center gap-2">{renderActions()}</div>
       </div>
 
       {/* Transaction Status for inline actions (activate/flag/recycle) */}
@@ -349,7 +347,8 @@ function AssetDetailContent({ id }: { id: string }) {
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Tag ID</div>
                   {tagHash &&
-                  tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
+                  tagHash !==
+                    "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
                     <code className="text-sm break-all">{tagHash}</code>
                   ) : (
                     <span className="text-muted-foreground">Not bound</span>
@@ -361,9 +360,7 @@ function AssetDetailContent({ id }: { id: string }) {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Timestamp</div>
-                  <div className="text-sm">
-                    {timestampMs > 0 ? formatDate(timestampMs) : "—"}
-                  </div>
+                  <div className="text-sm">{timestampMs > 0 ? formatDate(timestampMs) : "—"}</div>
                 </div>
               </div>
             </CardContent>
@@ -382,9 +379,7 @@ function AssetDetailContent({ id }: { id: string }) {
                   Loading timeline...
                 </div>
               ) : stateChanges.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No state changes recorded yet.
-                </p>
+                <p className="text-sm text-muted-foreground py-4">No state changes recorded yet.</p>
               ) : (
                 <div className="relative">
                   {/* Timeline line */}
@@ -450,9 +445,7 @@ function AssetDetailContent({ id }: { id: string }) {
                   Loading transfers...
                 </div>
               ) : transfers.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No transfers recorded yet.
-                </p>
+                <p className="text-sm text-muted-foreground py-4">No transfers recorded yet.</p>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full">
@@ -535,15 +528,11 @@ function AssetDetailContent({ id }: { id: string }) {
             <CardContent className="space-y-3">
               <div>
                 <div className="text-sm text-muted-foreground mb-1">TAGITCore</div>
-                <AddressBadge
-                  address={coreAddress}
-                  chainId={chainId}
-                  truncate
-                />
+                <AddressBadge address={coreAddress} chainId={chainId} truncate />
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Network</div>
-                <Badge variant="outline">OP Sepolia</Badge>
+                <Badge variant="outline">Base Sepolia</Badge>
               </div>
             </CardContent>
           </Card>

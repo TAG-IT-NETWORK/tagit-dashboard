@@ -159,15 +159,11 @@ function DashboardContent() {
 
   const displayDailyMints = useSubgraphData && dailyMints !== null ? dailyMints : 23;
   const displayActiveUsers = useSubgraphData && activeUsers !== null ? activeUsers : 145;
-  const displayStateDistribution = useSubgraphData && stateDistribution
-    ? stateDistribution
-    : mockStateDistribution;
-  const displayRecentActivity = useSubgraphData && recentActivity
-    ? recentActivity
-    : mockRecentActivity;
-  const displayTopUsers = useSubgraphData && topUsers
-    ? topUsers
-    : mockTopUsers;
+  const displayStateDistribution =
+    useSubgraphData && stateDistribution ? stateDistribution : mockStateDistribution;
+  const displayRecentActivity =
+    useSubgraphData && recentActivity ? recentActivity : mockRecentActivity;
+  const displayTopUsers = useSubgraphData && topUsers ? topUsers : mockTopUsers;
 
   const flaggedAssets = displayStateDistribution.find((s) => s.state === 4)?.value ?? 0;
 
@@ -269,7 +265,9 @@ function DashboardContent() {
               <div className="flex items-center gap-2">
                 <FlaskConical className="h-5 w-5 text-primary" />
                 <CardTitle className="text-base">NFC Lifecycle Test</CardTitle>
-                <Badge variant="secondary" className="text-xs">Dev</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  Dev
+                </Badge>
               </div>
               <Button asChild size="sm">
                 <Link href="/test/lifecycle">
@@ -279,7 +277,8 @@ function DashboardContent() {
               </Button>
             </div>
             <CardDescription>
-              Test the complete asset lifecycle with NTAG424 DNA tags: MINT → BIND → ACTIVATE → CLAIM → FLAG → RESOLVE
+              Test the complete asset lifecycle with NTAG424 DNA tags: MINT → BIND → ACTIVATE →
+              CLAIM → FLAG → RESOLVE
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -329,7 +328,9 @@ function DashboardContent() {
                           <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg">
                             <p className="font-medium">{data.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {data.value} assets ({totalAssets > 0 ? ((data.value / totalAssets) * 100).toFixed(1) : 0}%)
+                              {data.value} assets (
+                              {totalAssets > 0 ? ((data.value / totalAssets) * 100).toFixed(1) : 0}
+                              %)
                             </p>
                           </div>
                         );
@@ -338,9 +339,7 @@ function DashboardContent() {
                     }}
                   />
                   <Legend
-                    formatter={(value) => (
-                      <span className="text-sm text-foreground">{value}</span>
-                    )}
+                    formatter={(value) => <span className="text-sm text-foreground">{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -395,9 +394,7 @@ function DashboardContent() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No recent activity
-                </p>
+                <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
               )}
             </div>
           </CardContent>
@@ -498,14 +495,24 @@ function DashboardContent() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Subgraph</span>
-                <span className={`flex items-center gap-1.5 text-sm ${useSubgraphData ? "text-green-500" : "text-yellow-500"}`}>
-                  <span className={`w-2 h-2 rounded-full ${useSubgraphData ? "bg-green-500" : "bg-yellow-500"}`} />
+                <span
+                  className={`flex items-center gap-1.5 text-sm ${useSubgraphData ? "text-green-500" : "text-yellow-500"}`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${useSubgraphData ? "bg-green-500" : "bg-yellow-500"}`}
+                  />
                   {useSubgraphData ? "Synced" : "Pending"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Network</span>
-                <span className="text-sm">{chainId === 421614 ? "Arbitrum Sepolia" : "OP Sepolia"}</span>
+                <span className="text-sm">
+                  {chainId === 84532
+                    ? "Base Sepolia"
+                    : chainId === 421614
+                      ? "Arbitrum Sepolia"
+                      : "OP Sepolia"}
+                </span>
               </div>
             </div>
           </CardContent>

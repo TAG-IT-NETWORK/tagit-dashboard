@@ -122,7 +122,7 @@ export function TransferModal({ open, onOpenChange, tokenId, onSuccess }: Transf
                       rel="noopener noreferrer"
                       className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
                     >
-                      View on Blockscout
+                      View on Basescan
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
@@ -173,10 +173,7 @@ export function TransferModal({ open, onOpenChange, tokenId, onSuccess }: Transf
             {isSuccess ? "Close" : "Cancel"}
           </Button>
           {!isSuccess && (
-            <Button
-              onClick={handleTransfer}
-              disabled={!validatedAddress || isBusy}
-            >
+            <Button onClick={handleTransfer} disabled={!validatedAddress || isBusy}>
               {isBusy ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -3,13 +3,9 @@
 
 import { createPublicClient, http } from "viem";
 import type { PublicClient, Chain, HttpTransport } from "viem";
-import { optimismSepolia, arbitrumSepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 import { TAGITCoreABI } from "../abis/TAGITCore";
-import {
-  getContractsForChain,
-  OP_SEPOLIA_CHAIN_ID,
-  ARBITRUM_SEPOLIA_CHAIN_ID,
-} from "../addresses";
+import { getContractsForChain, BASE_SEPOLIA_CHAIN_ID } from "../addresses";
 import { START_BLOCKS } from "../addresses";
 import type { ActivityItem, TransferItem, FeedEvent, AssetTimelineEvent } from "./types";
 
@@ -20,19 +16,15 @@ type EnvLike = { process?: { env?: Record<string, string | undefined> } };
 const _env = (globalThis as unknown as EnvLike).process?.env;
 
 const chainById: Record<number, Chain> = {
-  [OP_SEPOLIA_CHAIN_ID]: optimismSepolia,
-  [ARBITRUM_SEPOLIA_CHAIN_ID]: arbitrumSepolia,
+  [BASE_SEPOLIA_CHAIN_ID]: baseSepolia,
 };
 
 // Cache clients by chainId to avoid re-creating on every poll
 const clientCache = new Map<number, PublicClient<HttpTransport, Chain>>();
 
 function getRpcUrl(chainId: number): string | undefined {
-  if (chainId === OP_SEPOLIA_CHAIN_ID) {
-    return _env?.NEXT_PUBLIC_OP_SEPOLIA_RPC;
-  }
-  if (chainId === ARBITRUM_SEPOLIA_CHAIN_ID) {
-    return _env?.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC;
+  if (chainId === BASE_SEPOLIA_CHAIN_ID) {
+    return _env?.NEXT_PUBLIC_BASE_SEPOLIA_RPC;
   }
   return undefined;
 }
@@ -57,8 +49,8 @@ export function createRpcClient(chainId: number): PublicClient<HttpTransport, Ch
 export function resolveEventChainId(preferredChainId: number): number {
   const contracts = getContractsForChain(preferredChainId);
   if (contracts.TAGITCore !== ZERO_ADDRESS) return preferredChainId;
-  // Fallback to OP Sepolia where TAGITCore is deployed
-  return OP_SEPOLIA_CHAIN_ID;
+  // Fallback to Base Sepolia where TAGITCore is deployed
+  return BASE_SEPOLIA_CHAIN_ID;
 }
 
 export async function fetchRecentStateChanges(

@@ -6,56 +6,56 @@
 // Known TAGIT contract revert reasons
 export const TAGIT_ERRORS: Record<string, string> = {
   // TAGITCore errors
-  "AssetDoesNotExist": "This asset does not exist.",
-  "AssetAlreadyExists": "An asset with this ID already exists.",
-  "InvalidState": "The asset is not in the correct state for this operation.",
-  "InvalidStateTransition": "This state transition is not allowed.",
-  "NotAssetOwner": "You must be the asset owner to perform this action.",
-  "TagAlreadyBound": "This NFC tag is already bound to an asset.",
-  "TagNotBound": "This NFC tag is not bound to any asset.",
-  "InvalidTagId": "The provided tag ID is invalid.",
-  "InvalidMetadata": "The metadata URI is invalid or empty.",
-  "AssetNotFlagged": "This asset is not flagged and cannot be resolved.",
-  "AssetNotMinted": "The asset must be minted before this operation.",
-  "AssetNotBound": "The asset must be bound to a tag before this operation.",
-  "AssetNotActivated": "The asset must be activated before this operation.",
-  "CannotRecycle": "This asset cannot be recycled in its current state.",
+  AssetDoesNotExist: "This asset does not exist.",
+  AssetAlreadyExists: "An asset with this ID already exists.",
+  InvalidState: "The asset is not in the correct state for this operation.",
+  InvalidStateTransition: "This state transition is not allowed.",
+  NotAssetOwner: "You must be the asset owner to perform this action.",
+  TagAlreadyBound: "This NFC tag is already bound to an asset.",
+  TagNotBound: "This NFC tag is not bound to any asset.",
+  InvalidTagId: "The provided tag ID is invalid.",
+  InvalidMetadata: "The metadata URI is invalid or empty.",
+  AssetNotFlagged: "This asset is not flagged and cannot be resolved.",
+  AssetNotMinted: "The asset must be minted before this operation.",
+  AssetNotBound: "The asset must be bound to a tag before this operation.",
+  AssetNotActivated: "The asset must be activated before this operation.",
+  CannotRecycle: "This asset cannot be recycled in its current state.",
 
   // TAGITAccess errors
-  "Unauthorized": "You don't have permission to perform this action.",
-  "MissingCapability": "You lack the required capability for this operation.",
-  "CapabilityAlreadyGranted": "This capability has already been granted.",
-  "CapabilityNotGranted": "This capability was not previously granted.",
-  "CannotRevokeOwnCapability": "You cannot revoke your own capability.",
-  "InvalidCapability": "The specified capability is invalid.",
+  Unauthorized: "You don't have permission to perform this action.",
+  MissingCapability: "You lack the required capability for this operation.",
+  CapabilityAlreadyGranted: "This capability has already been granted.",
+  CapabilityNotGranted: "This capability was not previously granted.",
+  CannotRevokeOwnCapability: "You cannot revoke your own capability.",
+  InvalidCapability: "The specified capability is invalid.",
 
   // IdentityBadge errors
-  "BadgeAlreadyExists": "This user already has this badge.",
-  "BadgeDoesNotExist": "This badge does not exist for the user.",
-  "InvalidBadgeId": "The specified badge ID is invalid.",
-  "CannotTransferSoulbound": "Identity badges are soulbound and cannot be transferred.",
+  BadgeAlreadyExists: "This user already has this badge.",
+  BadgeDoesNotExist: "This badge does not exist for the user.",
+  InvalidBadgeId: "The specified badge ID is invalid.",
+  CannotTransferSoulbound: "Identity badges are soulbound and cannot be transferred.",
 
   // CapabilityBadge errors
-  "CapabilityBadgeAlreadyExists": "This capability badge already exists.",
-  "CapabilityBadgeDoesNotExist": "This capability badge does not exist.",
+  CapabilityBadgeAlreadyExists: "This capability badge already exists.",
+  CapabilityBadgeDoesNotExist: "This capability badge does not exist.",
 
   // Generic ERC721/1155 errors
-  "ERC721InvalidOwner": "Invalid owner address.",
-  "ERC721NonexistentToken": "This token does not exist.",
-  "ERC721InvalidReceiver": "Invalid receiver address for token transfer.",
-  "OwnableUnauthorizedAccount": "Only the contract owner can perform this action.",
-  "EnforcedPause": "The contract is currently paused.",
+  ERC721InvalidOwner: "Invalid owner address.",
+  ERC721NonexistentToken: "This token does not exist.",
+  ERC721InvalidReceiver: "Invalid receiver address for token transfer.",
+  OwnableUnauthorizedAccount: "Only the contract owner can perform this action.",
+  EnforcedPause: "The contract is currently paused.",
 };
 
 // Error codes from viem/wagmi
 export const TRANSACTION_ERRORS: Record<string, string> = {
-  "UserRejectedRequestError": "Transaction was cancelled in your wallet.",
-  "TransactionExecutionError": "Transaction failed to execute.",
-  "InsufficientFundsError": "Insufficient funds in your wallet.",
-  "NonceError": "Transaction nonce error. Please refresh and try again.",
-  "GasEstimationError": "Gas estimation failed. The transaction may revert.",
-  "ChainMismatchError": "Please switch to OP Sepolia network.",
-  "ConnectorNotConnectedError": "Wallet not connected.",
+  UserRejectedRequestError: "Transaction was cancelled in your wallet.",
+  TransactionExecutionError: "Transaction failed to execute.",
+  InsufficientFundsError: "Insufficient funds in your wallet.",
+  NonceError: "Transaction nonce error. Please refresh and try again.",
+  GasEstimationError: "Gas estimation failed. The transaction may revert.",
+  ChainMismatchError: "Please switch to Base Sepolia network.",
+  ConnectorNotConnectedError: "Wallet not connected.",
 };
 
 /**
@@ -72,7 +72,11 @@ export function parseContractError(error: unknown): {
   const lowerError = errorString.toLowerCase();
 
   // Check for user rejection first
-  if (lowerError.includes("user rejected") || lowerError.includes("user denied") || lowerError.includes("cancelled")) {
+  if (
+    lowerError.includes("user rejected") ||
+    lowerError.includes("user denied") ||
+    lowerError.includes("cancelled")
+  ) {
     return {
       message: "Transaction was cancelled.",
       code: "USER_REJECTED",
@@ -83,9 +87,13 @@ export function parseContractError(error: unknown): {
   }
 
   // Check for network errors
-  if (lowerError.includes("network") || lowerError.includes("chain") || lowerError.includes("wrong network")) {
+  if (
+    lowerError.includes("network") ||
+    lowerError.includes("chain") ||
+    lowerError.includes("wrong network")
+  ) {
     return {
-      message: "Network error. Please switch to OP Sepolia and try again.",
+      message: "Network error. Please switch to Base Sepolia and try again.",
       code: "NETWORK_ERROR",
       isUserRejection: false,
       isCapabilityError: false,
@@ -97,7 +105,9 @@ export function parseContractError(error: unknown): {
   let revertReason: string | null = null;
 
   // Match patterns like: reverted with reason "ErrorName"
-  const reasonMatch = errorString.match(/reverted with (?:reason|custom error|the following reason):\s*["']?([^"'\n]+)["']?/i);
+  const reasonMatch = errorString.match(
+    /reverted with (?:reason|custom error|the following reason):\s*["']?([^"'\n]+)["']?/i,
+  );
   if (reasonMatch) {
     revertReason = reasonMatch[1].trim();
   }
@@ -122,9 +132,10 @@ export function parseContractError(error: unknown): {
   if (revertReason) {
     // Check if it's a known TAGIT error
     const knownError = TAGIT_ERRORS[revertReason];
-    const isCapabilityError = revertReason.includes("Capability") ||
-                              revertReason === "Unauthorized" ||
-                              revertReason === "MissingCapability";
+    const isCapabilityError =
+      revertReason.includes("Capability") ||
+      revertReason === "Unauthorized" ||
+      revertReason === "MissingCapability";
 
     if (knownError) {
       return {
@@ -167,7 +178,11 @@ export function parseContractError(error: unknown): {
     };
   }
 
-  if (lowerError.includes("capability") || lowerError.includes("unauthorized") || lowerError.includes("permission")) {
+  if (
+    lowerError.includes("capability") ||
+    lowerError.includes("unauthorized") ||
+    lowerError.includes("permission")
+  ) {
     return {
       message: "You don't have permission to perform this action.",
       code: "UNAUTHORIZED",
@@ -211,10 +226,7 @@ export function getActionDescription(action: string): string {
 /**
  * Format a transaction error for display
  */
-export function formatTransactionError(
-  error: unknown,
-  action?: string
-): string {
+export function formatTransactionError(error: unknown, action?: string): string {
   const parsed = parseContractError(error);
 
   if (action) {

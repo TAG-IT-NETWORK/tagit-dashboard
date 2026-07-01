@@ -10,14 +10,7 @@ import {
   type TransferItem,
   type FlagItem,
 } from "@tagit/contracts";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Badge,
-  StateBadge,
-} from "@tagit/ui";
+import { Card, CardHeader, CardTitle, CardContent, Badge, StateBadge } from "@tagit/ui";
 import {
   Activity,
   ArrowRightLeft,
@@ -59,7 +52,11 @@ const sourceBadge = {
 
 export function EventFeed() {
   const chainId = useChainId();
-  const { events, isLoading, source, effectiveChainId } = useEventFeedWithFallback(chainId, 15, 5000);
+  const { events, isLoading, source, effectiveChainId } = useEventFeedWithFallback(
+    chainId,
+    15,
+    5000,
+  );
 
   const badge = sourceBadge[source];
 
@@ -68,9 +65,7 @@ export function EventFeed() {
       {/* Testnet Banner */}
       <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
         <Radio className="h-4 w-4 text-blue-500 animate-pulse" />
-        <span className="text-sm font-medium text-blue-500">
-          OP SEPOLIA TESTNET — LIVE FEED
-        </span>
+        <span className="text-sm font-medium text-blue-500">BASE SEPOLIA TESTNET — LIVE FEED</span>
         <Badge variant="outline" className={`ml-auto text-xs gap-1 ${badge.className}`}>
           {badge.label}
         </Badge>

@@ -16,7 +16,7 @@ interface TransactionStatusProps {
   error?: Error | null;
   /** Transaction hash if available */
   hash?: string;
-  /** Chain ID for explorer links (default: 11155420 / OP Sepolia) */
+  /** Chain ID for explorer links (default: 84532 / Base Sepolia) */
   chainId?: number;
   /** Action being performed (for error messages) */
   action?: string;
@@ -42,7 +42,7 @@ export function TransactionStatus({
   isSuccess,
   error,
   hash,
-  chainId = 11155420,
+  chainId = 84532,
   action,
   onSuccess,
   onError,
@@ -159,7 +159,7 @@ export function TransactionStatus({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-primary hover:underline text-sm mt-1"
                 >
-                  View on Blockscout
+                  View on Basescan
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}

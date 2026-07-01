@@ -21,7 +21,10 @@ export default function VerifyHome() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#000" }}>
+    <main
+      className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{ background: "#000" }}
+    >
       <div className="w-full max-w-sm text-center">
         <div className="inline-flex items-center gap-2 mb-1">
           <div className="w-2 h-2 rounded-full bg-[#D4AF37]" />
@@ -29,9 +32,7 @@ export default function VerifyHome() {
             TAG IT Network
           </span>
         </div>
-        <h1 className="text-3xl font-bold text-white mt-4 mb-2">
-          Verify Authenticity
-        </h1>
+        <h1 className="text-3xl font-bold text-white mt-4 mb-2">Verify Authenticity</h1>
         <p className="text-gray-400 text-sm mb-8">
           Tap an NFC tag or enter a token ID to verify any product on-chain.
         </p>
@@ -55,9 +56,7 @@ export default function VerifyHome() {
 
         <div className="mt-12 space-y-1">
           <p className="text-gray-600 text-xs">No wallet required</p>
-          <p className="text-gray-600 text-xs">
-            Reads directly from Arbitrum Sepolia
-          </p>
+          <p className="text-gray-600 text-xs">Reads directly from Base Sepolia</p>
         </div>
       </div>
     </main>

@@ -8,7 +8,6 @@ export {
   getContractsForChain,
   getContractAddress,
   START_BLOCKS,
-  ARBITRUM_START_BLOCKS,
   BASE_SEPOLIA_START_BLOCKS,
   startBlocksByChain,
   type ContractName,
@@ -171,15 +170,13 @@ export function shortenHash(hash: string, chars = 6): string {
   return `${hash.slice(0, chars + 2)}...${hash.slice(-chars)}`;
 }
 
-// Block explorer URLs (chain-aware)
+// Block explorer URLs — Base Sepolia canonical (OP/Arb archived 2026-06-27)
 const explorerBaseUrls: Record<number, string> = {
-  421614: "https://sepolia.arbiscan.io",
-  11155420: "https://optimism-sepolia.blockscout.com",
   84532: "https://sepolia.basescan.org",
 };
 
 export function getExplorerUrl(chainId: number): string {
-  return explorerBaseUrls[chainId] ?? explorerBaseUrls[11155420];
+  return explorerBaseUrls[chainId] ?? explorerBaseUrls[84532];
 }
 
 export function getExplorerTxUrl(chainId: number, hash: string): string {
@@ -192,12 +189,12 @@ export function getExplorerAddressUrl(chainId: number, address: string): string 
 
 /** @deprecated Use getExplorerTxUrl(chainId, hash) */
 export function getBlockscoutTxUrl(hash: string): string {
-  return `https://optimism-sepolia.blockscout.com/tx/${hash}`;
+  return `https://sepolia.basescan.org/tx/${hash}`;
 }
 
 /** @deprecated Use getExplorerAddressUrl(chainId, address) */
 export function getBlockscoutAddressUrl(address: string): string {
-  return `https://optimism-sepolia.blockscout.com/address/${address}`;
+  return `https://sepolia.basescan.org/address/${address}`;
 }
 
 // ============================================================================
