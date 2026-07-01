@@ -22,6 +22,7 @@ import {
 import { CheckCircle2, ExternalLink, RefreshCw, XCircle } from "lucide-react";
 import { useBusinessProfile, type BusinessProfile } from "@/lib/profile";
 import { isBindReady, useBindReadiness } from "@/lib/bind";
+import { BuyCredits } from "@/components/buy-credits";
 
 const BUSINESS_TYPES: BusinessProfile["type"][] = [
   "manufacturer",
@@ -262,6 +263,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <BuyCredits />
 
       <BindRelayerCard />
     </div>
