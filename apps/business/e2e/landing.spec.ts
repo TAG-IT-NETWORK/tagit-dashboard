@@ -3,47 +3,46 @@ import { test, expect } from "@playwright/test";
 /**
  * P1 — public marketing/explainer landing (pro.tagit.network).
  * Verifies the non-wallet-gated funnel a disconnected visitor sees:
- * hero → 7-state lifecycle → features → pricing teaser → request-access form.
+ * hero → 4-step journey → features → pricing (free banner + 2 tiers) → request-access form.
  */
 
-const LIFECYCLE_STATES = [
-  "None",
-  "Minted",
-  "Bound",
-  "Activated",
-  "Claimed",
-  "Flagged",
-  "Recycled",
-];
+const JOURNEY_STEPS = ["Register the product", "Attach the smart tag", "Approve it for sale"];
 
 test.describe("P1 landing", () => {
   test("renders the full explainer funnel for disconnected visitors", async ({ page }) => {
     await page.goto("/");
 
-    // Hero
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Verified by the chain");
-    await expect(page.getByText("Free verification · Built on Base")).toBeVisible();
+    // Hero — plain-English value prop, demo-first CTA
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "Prove your products are real",
+    );
+    await expect(page.getByText(/Free verification for your customers/)).toBeVisible();
 
-    // How it works — the 7-state lifecycle
-    await expect(page.getByRole("heading", { name: "One lifecycle, end to end" })).toBeVisible();
-    for (const state of LIFECYCLE_STATES) {
-      await expect(page.getByText(state, { exact: true }).first()).toBeVisible();
+    // How it works — actor-grouped journey, no raw contract states
+    await expect(page.getByRole("heading", { name: "How it works" })).toBeVisible();
+    for (const step of JOURNEY_STEPS) {
+      await expect(page.getByRole("heading", { name: step })).toBeVisible();
     }
+    await expect(page.getByRole("heading", { name: /Tap to verify/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Protected for life" })).toBeVisible();
 
     // Features
     await expect(
-      page.getByRole("heading", { name: "Everything to run verified commerce" }),
+      page.getByRole("heading", { name: "Everything you need to sell verified goods" }),
     ).toBeVisible();
-    await expect(page.getByText("Autonomous agents")).toBeVisible();
-    await expect(page.getByText("Recovery (AIRP)")).toBeVisible();
+    await expect(page.getByText("AI assistants for your inventory")).toBeVisible();
+    await expect(page.getByText("Lost or stolen? Recoverable.")).toBeVisible();
 
-    // Pricing teaser — crypto-native + free-first-5
+    // Pricing — free banner + two purchasable tiers with distinct CTAs
     await expect(page.getByRole("heading", { name: /Verification is free/i })).toBeVisible();
     await expect(page.getByText(/First 5 businesses: free early-access seat/i)).toBeVisible();
-    await expect(page.getByText("Pay-as-you-go · USDC")).toBeVisible();
+    await expect(page.getByText(/no app, no account, no wallet/i)).toBeVisible();
+    await expect(page.getByText("Pay as you go")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Talk to sales" })).toBeVisible();
 
-    // Conversion CTA is reachable without a wallet
-    await expect(page.getByRole("button", { name: "Connect Wallet" }).first()).toBeVisible();
+    // Conversion CTAs are reachable without a wallet
+    await expect(page.getByRole("link", { name: "Request a demo" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Launch app" }).first()).toBeVisible();
   });
 
   test("request-access form validates and reaches the success state", async ({ page }) => {
