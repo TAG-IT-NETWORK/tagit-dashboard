@@ -45,7 +45,9 @@ test.describe("P1 landing", () => {
     await expect(page.getByRole("button", { name: "Launch app" }).first()).toBeVisible();
   });
 
-  test("request-access form validates and reaches the success state", async ({ page }) => {
+  test("request-access form validates, POSTs the lead, and reaches the success state", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     const form = page.locator("#get-started");
@@ -58,9 +60,42 @@ test.describe("P1 landing", () => {
     await form.getByRole("textbox", { name: "Company" }).fill("Acme Goods Inc.");
 
     await expect(submit).toBeEnabled();
-    await submit.click();
+
+    // The lead must actually be transmitted, not just flip local state.
+    const [request] = await Promise.all([
+      page.waitForRequest((r) => r.url().includes("/api/demo-request") && r.method() === "POST"),
+      submit.click(),
+    ]);
+    expect(request.postDataJSON()).toMatchObject({
+      name: "Jane Doe",
+      email: "jane@acme.com",
+      company: "Acme Goods Inc.",
+    });
 
     await expect(page.getByText("You're on the list")).toBeVisible();
+  });
+
+  test("request-access form surfaces capture failures instead of faking success", async ({
+    page,
+  }) => {
+    await page.route("**/api/demo-request", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "lead capture not configured" }),
+      }),
+    );
+    await page.goto("/");
+
+    const form = page.locator("#get-started");
+    await form.getByRole("textbox", { name: "Your name" }).fill("Jane Doe");
+    await form.getByRole("textbox", { name: "Work email" }).fill("jane@acme.com");
+    await form.getByRole("textbox", { name: "Company" }).fill("Acme Goods Inc.");
+    await form.getByRole("button", { name: "Request a demo" }).click();
+
+    await expect(form.getByRole("alert")).toContainText("wasn't sent");
+    await expect(form.getByRole("link", { name: "info@tagit.network" })).toBeVisible();
+    await expect(page.getByText("You're on the list")).toBeHidden();
   });
 
   test("collapses the desktop nav on mobile widths", async ({ page }) => {
