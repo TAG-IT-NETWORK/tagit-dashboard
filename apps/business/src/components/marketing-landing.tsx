@@ -18,10 +18,9 @@ import {
 /**
  * Public, non-wallet-gated marketing + explainer surface for pro.tagit.network.
  * Shown to disconnected visitors. Written for non-crypto SMB owners: plain-English
- * copy, "Request a demo" as the primary CTA, wallet entry demoted to "Launch the app".
- * All CTAs resolve on-page (anchors / inline form / Connect wallet) so the funnel works
- * end-to-end without backend routes — real pricing checkout + server-side demo capture
- * are tracked as separate P1/P7 tasks.
+ * copy, "Request a demo" as the primary CTA, wallet entry demoted to "Launch app".
+ * Demo requests POST to /api/demo-request (webhook/Notion sinks — see that route
+ * for the env contract); real pricing checkout is tracked as a separate P1 task.
  */
 
 const NAV = [
@@ -135,9 +134,28 @@ function RequestAccessForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
+  // Honeypot — hidden from real users; bots that fill it are silently dropped server-side.
+  const [website, setWebsite] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [submitted, setSubmitted] = useState(false);
 
-  const valid = name.trim() && /.+@.+\..+/.test(email) && company.trim();
+  const valid = Boolean(name.trim() && /.+@.+\..+/.test(email) && company.trim());
+
+  const submit = async () => {
+    if (!valid || status === "sending") return;
+    setStatus("sending");
+    try {
+      const res = await fetch("/api/demo-request", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, email, company, website }),
+      });
+      if (!res.ok) throw new Error(`capture failed (${res.status})`);
+      setSubmitted(true);
+    } catch {
+      setStatus("error");
+    }
+  };
 
   if (submitted) {
     return (
@@ -170,7 +188,7 @@ function RequestAccessForm() {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            if (valid) setSubmitted(true);
+            void submit();
           }}
         >
           <div className="space-y-2">
@@ -204,10 +222,31 @@ function RequestAccessForm() {
               onChange={(e) => setCompany(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={!valid}>
-            Request a demo
+          <div className="hidden" aria-hidden="true">
+            <label htmlFor="ra-website">Website</label>
+            <input
+              id="ra-website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={!valid || status === "sending"}>
+            {status === "sending" ? "Sending…" : "Request a demo"}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+          {status === "error" && (
+            <p role="alert" className="text-center text-xs text-destructive">
+              Something went wrong and your request wasn&apos;t sent. Please try again, or email{" "}
+              <a href="mailto:info@tagit.network" className="underline underline-offset-2">
+                info@tagit.network
+              </a>
+              .
+            </p>
+          )}
         </form>
         <p className="text-center text-xs text-muted-foreground">
           Already using TAG IT? Use &quot;Launch app&quot; above to continue.
