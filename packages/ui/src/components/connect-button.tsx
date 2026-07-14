@@ -1,23 +1,24 @@
 "use client";
 
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
-import { Button } from "./button";
+import { Button, type ButtonProps } from "./button";
 
 export interface ConnectButtonProps {
   className?: string;
+  /** Label shown while disconnected. Defaults to "Connect Wallet". */
+  label?: string;
+  /** Visual variant while disconnected. Defaults to "default". */
+  variant?: ButtonProps["variant"];
 }
 
-export function ConnectButton({ className }: ConnectButtonProps) {
+export function ConnectButton({
+  className,
+  label = "Connect Wallet",
+  variant = "default",
+}: ConnectButtonProps) {
   return (
     <RainbowConnectButton.Custom>
-      {({
-        account,
-        chain,
-        openAccountModal,
-        openChainModal,
-        openConnectModal,
-        mounted,
-      }) => {
+      {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
         const ready = mounted;
         const connected = ready && account && chain;
 
@@ -27,6 +28,9 @@ export function ConnectButton({ className }: ConnectButtonProps) {
               "aria-hidden": true,
               style: {
                 opacity: 0,
+                // visibility removes the inner button from the tab order while
+                // (unlike display:none) still reserving its layout box.
+                visibility: "hidden",
                 pointerEvents: "none",
                 userSelect: "none",
               },
@@ -35,23 +39,15 @@ export function ConnectButton({ className }: ConnectButtonProps) {
             {(() => {
               if (!connected) {
                 return (
-                  <Button
-                    onClick={openConnectModal}
-                    variant="default"
-                    className={className}
-                  >
-                    Connect Wallet
+                  <Button onClick={openConnectModal} variant={variant} className={className}>
+                    {label}
                   </Button>
                 );
               }
 
               if (chain.unsupported) {
                 return (
-                  <Button
-                    onClick={openChainModal}
-                    variant="destructive"
-                    className={className}
-                  >
+                  <Button onClick={openChainModal} variant="destructive" className={className}>
                     Wrong network
                   </Button>
                 );
@@ -87,11 +83,7 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                     {chain.name}
                   </Button>
 
-                  <Button
-                    onClick={openAccountModal}
-                    variant="secondary"
-                    className={className}
-                  >
+                  <Button onClick={openAccountModal} variant="secondary" className={className}>
                     {account.displayName}
                   </Button>
                 </div>
