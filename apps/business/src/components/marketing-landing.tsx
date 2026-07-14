@@ -384,7 +384,8 @@ export function MarketingLanding() {
               </div>
 
               <p className="text-center text-xs text-muted-foreground">
-                Under the hood, these are on-chain states enforced by our smart contracts on Base.
+                Under the hood, these are on-chain states enforced by our smart contracts on a
+                public blockchain.
               </p>
             </div>
           </div>
@@ -526,7 +527,7 @@ export function MarketingLanding() {
       </main>
 
       <footer className="border-t px-6 py-5 flex items-center justify-center text-center text-xs text-muted-foreground">
-        TAG IT Network — records secured on Base, a public network built by Coinbase
+        TAG IT Network — records secured on a public blockchain network
       </footer>
     </div>
   );
