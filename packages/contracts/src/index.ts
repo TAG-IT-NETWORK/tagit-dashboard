@@ -88,6 +88,11 @@ export {
   useMint,
   useBindTag,
   useActivate,
+  // Batch lifecycle — Assembly Line bulk chip-programming
+  useBatchMint,
+  useBatchBind,
+  useBatchActivate,
+  useBatchFlag,
   useClaim,
   useFlag,
   useApproveResolve,
@@ -109,6 +114,17 @@ export {
   // CapabilityBadge
   useCapabilityBadgeBalance,
 } from "./hooks";
+
+// Batch lifecycle — pure digest/parsing helpers (Assembly Line bulk chip-programming)
+export {
+  MAX_BATCH_SIZE,
+  BATCH_BIND_DOMAIN,
+  challengeResponseForToken,
+  computeBatchBindDigest,
+  parseAssetMintedTokenIds,
+  type BatchBindDigestParams,
+  type MinimalLog,
+} from "./batch-utils";
 
 // Re-export wagmi hooks to ensure same instance is used across the app
 export { useAccount, useConfig } from "wagmi";
