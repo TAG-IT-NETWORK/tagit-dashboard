@@ -33,6 +33,11 @@ import {
   type AssetStateType,
 } from "./abis/TAGITCore";
 import {
+  challengeResponseForToken,
+  computeBatchBindDigest,
+  parseAssetMintedTokenIds,
+} from "./batch-utils";
+import {
   TAGITAccessABI,
   Capabilities,
   CapabilityNames,
@@ -444,6 +449,161 @@ export function useActivate() {
   };
 
   return { activate, hash, isPending, isConfirming, isSuccess, error };
+}
+
+// ============================================================================
+// TAGITCore Batch Lifecycle Hooks — Assembly Line bulk chip-programming
+// ============================================================================
+
+/**
+ * Batch-mint Digital Twin NFTs for multiple recipients in one transaction.
+ * Used by the admin "Assembly Line" bulk chip-programming flow to mint an
+ * entire production run before binding tags. Capped at MAX_BATCH_SIZE (100)
+ * on-chain — see ./batch-utils.
+ * @returns tokenIds recovered from AssetMinted logs once the receipt lands
+ *   (see parseAssetMintedTokenIds in ./batch-utils)
+ */
+export function useBatchMint() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const {
+    isLoading: isConfirming,
+    isSuccess,
+    data: receipt,
+  } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
+
+  const tokenIds = useMemo(() => parseAssetMintedTokenIds(receipt?.logs), [receipt]);
+
+  const batchMint = (recipients: `0x${string}`[], metadata: `0x${string}`[]) => {
+    writeContract({
+      address: contracts.TAGITCore,
+      abi: TAGITCoreABI,
+      functionName: "batchMint",
+      args: [recipients, metadata],
+      chainId,
+      ...gasFor(chainId),
+    });
+  };
+
+  return { batchMint, hash, isPending, isConfirming, isSuccess, error, tokenIds, receipt };
+}
+
+/**
+ * Batch-bind NFC tags to multiple minted assets with a single oracle
+ * attestation. Mirrors useBindTag()'s self-signing pattern — the operator
+ * wallet IS trustedOracle+BINDER in the admin context — but signs ONE digest
+ * covering the whole batch instead of one signature per tag. See
+ * computeBatchBindDigest() in ./batch-utils for the exact digest math, which
+ * mirrors TAGITCore.batchBind() (src/core/TAGITCore.sol in tagit-contracts).
+ * @param tokenIds - Token IDs to bind (each must be in MINTED state)
+ * @param tagHashes - keccak256(uid) for each tag, same order as tokenIds
+ */
+export function useBatchBind() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
+  const { data: walletClient } = useWalletClient();
+
+  const batchBind = async (tokenIds: bigint[], tagHashes: `0x${string}`[]) => {
+    if (!walletClient) return;
+
+    const challengeResponses = tokenIds.map((tokenId) => challengeResponseForToken(tokenId));
+    const digest = computeBatchBindDigest({
+      chainId,
+      contractAddress: contracts.TAGITCore,
+      tokenIds,
+      tagHashes,
+      challengeResponses,
+    });
+    const oracleSignature = await walletClient.signMessage({
+      message: { raw: toBytes(digest) },
+    });
+
+    writeContract({
+      address: contracts.TAGITCore,
+      abi: TAGITCoreABI,
+      functionName: "batchBind",
+      args: [tokenIds, tagHashes, challengeResponses, oracleSignature],
+      chainId,
+      ...gasFor(chainId),
+    });
+  };
+
+  return { batchBind, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/**
+ * Batch-activate multiple bound assets after QA approval of a production run.
+ * @param tokenIds - Token IDs to activate (each must be in BOUND state)
+ */
+export function useBatchActivate() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
+
+  const batchActivate = (tokenIds: bigint[]) => {
+    writeContract({
+      address: contracts.TAGITCore,
+      abi: TAGITCoreABI,
+      functionName: "batchActivate",
+      args: [tokenIds],
+      chainId,
+      ...gasFor(chainId),
+    });
+  };
+
+  return { batchActivate, hash, isPending, isConfirming, isSuccess, error };
+}
+
+/**
+ * Batch-flag multiple assets in one transaction (product recall).
+ * @param tokenIds - Token IDs to flag (each must be BOUND, ACTIVATED, or CLAIMED)
+ */
+export function useBatchFlag() {
+  const chainId = useChainId();
+  const contracts = getContractsForChain(chainId);
+
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+    confirmations: 1,
+    pollingInterval: 4_000,
+  });
+
+  const batchFlag = (tokenIds: bigint[]) => {
+    writeContract({
+      address: contracts.TAGITCore,
+      abi: TAGITCoreABI,
+      functionName: "batchFlag",
+      args: [tokenIds],
+      chainId,
+      ...gasFor(chainId),
+    });
+  };
+
+  return { batchFlag, hash, isPending, isConfirming, isSuccess, error };
 }
 
 /**

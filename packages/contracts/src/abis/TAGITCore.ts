@@ -178,6 +178,57 @@ export const TAGITCoreABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // Batch lifecycle — assembly-line bulk chip-programming (see MAX_BATCH_SIZE, BATCH_BIND_DOMAIN)
+  {
+    inputs: [
+      { type: "address[]", name: "recipients" },
+      { type: "bytes32[]", name: "metadata" },
+    ],
+    name: "batchMint",
+    outputs: [{ type: "uint256[]", name: "tokenIds" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { type: "uint256[]", name: "tokenIds" },
+      { type: "bytes32[]", name: "tagHashes" },
+      { type: "bytes[]", name: "challengeResponses" },
+      { type: "bytes", name: "oracleSignature" },
+    ],
+    name: "batchBind",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ type: "uint256[]", name: "tokenIds" }],
+    name: "batchActivate",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ type: "uint256[]", name: "tokenIds" }],
+    name: "batchFlag",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "MAX_BATCH_SIZE",
+    outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "BATCH_BIND_DOMAIN",
+    outputs: [{ type: "bytes32", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
   {
     inputs: [{ type: "uint256", name: "tokenId" }],
     name: "activate",
@@ -402,6 +453,27 @@ export const TAGITCoreABI = [
   {
     inputs: [{ type: "bytes32", name: "tagHash" }],
     name: "TagAlreadyBound",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "provided" },
+      { type: "uint256", name: "maximum" },
+    ],
+    name: "BatchTooLarge",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "EmptyBatch",
+    type: "error",
+  },
+  {
+    inputs: [
+      { type: "uint256", name: "recipientsLength" },
+      { type: "uint256", name: "metadataLength" },
+    ],
+    name: "ArrayLengthMismatch",
     type: "error",
   },
   {
