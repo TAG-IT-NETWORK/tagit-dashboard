@@ -462,7 +462,19 @@ async function main(): Promise<void> {
       detached: true,
       // NOT "ignore": a bind failure or a crash must be readable, not swallowed.
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      // `next start` runs as NODE_ENV=production, where rpcClient() refuses to
+      // run without a server-side RPC endpoint rather than silently falling back
+      // to the public one (src/lib/contract.ts). That guard is the point of the
+      // transport split, so the harness must supply an endpoint rather than have
+      // the guard relaxed for it. The public endpoint is correct here: this suite
+      // tests the API contract, not the spend cap.
+      env: {
+        ...process.env,
+        BASE_SEPOLIA_RPC_URL:
+          process.env.BASE_SEPOLIA_RPC_URL ||
+          process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC ||
+          "https://sepolia.base.org",
+      },
     });
     server.stdout?.on("data", (c: Buffer) => (serverOutput += c.toString()));
     server.stderr?.on("data", (c: Buffer) => (serverOutput += c.toString()));

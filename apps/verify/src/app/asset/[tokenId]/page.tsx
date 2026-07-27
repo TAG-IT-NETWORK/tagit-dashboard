@@ -16,7 +16,7 @@
  * src/app/01/[...segments]/page.tsx already did. The verdict is in the initial
  * HTML with JavaScript disabled.
  *
- * ONE RESOLVER. The chain read is `getAsset()` from @/lib/contract and the
+ * ONE RESOLVER. The chain read is `getAsset()` from @/lib/contract.server and the
  * product metadata is `loadProduct()` from @/lib/dpp — the same functions the
  * SUN/GS1 tap routes and the JSON-LD passport endpoint use. Do not add a second
  * path that reads the contract directly; a verification host with two resolvers
@@ -43,7 +43,11 @@
 import { cache } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CONTRACT_ADDRESS, getAsset } from "@/lib/contract";
+import { CONTRACT_ADDRESS } from "@/lib/contract";
+// The chain read comes from the `server-only` half of the contract module, so
+// the RPC URL cannot reach the browser bundle from this route. See the header
+// of @/lib/contract.server.
+import { getAsset } from "@/lib/contract.server";
 // CHAIN_ID / CHAIN_NAME come from @/lib/dpp rather than being redeclared here,
 // so this page, the JSON-LD passport and the tap routes can never disagree about
 // which chain a verdict was read from.

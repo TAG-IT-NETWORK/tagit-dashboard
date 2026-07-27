@@ -1,18 +1,23 @@
-import { createPublicClient, http, keccak256 } from "viem";
-import { baseSepolia } from "viem/chains";
-import { TAGITCoreABI } from "./abi";
+import { keccak256 } from "viem";
 
 // Real TAGITCore proxy on Base Sepolia (primary chain)
 // Hardcoded — do NOT use NEXT_PUBLIC_TAGIT_CORE_ADDRESS env var,
 // it was set to the demo contract on Vercel and caused "Asset Not Found"
 export const CONTRACT_ADDRESS = "0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D" as `0x${string}`;
 
-const RPC_URL = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC || "https://sepolia.base.org";
-
-export const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(RPC_URL),
-});
+/*
+ * NO CHAIN TRANSPORT LIVES HERE — deliberately.
+ *
+ * This module is imported by client components (asset-client.tsx for the buy
+ * config, and the tap pages for metadata), so anything defined here can reach
+ * the browser. Every chain read therefore lives in ./contract.server.ts, which
+ * is fenced with `import "server-only"`: a client component that reaches it
+ * fails the build instead of shipping an RPC URL to visitors.
+ *
+ * What remains below is pure data and pure functions — no network, no secrets.
+ * If you find yourself adding a viem client to this file, that is the signal
+ * that the code belongs in contract.server.ts instead.
+ */
 
 /** Static metadata for known demo tokens (fallback when ?meta= IPFS URL is missing).
  * `meta` field is an ipfs://Qm... URL the page auto-fetches if no ?meta= query param.
@@ -59,75 +64,6 @@ export function getBuyConfigForToken(tokenId: string): {
     productName: meta?.productName,
     priceUsdc: meta?.priceUsdc ?? DEFAULT_PRICE_USDC,
   };
-}
-
-/**
- * THE resolver. Every surface on this host — the SSR asset page, the SUN/GS1 tap
- * routes, the DPP credential and the public JSON read at /api/asset/[tokenId] —
- * gets its lifecycle verdict from this one function. A verification host with
- * two readers eventually disagrees with itself, and then neither answer is worth
- * anything. Do not add a second `readContract({ functionName: "getAsset" })`.
- *
- * `blockNumber` pins the read to a specific block instead of "latest". It exists
- * so a caller can publish the block it read at and let anyone re-derive the same
- * verdict independently:
- *
- *   cast call 0x3aDc…1d1D "getAsset(uint256)" <tokenId> \
- *        --block <blockNumber> --rpc-url https://sepolia.base.org
- *
- * That is the whole point of the chainRef in the public API response — a chain
- * reference whose values cannot reproduce the verdict is worse than none,
- * because it looks like a proof. Omitted (the default) reads the chain head,
- * which is what every existing caller wants.
- *
- * An unminted token does NOT revert here: the contract returns a zero record
- * with state 0. Callers must treat state 0 as "no record", not as an error.
- */
-export async function getAsset(tokenId: bigint, blockNumber?: bigint) {
-  const [owner, timestamp, state, flags, reserved] = (await publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreABI,
-    functionName: "getAsset",
-    args: [tokenId],
-    ...(blockNumber === undefined ? {} : { blockNumber }),
-  })) as [string, bigint, number, number, number];
-
-  return { owner, timestamp, state, flags, reserved };
-}
-
-export async function getTokenByTag(tagHash: `0x${string}`) {
-  return publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreABI,
-    functionName: "getTokenByTag",
-    args: [tagHash],
-  });
-}
-
-export async function getTagByToken(tokenId: bigint) {
-  return publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreABI,
-    functionName: "getTagByToken",
-    args: [tokenId],
-  });
-}
-
-/**
- * Read the on-chain metadata content hash — keccak256 of the off-chain DPP
- * metadata JSON. This is the integrity anchor: if the off-chain passport bytes
- * change, their keccak256 no longer matches this value, so tampering is
- * detectable. Returns null (not a throw) for the zero hash / unset.
- */
-export async function getMetadataHash(tokenId: bigint): Promise<`0x${string}` | null> {
-  const hash = (await publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: TAGITCoreABI,
-    functionName: "metadataHash",
-    args: [tokenId],
-  })) as `0x${string}`;
-  if (!hash || /^0x0{64}$/.test(hash)) return null;
-  return hash;
 }
 
 /** Convert a raw NFC UID (hex string, no colons) to a tag hash */

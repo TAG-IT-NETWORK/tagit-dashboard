@@ -53,7 +53,8 @@
  * below applies to this route only.
  */
 import { encodeAbiParameters, keccak256, parseAbiParameters } from "viem";
-import { CONTRACT_ADDRESS, getAsset, publicClient } from "@/lib/contract";
+import { CONTRACT_ADDRESS } from "@/lib/contract";
+import { getAsset, getPublicClient } from "@/lib/contract.server";
 import { CHAIN_ID, loadProduct } from "@/lib/dpp";
 import { isAuthenticState } from "@/lib/resolve";
 import { STATES } from "@/lib/states";
@@ -255,7 +256,7 @@ export async function GET(
     // two can straddle a block, and the chainRef would then point at a height
     // that does not reproduce the verdict. One getBlock gives number and hash
     // from a single node's view, so they always belong together.
-    const block = await publicClient.getBlock({ blockTag: "latest" });
+    const block = await getPublicClient().getBlock({ blockTag: "latest" });
     // viem types number/hash as nullable because a PENDING block has neither.
     // We asked for `latest`, so null here means the node answered with something
     // we cannot pin to — refuse rather than emit an unusable chainRef.
