@@ -12,19 +12,40 @@
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap } from "@/lib/resolve";
 import { buildDpp, dppToVerifiableCredential, loadProduct } from "@/lib/dpp";
+import { neverCacheControl } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * `no-store` on EVERY response from this route, success and failure alike.
+ *
+ * `dynamic = "force-dynamic"` only stops Next from caching; it emits no wire
+ * header, so before this the endpoint answered with no Cache-Control at all and
+ * a shared cache was free to apply heuristic freshness to it. This route is a
+ * SUN tap verifier: its answer is only meaningful for the exact tap that
+ * produced it, because the monotonic counter inside the decrypted PICC is the
+ * anti-replay mechanism. A stored 200 keyed on ?picc=&cmac= turns one captured
+ * cryptogram into an unlimited authenticity oracle. `access-control-allow-origin: *`
+ * makes that reachable from anywhere. See the boundary note in src/lib/cache.ts.
+ */
+const NO_STORE = neverCacheControl();
 
 const JSON_LD_HEADERS = {
   "content-type": "application/ld+json",
   "access-control-allow-origin": "*",
   "x-dpp-proof": "unsigned-anchor-only",
+  "cache-control": NO_STORE,
 };
 
 function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: { "content-type": "application/json", "access-control-allow-origin": "*", ...extra },
+    headers: {
+      "content-type": "application/json",
+      "access-control-allow-origin": "*",
+      "cache-control": NO_STORE,
+      ...extra,
+    },
   });
 }
 
