@@ -61,12 +61,35 @@ export function getBuyConfigForToken(tokenId: string): {
   };
 }
 
-export async function getAsset(tokenId: bigint) {
+/**
+ * THE resolver. Every surface on this host — the SSR asset page, the SUN/GS1 tap
+ * routes, the DPP credential and the public JSON read at /api/asset/[tokenId] —
+ * gets its lifecycle verdict from this one function. A verification host with
+ * two readers eventually disagrees with itself, and then neither answer is worth
+ * anything. Do not add a second `readContract({ functionName: "getAsset" })`.
+ *
+ * `blockNumber` pins the read to a specific block instead of "latest". It exists
+ * so a caller can publish the block it read at and let anyone re-derive the same
+ * verdict independently:
+ *
+ *   cast call 0x3aDc…1d1D "getAsset(uint256)" <tokenId> \
+ *        --block <blockNumber> --rpc-url https://sepolia.base.org
+ *
+ * That is the whole point of the chainRef in the public API response — a chain
+ * reference whose values cannot reproduce the verdict is worse than none,
+ * because it looks like a proof. Omitted (the default) reads the chain head,
+ * which is what every existing caller wants.
+ *
+ * An unminted token does NOT revert here: the contract returns a zero record
+ * with state 0. Callers must treat state 0 as "no record", not as an error.
+ */
+export async function getAsset(tokenId: bigint, blockNumber?: bigint) {
   const [owner, timestamp, state, flags, reserved] = (await publicClient.readContract({
     address: CONTRACT_ADDRESS,
     abi: TAGITCoreABI,
     functionName: "getAsset",
     args: [tokenId],
+    ...(blockNumber === undefined ? {} : { blockNumber }),
   })) as [string, bigint, number, number, number];
 
   return { owner, timestamp, state, flags, reserved };
