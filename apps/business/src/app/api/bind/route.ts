@@ -11,6 +11,10 @@ import { NextResponse } from "next/server";
 
 const SERVICES_URL = process.env.TAGIT_SERVICES_URL ?? "http://localhost:3100";
 const SERVICES_API_KEY = process.env.TAGIT_SERVICES_API_KEY ?? "";
+// Second-tier credential for relayer-backed writes. bind causes the funded
+// signer to sign as oracle and submit bindTag on-chain, so tagit-services
+// requires this alongside the bearer token.
+const RELAYER_API_KEY = process.env.RELAYER_API_KEY ?? "";
 
 export async function POST(req: Request) {
   let body: { tokenId?: string; tagUid?: string };
@@ -34,6 +38,7 @@ export async function POST(req: Request) {
       headers: {
         "content-type": "application/json",
         ...(SERVICES_API_KEY ? { authorization: `Bearer ${SERVICES_API_KEY}` } : {}),
+        ...(RELAYER_API_KEY ? { "x-relayer-key": RELAYER_API_KEY } : {}),
       },
       body: JSON.stringify({ tokenId, tagUid }),
       cache: "no-store",

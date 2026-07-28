@@ -14,6 +14,7 @@ const SERVICES_URL =
   process.env.SERVICES_URL ||
   "https://tagit-services-31154571939.us-central1.run.app";
 const SERVICES_API_KEY = process.env.SERVICES_API_KEY;
+const RELAYER_API_KEY = process.env.RELAYER_API_KEY;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,11 @@ export async function POST(req: Request) {
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${SERVICES_API_KEY}`,
+        // Second-tier credential. settle makes the relayer broadcast a claim
+        // transaction, so tagit-services requires this in addition to the
+        // bearer token. Server-side only — this route is a Next.js route
+        // handler, so neither key reaches the browser.
+        ...(RELAYER_API_KEY ? { "x-relayer-key": RELAYER_API_KEY } : {}),
       },
       body: JSON.stringify({ tokenId, buyerWallet, paymentTxHash, priceUsdc }),
     });
