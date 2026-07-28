@@ -54,6 +54,24 @@ import { SITE_ORIGIN } from "@/lib/site";
  * /api/buy is disallowed on the same cost logic plus one more: it is a POST
  * settlement proxy into tagit-services that moves ownership on-chain. There is
  * no version of a crawler touching it that is useful to anyone.
+ *
+ * /mcp is disallowed for the cost reason ALONE, and the reasoning is worth
+ * stating because it looks contradictory next to a project goal of being
+ * agent-invocable. It is not. A crawler and an agent reach this host by
+ * completely different routes:
+ *
+ *   • An AGENT is handed the URL by its host config or an MCP registry entry
+ *     and speaks JSON-RPC 2.0 over POST to it. robots.txt has no bearing on
+ *     that — it governs crawling, not client configuration — so nothing here
+ *     costs us a single legitimate agent call.
+ *   • A CRAWLER issues GET. /mcp answers GET with 405 by design (the spec
+ *     requires it of a server offering no SSE stream), so there is nothing to
+ *     index and never will be. Every crawl of it is a wasted uncacheable
+ *     invocation on the one path with no edge cache in front of it.
+ *
+ * Discovery is served by /.well-known/mcp.json, which IS crawlable and IS the
+ * document a machine should read. Blocking the JSON-RPC endpoint while
+ * advertising its descriptor is the coherent pair, not a contradiction.
  */
 const TAP_GATED_AND_WRITE_ROUTES = [
   "/sun", // legacy SUN carrier — needs ?picc=&cmac=
@@ -61,6 +79,7 @@ const TAP_GATED_AND_WRITE_ROUTES = [
   "/api/verify", // SUN attestation JSON — the moat; never agent-reachable
   "/api/dpp/", // DPP verifiable credential — tap-gated like /api/verify
   "/api/buy", // POST settlement proxy — write path, never crawlable
+  "/mcp", // POST JSON-RPC — 405s on GET; zero crawl value, real cost
 ];
 
 /**
@@ -75,8 +94,14 @@ const TAP_GATED_AND_WRITE_ROUTES = [
  * incoherent. It is allowed here but deliberately NOT listed in sitemap.xml —
  * a sitemap is a request to *index*, and there is nothing to index in a JSON
  * document.
+ *
+ * /.well-known/mcp.json is allowed for the opposite reason to /mcp being
+ * blocked: it is a static GET-able descriptor with no chain read behind it, it
+ * is the document an MCP aggregator crawls for, and it is the only inbound
+ * discovery path the MCP server has that does not require a human to paste a
+ * URL. Blocking it would leave the server findable by nothing.
  */
-const CRAWLABLE = ["/", "/asset/", "/api/asset/"];
+const CRAWLABLE = ["/", "/asset/", "/api/asset/", "/.well-known/mcp.json"];
 
 /**
  * AI crawlers, named explicitly.

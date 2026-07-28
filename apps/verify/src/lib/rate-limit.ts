@@ -64,6 +64,32 @@ export const READ_RATE_LIMIT = 60;
 /** Fixed-window length, in seconds. */
 export const READ_RATE_WINDOW_SECONDS = 60;
 
+/**
+ * Requests per IP per window on /mcp. Deliberately a THIRD of the read budget.
+ *
+ * WHY IT IS TIGHTER RATHER THAN THE SAME. The two paths cost different amounts
+ * and have different protection:
+ *
+ *   • /api/asset/<id> is a GET behind a 60s shared cache. A burst on one token
+ *     collapses to a single origin read per TTL, so the limiter is trimming
+ *     something the cache has already largely absorbed.
+ *   • /mcp is a POST. Shared caches do not store POST responses, and cannot be
+ *     made to — so EVERY request reaches the origin and every one performs at
+ *     least the two chain reads a verdict needs. `get_lifecycle_history` can
+ *     additionally spend up to MAX_LOG_REQUESTS eth_getLogs calls on a cold
+ *     scan (see @/lib/lifecycle). One MCP call is therefore worth between two
+ *     and several dozen uncached RPC reads, against a spend-capped key.
+ *
+ * Giving the uncacheable, higher-amplification path the SAME budget as the
+ * cached one would mean the tighter control sits on the cheaper surface. 20/min
+ * is still far more than any real agent workload — an agent verifying a purchase
+ * makes one or two calls — and well under what an enumeration sweep needs.
+ *
+ * The honesty note above applies here unchanged: this is per-instance,
+ * defence-in-depth, and the only hard ceiling is the provider-side spend cap.
+ */
+export const MCP_RATE_LIMIT = 20;
+
 /** Bound the Map so a spray of unique IPs cannot grow it without limit. Beyond
  *  this we fail open rather than evict blindly — see `hit()`. */
 const MAX_TRACKED_KEYS = 10_000;
@@ -186,9 +212,14 @@ export function createRateLimitStore(): RateLimitStore {
  * Best-available client identifier. On Vercel the leftmost x-forwarded-for entry
  * is the real client; it is trivially spoofable by anyone willing to rotate it,
  * which is another reason this limiter is defence-in-depth and not a guarantee.
+ *
+ * `scope` keeps the two budgets in separate buckets. Sharing one key would let a
+ * client burn its /mcp allowance on cheap cached page reads — or, worse, let an
+ * agent's legitimate MCP traffic 429 a human loading /asset/50 in a browser from
+ * the same NAT. Different costs, different ceilings, different counters.
  */
-export function clientKey(headers: Headers): string {
+export function clientKey(headers: Headers, scope: "asset" | "mcp" = "asset"): string {
   const forwarded = headers.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0]?.trim() || headers.get("x-real-ip")?.trim() || "unknown";
-  return `rl:asset:${ip}`;
+  return `rl:${scope}:${ip}`;
 }

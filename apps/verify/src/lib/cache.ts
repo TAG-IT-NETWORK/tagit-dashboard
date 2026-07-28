@@ -88,7 +88,34 @@ export function neverCacheControl(): string {
  *
  * Matches:  /asset/<tokenId>   /api/asset/<tokenId>
  * Excludes: /sun  /01/…  /api/verify  /api/dpp/…  (tap routes — never cached)
+ * Excludes: /mcp — see isRateLimitedPath below. It is POST JSON-RPC and is NOT
+ *           cacheable by anything; being rate-limited is not the same property
+ *           as being cacheable, which is why these are two predicates and not
+ *           one with a widened regex.
  */
 export function isCacheableReadPath(pathname: string): boolean {
   return /^\/(api\/)?asset\/[^/]+\/?$/.test(pathname);
+}
+
+/** The MCP Streamable HTTP endpoint. One constant so the middleware matcher,
+ *  this predicate and robots.txt cannot drift apart. */
+export const MCP_PATH = "/mcp";
+
+/**
+ * Paths the per-IP limiter guards.
+ *
+ * A SUPERSET of the cacheable surface, and that asymmetry is the point. /mcp
+ * cannot be cached — shared caches do not store POST responses — so for that
+ * path the limiter is not defence-in-depth behind a cache, it is the ONLY
+ * request-side control there is. That makes rate limiting it more important
+ * than rate limiting the routes that already have a cache in front of them,
+ * not less.
+ *
+ * The tap routes remain excluded here for the reason given in src/middleware.ts:
+ * a 429 on a physical tap is a broken product. Someone standing in a shop
+ * tapping a chip must always reach the verifier.
+ */
+export function isRateLimitedPath(pathname: string): boolean {
+  if (isCacheableReadPath(pathname)) return true;
+  return pathname === MCP_PATH || pathname === `${MCP_PATH}/`;
 }
