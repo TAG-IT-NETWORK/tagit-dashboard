@@ -8,13 +8,20 @@
     "build": "next build",
     "start": "next start --port 3004",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "//test:api": "Not named `test`: it needs a prior `next build` and live Base Sepolia RPC, so `turbo test` must not pick it up implicitly.",
+    "test:api": "tsx scripts/test-asset-api.ts",
+    "test:mcp": "tsx scripts/test-mcp.ts",
+    "//test:mcp": "Conformance + safety suite for POST /mcp. Needs a prior `next build`; starts two servers and the archive-rpc-stub. Includes the closed-tool-set guard.",
+    "typecheck": "tsc --noEmit",
+    "test:rpc-split": "tsx scripts/test-rpc-split.ts",
+    "//test:rpc-split": "Proves the capped BASE_SEPOLIA_RPC_URL never reaches the client bundle. Rebuilds with sentinel values."
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.29.2",
     "next": "^14.2.21",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "server-only": "^0.0.1",
     "viem": "^2.21.51"
   },
   "devDependencies": {

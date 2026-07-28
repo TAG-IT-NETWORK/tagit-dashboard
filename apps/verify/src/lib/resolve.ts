@@ -11,7 +11,8 @@
  * it does not (yet) drive resolution, so no on-chain GTIN map is required.
  */
 import { verifySunUrl } from "./sdm";
-import { getAsset, getMetadataHash, getTokenByTag, uidToTagHash } from "./contract";
+import { uidToTagHash } from "./contract";
+import { getAsset, getMetadataHash, getTokenByTag } from "./contract.server";
 
 export interface AssetState {
   owner: string;
