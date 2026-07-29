@@ -91,7 +91,33 @@ export const SUPPORTED_PROTOCOL_VERSIONS = [
  */
 export const DEFAULT_NEGOTIATED_PROTOCOL_VERSION = "2025-03-26";
 
-export const SERVER_NAME = "network.tagit/verify";
+/**
+ * The registry identity. Changing this string is a BREAKING change once anyone
+ * has pinned it: in registry.modelcontextprotocol.io the name IS the primary
+ * key, so a rename is a new listing plus a retirement of the old one, not an
+ * edit.
+ *
+ * WHY `nfc-verify` AND NOT `verify`. The registry's `?search=` parameter matches
+ * the server NAME ONLY — it does not index `description`. Measured, not assumed:
+ * this server first published as `network.tagit/verify` with "NFC-tagged
+ * physical products" in its description, and `?search=nfc` still returned zero
+ * results. Corroborated in the other direction by `?search=verify&limit=100`,
+ * which returns 57 servers of which 57 carry "verify" in the name.
+ *
+ * That matters because both ANVS and AEO justify this whole workstream with
+ * "?search=nfc returns zero servers, the category is uncontested". The premise
+ * was read as "nobody serves NFC verification". It actually means "no server has
+ * the token `nfc` in its name" — so publishing with NFC only in the prose would
+ * have captured exactly nothing. The token has to be in the name.
+ *
+ * The rename cost more than a republish: the registry allows one listing per
+ * remote URL, and `deprecated` does NOT release that claim — only `deleted`
+ * does. So `network.tagit/verify` 1.0.0 had to be deleted outright to free
+ * https://verify.tagit.network/mcp for this name. That was affordable only
+ * because it was 15 minutes old with no consumers. It would not be affordable
+ * again, which is the real reason not to touch this constant.
+ */
+export const SERVER_NAME = "network.tagit/nfc-verify";
 export const SERVER_TITLE = "TAG IT Verify";
 export const SERVER_VERSION = "1.0.0";
 

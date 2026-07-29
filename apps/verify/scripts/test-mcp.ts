@@ -213,7 +213,7 @@ async function testHandshake(port: number): Promise<void> {
   });
   eq(r.status, 200, "status");
   eq(r.json?.result?.protocolVersion, "2025-11-25", "echoes a supported protocol version");
-  eq(r.json?.result?.serverInfo?.name, "network.tagit/verify", "serverInfo.name is the reverse-DNS id");
+  eq(r.json?.result?.serverInfo?.name, "network.tagit/nfc-verify", "serverInfo.name is the reverse-DNS id");
   ok(r.json?.result?.capabilities?.tools !== undefined, "advertises the tools capability");
   ok(
     !("resources" in (r.json?.result?.capabilities ?? {})),
@@ -651,7 +651,7 @@ async function testDiscovery(port: number): Promise<void> {
   const res = await fetch(`http://127.0.0.1:${port}/.well-known/mcp.json`);
   eq(res.status, 200, "descriptor is served");
   const doc = await res.json();
-  eq(doc.name, "network.tagit/verify", "descriptor name matches serverInfo.name");
+  eq(doc.name, "network.tagit/nfc-verify", "descriptor name matches serverInfo.name");
   eq(doc.remotes?.[0]?.type, "streamable-http", "declares the streamable-http transport");
   eq(
     doc.remotes?.[0]?.url,
@@ -660,7 +660,15 @@ async function testDiscovery(port: number): Promise<void> {
   );
   ok(!/api\.tagit\.network/.test(JSON.stringify(doc)), "the decommissioned host appears nowhere in the descriptor");
   ok(doc.description.length <= 100, "description is within the registry's 100-char cap", doc.description.length);
-  ok(/nfc/i.test(doc.description), "description contains the term a searcher would type");
+  // The NAME is what the registry actually searches, so that is what gets the
+  // load-bearing assertion. Measured against the live registry: this server first
+  // published as `network.tagit/verify` WITH "NFC-tagged" already in its
+  // description, and `?search=nfc` returned zero results. `?search=` does not
+  // index `description` at all. Keep the description check too — the secondary
+  // directories (Glama, Smithery, PulseMCP) do index prose — but do not mistake
+  // it for the thing that makes us findable in the official registry.
+  ok(/nfc/i.test(doc.name), "THE SEARCHABLE FIELD — name carries the token, since ?search= ignores description");
+  ok(/nfc/i.test(doc.description), "description also carries it, for directories that do index prose");
   eq(doc._meta?.["network.tagit"]?.audit_status, "unaudited", "the listing itself discloses the audit status");
   eq(doc._meta?.["network.tagit"]?.write_capability, false, "the listing itself discloses there is no write capability");
 
