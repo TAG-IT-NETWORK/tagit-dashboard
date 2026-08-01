@@ -162,7 +162,7 @@ export async function writeNFCTag(
 
   const verifyUrl = options?.verifyUrl ?? "https://verify.tagit.network";
   const chainId = options?.chainId ?? 84532;
-  const contract = options?.contractAddress ?? "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d";
+  const contract = options?.contractAddress ?? "0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D";
 
   const chainName =
     chainId === 84532

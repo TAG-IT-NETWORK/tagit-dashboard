@@ -8,7 +8,7 @@ dataSources:
     name: TAGITCore
     network: base-sepolia
     source:
-      address: "0x3adC7eFdB58Ae85483Eff5D4966D916185F31D1d"
+      address: "0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D"
       abi: TAGITCore
       startBlock: 39611546
     mapping:
