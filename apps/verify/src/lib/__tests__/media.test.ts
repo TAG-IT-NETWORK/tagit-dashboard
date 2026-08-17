@@ -7,10 +7,10 @@ const CDN = `https://media.tagit.network/i/${SHA}`;
 describe("variantForWidth", () => {
   it("maps requested widths onto the nearest pre-baked variant", () => {
     expect(variantForWidth(1)).toBe("sm");
-    expect(variantForWidth(384)).toBe("sm");
-    expect(variantForWidth(385)).toBe("md");
-    expect(variantForWidth(828)).toBe("md");
-    expect(variantForWidth(829)).toBe("lg");
+    expect(variantForWidth(400)).toBe("sm");
+    expect(variantForWidth(401)).toBe("md");
+    expect(variantForWidth(800)).toBe("md");
+    expect(variantForWidth(801)).toBe("lg");
     expect(variantForWidth(3840)).toBe("lg");
   });
 });
@@ -23,7 +23,7 @@ describe("mediaVariantUrl / mediaImageLoader", () => {
   });
 
   it("is what the next/image loader delegates to", () => {
-    expect(mediaImageLoader({ src: `${CDN}/lg.webp`, width: 384 })).toBe(`${CDN}/sm.webp`);
+    expect(mediaImageLoader({ src: `${CDN}/lg.webp`, width: 400 })).toBe(`${CDN}/sm.webp`);
   });
 
   it("passes through non-CDN URLs unchanged (never re-optimized either)", () => {

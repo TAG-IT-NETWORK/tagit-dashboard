@@ -41,8 +41,7 @@ export async function POST(req: Request) {
 
   const parsed = parseRevalidatePayload(rawBody);
   if (!parsed.ok) {
-    const status = parsed.error === "stale" ? 400 : 400;
-    return NextResponse.json({ ok: false, error: parsed.error }, { status });
+    return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
   }
 
   // Duplicate delivery: acknowledge with 200 so the emitter stops retrying,

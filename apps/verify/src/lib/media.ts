@@ -39,8 +39,8 @@ export type MediaVariant = "sm" | "md" | "lg";
 
 /** Pre-baked variant pixel widths (longest edge), matching the media pipeline. */
 export const VARIANT_WIDTHS: Readonly<Record<MediaVariant, number>> = {
-  sm: 384,
-  md: 828,
+  sm: 400,
+  md: 800,
   lg: 1600,
 };
 
@@ -54,7 +54,7 @@ export function variantForWidth(width: number): MediaVariant {
   return "lg";
 }
 
-const MEDIA_VARIANT_PATH_RE = /^\/i\/([0-9a-f]{64})\/(sm|md|lg)\.webp$/;
+const MEDIA_VARIANT_PATH_RE = /^\/i\/([0-9a-f]{64})\/(orig|lg|md|sm|t)\.webp$/;
 
 /**
  * Rewrite a media-CDN variant URL to the variant nearest `width`. URLs that are
