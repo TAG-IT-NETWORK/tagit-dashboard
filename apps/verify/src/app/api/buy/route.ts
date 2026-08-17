@@ -10,9 +10,7 @@ import { NextResponse } from "next/server";
  * ownership to the buyer's Privy wallet on Base Sepolia.
  */
 
-const SERVICES_URL =
-  process.env.SERVICES_URL ||
-  "https://tagit-services-31154571939.us-central1.run.app";
+const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 const SERVICES_API_KEY = process.env.SERVICES_API_KEY;
 const RELAYER_API_KEY = process.env.RELAYER_API_KEY;
 

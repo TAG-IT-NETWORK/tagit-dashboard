@@ -3,13 +3,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { encodeFunctionData, type Hex } from "viem";
+import { isPurchasable, type CanonicalPrice } from "@/lib/price";
 
-// Base Sepolia test USDC (6 decimals) + the seller treasury that receives it.
+// Base Sepolia test USDC (6 decimals).
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
-const USDC_DECIMALS = 6;
-const TREASURY =
-  (process.env.NEXT_PUBLIC_SALE_TREASURY as `0x${string}` | undefined) ??
-  "0x458B4d0c3a55006965Fd13D6af7B8509De51Cb3D";
 const BASE_SEPOLIA = 84532;
 // When set, the buyer pays USDC (verified on-chain) before claiming. Off by
 // default so the gasless demo keeps working until we flip this on.
@@ -29,22 +26,18 @@ const erc20TransferAbi = [
   },
 ] as const;
 
-function priceToUnits(priceUsdc: number): bigint {
-  return BigInt(Math.round(priceUsdc * 10 ** USDC_DECIMALS));
-}
-
 /**
- * "Tap to buy" button — the hackathon centerpiece.
+ * "Tap to buy" button.
  *
- * A buyer taps a chipped product, lands on the verify page, and (for an
- * ACTIVATED asset) sees this. Sign in with email → Privy mints a non-custodial
- * embedded wallet on Base Sepolia → "Buy now" POSTs to /api/buy → the backend
- * relayer calls TAGITCore.claim(tokenId, buyerWallet), flipping ownership to the
- * buyer's wallet. No app, no seed phrase, no gas. Cross-device by construction
- * (it's a web page), so iPhone⇄Android "tap to buy" just works.
+ * PRICE DISCIPLINE (META-T17): the ONLY price this component knows is the
+ * canonical server price handed down by BuyWidget, and it re-fetches that
+ * price immediately before charging — a listing that was updated or delisted
+ * between page load and tap is caught before any USDC moves. Payment amounts
+ * are integer USDC-6 units straight from `priceUsdc6` (no floats).
  *
- * Only rendered when NEXT_PUBLIC_PRIVY_APP_ID is set (page-gated), so the Privy
- * hooks always have their provider.
+ * A 409 LISTING_STALE from settle (owner changed off-platform; services
+ * auto-delists) surfaces as "listing no longer available" and triggers a
+ * price refetch, which hides the widget.
  */
 
 type Phase = "idle" | "paying" | "settling" | "done" | "error";
@@ -52,18 +45,22 @@ type Phase = "idle" | "paying" | "settling" | "done" | "error";
 interface BuyButtonProps {
   tokenId: string;
   productName: string;
-  priceUsdc: number;
-}
-
-function formatPrice(p: number): string {
-  return p % 1 === 0 ? `$${p}` : `$${p.toFixed(2)}`;
+  price: CanonicalPrice;
+  /** Live re-read of the canonical price (also updates the widget's state). */
+  refetchPrice: () => Promise<CanonicalPrice | null>;
 }
 
 function shortAddr(a: string): string {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
+/** usdc6 → "$22.00" (fallback when the API omitted `display`). */
+function formatUsdc6(priceUsdc6: string): string {
+  const padded = priceUsdc6.padStart(7, "0");
+  return `$${padded.slice(0, -6)}.${padded.slice(-6, -4)}`;
+}
+
+export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButtonProps) {
   const { ready, authenticated, user, login } = usePrivy();
   const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
@@ -74,6 +71,8 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
     explorerUrl?: string;
     paymentExplorerUrl?: string;
   } | null>(null);
+
+  const display = price.display ?? (price.priceUsdc6 ? formatUsdc6(price.priceUsdc6) : "—");
 
   const buyerWallet = useMemo(() => {
     const embedded = wallets.find((w) => w.walletClientType === "privy");
@@ -88,7 +87,16 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
     }
     setError(null);
     try {
-      // 1. Payment leg (when enabled): the buyer pays USDC to the seller treasury.
+      // 0. Re-read the canonical price IMMEDIATELY before payment. The page
+      //    may be minutes old; the charge must reflect the listing right now.
+      const fresh = await refetchPrice();
+      if (!isPurchasable(fresh)) {
+        setError("This listing is no longer available.");
+        setPhase("error");
+        return;
+      }
+
+      // 1. Payment leg (when enabled): buyer pays USDC to the listing's payTo.
       //    Gas is sponsored by Privy, so the buyer needs USDC but no ETH.
       let paymentTxHash: Hex | undefined;
       if (PAYMENT_ENABLED) {
@@ -96,7 +104,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
         const data = encodeFunctionData({
           abi: erc20TransferAbi,
           functionName: "transfer",
-          args: [TREASURY, priceToUnits(priceUsdc)],
+          args: [fresh.purchase!.payTo as `0x${string}`, BigInt(fresh.priceUsdc6!)],
         });
         try {
           const { hash } = await sendTransaction(
@@ -122,9 +130,20 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
       const res = await fetch("/api/buy", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tokenId, buyerWallet, paymentTxHash, priceUsdc }),
+        body: JSON.stringify({
+          tokenId,
+          buyerWallet,
+          paymentTxHash,
+          priceUsdc: Number(fresh.priceUsdc6) / 1e6,
+        }),
       });
       const data = await res.json();
+      if (res.status === 409 || data?.code === "LISTING_STALE") {
+        setError("This listing is no longer available.");
+        setPhase("error");
+        void refetchPrice(); // widget hides itself once the delist lands
+        return;
+      }
       if (!res.ok || !data.ok) {
         setError(data.error || `Purchase failed (${res.status})`);
         setPhase("error");
@@ -140,10 +159,9 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
       setError(e instanceof Error ? e.message : "Network error");
       setPhase("error");
     }
-  }, [buyerWallet, tokenId, priceUsdc, sendTransaction]);
+  }, [buyerWallet, tokenId, refetchPrice, sendTransaction]);
 
-  const wrap =
-    "rounded-2xl border border-[#00D68F]/30 p-5 mb-5 animate-fadeUp";
+  const wrap = "rounded-2xl border border-[#00D68F]/30 p-5 mb-5 animate-fadeUp";
   const wrapStyle = { background: "rgba(0,214,143,0.07)", animationDelay: "0.45s" };
   const primaryBtn =
     "w-full rounded-xl bg-[#00D68F] py-3.5 text-center text-sm font-bold text-black transition active:scale-[0.98] disabled:opacity-50";
@@ -187,7 +205,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
     <div className={wrap} style={wrapStyle}>
       <div className="flex items-baseline justify-between mb-3">
         <span className="text-sm font-semibold text-white">Buy this item</span>
-        <span className="text-lg font-bold text-[#00D68F]">{formatPrice(priceUsdc)}</span>
+        <span className="text-lg font-bold text-[#00D68F]">{display}</span>
       </div>
 
       {!ready ? (
@@ -196,7 +214,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
         </button>
       ) : !authenticated ? (
         <button onClick={login} className={primaryBtn}>
-          Sign in to buy · {formatPrice(priceUsdc)}
+          Sign in to buy · {display}
         </button>
       ) : (
         <button
@@ -210,7 +228,7 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
               ? "Transferring…"
               : !buyerWallet
                 ? "Preparing wallet…"
-                : `Buy now · ${formatPrice(priceUsdc)}`}
+                : `Buy now · ${display}`}
         </button>
       )}
 
@@ -218,9 +236,14 @@ export function BuyButton({ tokenId, productName, priceUsdc }: BuyButtonProps) {
         <div className="text-center text-[10px] text-gray-500 font-mono mt-2">
           {PAYMENT_ENABLED ? (
             <>
-              pay {formatPrice(priceUsdc)} USDC from {shortAddr(buyerWallet)} · gas sponsored
+              pay {display} USDC from {shortAddr(buyerWallet)} · gas sponsored
               <br />
-              <a href={CIRCLE_FAUCET} target="_blank" rel="noopener noreferrer" className="text-[#00D68F] hover:underline">
+              <a
+                href={CIRCLE_FAUCET}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#00D68F] hover:underline"
+              >
                 need test USDC? faucet.circle.com
               </a>
             </>

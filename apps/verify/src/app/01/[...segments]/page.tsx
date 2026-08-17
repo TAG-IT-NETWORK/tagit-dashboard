@@ -19,7 +19,7 @@ import Link from "next/link";
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
 import { buildDpp, loadProduct } from "@/lib/dpp";
-import { CONTRACT_ADDRESS, getBuyConfigForToken } from "@/lib/contract";
+import { CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
@@ -127,7 +127,12 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   if (res.kind !== "resolved") {
     return (
       <Shell>
-        <StatusHero tone="warn" glyph="?" title="Bad SUN URL" sub="Missing picc or cmac parameters." />
+        <StatusHero
+          tone="warn"
+          glyph="?"
+          title="Bad SUN URL"
+          sub="Missing picc or cmac parameters."
+        />
       </Shell>
     );
   }
@@ -161,7 +166,9 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   const rows: [string, string][] = [
     ["Product", displayName],
-    ...(link.gtin ? ([["GTIN", `${link.gtin}${link.gtinValid ? "" : " ⚠"}`]] as [string, string][]) : []),
+    ...(link.gtin
+      ? ([["GTIN", `${link.gtin}${link.gtinValid ? "" : " ⚠"}`]] as [string, string][])
+      : []),
     ...(link.serial ? ([["Serial", link.serial]] as [string, string][]) : []),
     ...(product.brand ? ([["Brand", product.brand]] as [string, string][]) : []),
     ...(product.origin ? ([["Origin", product.origin]] as [string, string][]) : []),
@@ -170,7 +177,10 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
     ["UID", formatUid(res.uid)],
     ["Tap counter", String(res.counter)],
     ["Token ID", res.tokenId.toString()],
-    ["Anchor", dpp.integrity.metadataHash ? `${dpp.integrity.metadataHash.slice(0, 10)}…` : "not set"],
+    [
+      "Anchor",
+      dpp.integrity.metadataHash ? `${dpp.integrity.metadataHash.slice(0, 10)}…` : "not set",
+    ],
   ];
 
   return (
@@ -190,7 +200,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
         sub={
           authentic
             ? "Verified on-chain via NTAG 424 DNA SUN"
-            : STATE_DESCRIPTIONS[dpp.lifecycle.stateCode] ?? ""
+            : (STATE_DESCRIPTIONS[dpp.lifecycle.stateCode] ?? "")
         }
       />
 
@@ -207,11 +217,9 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
       {dpp.lifecycle.stateCode === 3 && (
         <div className="mt-5">
-          <BuyWidget
-            tokenId={res.tokenId.toString()}
-            productName={displayName}
-            priceUsdc={getBuyConfigForToken(res.tokenId.toString()).priceUsdc}
-          />
+          {/* Price comes from the pricing API inside the widget; it hides
+              itself when there is no live listing. */}
+          <BuyWidget tokenId={res.tokenId.toString()} productName={displayName} />
         </div>
       )}
 
