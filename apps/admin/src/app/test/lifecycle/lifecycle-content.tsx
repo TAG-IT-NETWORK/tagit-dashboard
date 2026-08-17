@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getAddress } from "viem";
 import Link from "next/link";
 import {
@@ -16,7 +16,6 @@ import {
   AddressBadge,
 } from "@tagit/ui";
 import {
-  useMint,
   useBindTag,
   useActivate,
   useClaim,
@@ -39,7 +38,6 @@ import {
   AlertCircle,
   ExternalLink,
   RotateCcw,
-  Play,
   Nfc,
   Package,
   Zap,
@@ -48,11 +46,9 @@ import {
   Scale,
   RefreshCw,
   Search,
-  Upload,
-  ImageIcon,
 } from "lucide-react";
 import { BindTagModal } from "@/components/bind-tag-modal";
-import { LIFECYCLE_STEPS, generateTestMetadataURI } from "@/lib/test-utils";
+import { LIFECYCLE_STEPS } from "@/lib/test-utils";
 import { generateTestUID, uidToTagId, formatUID, truncateTagId } from "@/lib/tag-utils";
 
 interface StepState {
@@ -86,58 +82,15 @@ export function LifecycleContent() {
   const [resumeInput, setResumeInput] = useState("");
 
   // Form inputs
-  const [metadataURI, setMetadataURI] = useState("");
   const [tagUID, setTagUID] = useState("");
   const [claimAddress, setClaimAddress] = useState("");
   const [resolveAddress, setResolveAddress] = useState("");
 
-  // Product metadata form
-  const [productName, setProductName] = useState("");
-  const [productBrand, setProductBrand] = useState("");
-  const [productSKU, setProductSKU] = useState("");
-  const [productDescription, setProductDescription] = useState("");
-  const [productCategory, setProductCategory] = useState("general");
-  const [productOrigin, setProductOrigin] = useState("");
-  const [productImage, setProductImage] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Show preview immediately
-    setImagePreview(URL.createObjectURL(file));
-    setImageUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/ipfs", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setProductImage(data.url); // ipfs://Qm...
-    } catch (err) {
-      console.error("Upload failed:", err);
-      setProductImage("");
-      setImagePreview("");
-    } finally {
-      setImageUploading(false);
-    }
-  };
+  // META-T18: the mint path is RETIRED from this test harness. Minting goes
+  // through /assets/new (DB-first via tagit-services); this page continues an
+  // EXISTING token's lifecycle from BIND onward.
 
   // Contract hooks
-  const {
-    mint,
-    hash: mintHash,
-    isPending: mintPending,
-    isConfirming: mintConfirming,
-    isSuccess: mintSuccess,
-    error: mintError,
-    tokenId: mintedTokenId,
-  } = useMint();
   const {
     bindTag,
     hash: bindHash,
@@ -207,11 +160,6 @@ export function LifecycleContent() {
     refetch: refetchResolveStatus,
   } = useResolveApprovalStatus(tokenId ?? 0n);
 
-  // Initialize metadata URI
-  useEffect(() => {
-    setMetadataURI(generateTestMetadataURI());
-  }, []);
-
   // Map on-chain asset state to the next lifecycle step
   const stateToStep: Record<number, number> = {
     [AssetState.MINTED]: 1, // next: bind
@@ -224,7 +172,7 @@ export function LifecycleContent() {
 
   // When loading an existing token, sync step from on-chain state
   useEffect(() => {
-    if (tokenId && asset && !mintSuccess) {
+    if (tokenId && asset) {
       const step = stateToStep[asset.state] ?? 0;
       setCurrentStep(step);
       // Mark prior steps as completed
@@ -245,19 +193,6 @@ export function LifecycleContent() {
   };
 
   // Track step completions
-  useEffect(() => {
-    if (mintSuccess && mintHash) {
-      setStepStates((prev) => ({
-        ...prev,
-        mint: { completed: true, txHash: mintHash },
-      }));
-      if (mintedTokenId) {
-        setTokenId(mintedTokenId);
-      }
-      setCurrentStep(1);
-    }
-  }, [mintSuccess, mintHash, mintedTokenId]);
-
   useEffect(() => {
     if (bindSuccess && bindHash) {
       setStepStates((prev) => ({
@@ -336,7 +271,6 @@ export function LifecycleContent() {
   // Handle errors
   useEffect(() => {
     const errors = [
-      { step: "mint", error: mintError },
       { step: "bind", error: bindError },
       { step: "activate", error: activateError },
       { step: "claim", error: claimError },
@@ -353,35 +287,7 @@ export function LifecycleContent() {
         }));
       }
     });
-  }, [mintError, bindError, activateError, claimError, flagError, resolveError, recycleError]);
-
-  const buildMetadataURI = () => {
-    const metadata = {
-      name: productName || `Asset ${Date.now()}`,
-      description: productDescription || "TAG IT Digital Twin",
-      image: productImage || "ipfs://QmPlaceholder",
-      attributes: [
-        ...(productBrand ? [{ trait_type: "Brand", value: productBrand }] : []),
-        ...(productSKU ? [{ trait_type: "SKU", value: productSKU }] : []),
-        ...(productCategory ? [{ trait_type: "Category", value: productCategory }] : []),
-        ...(productOrigin ? [{ trait_type: "Origin", value: productOrigin }] : []),
-        { trait_type: "Created", value: new Date().toISOString() },
-      ],
-      tagit: {
-        version: "2.0",
-        lifecycle: "MINTED",
-        nfcBound: false,
-      },
-    };
-    return `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
-  };
-
-  const handleMint = () => {
-    if (!address) return;
-    const checksumAddress = getAddress(address);
-    const uri = showAdvanced ? metadataURI : buildMetadataURI();
-    mint(checksumAddress, uri || generateTestMetadataURI());
-  };
+  }, [bindError, activateError, claimError, flagError, resolveError, recycleError]);
 
   const handleBindWithModal = () => {
     setBindModalOpen(true);
@@ -446,15 +352,6 @@ export function LifecycleContent() {
     setTagUID("");
     setClaimAddress("");
     setResolveAddress("");
-    setMetadataURI(generateTestMetadataURI());
-    setProductName("");
-    setProductBrand("");
-    setProductSKU("");
-    setProductDescription("");
-    setProductCategory("general");
-    setProductOrigin("");
-    setProductImage("");
-    setShowAdvanced(false);
   };
 
   if (!isConnected) {
@@ -481,7 +378,12 @@ export function LifecycleContent() {
           <div>
             <h1 className="text-2xl font-bold">NFC Lifecycle Test</h1>
             <p className="text-muted-foreground">
-              Test the complete asset lifecycle: MINT → BIND → ACTIVATE → CLAIM → FLAG → RESOLVE
+              Continue an existing asset&apos;s lifecycle: BIND → ACTIVATE → CLAIM → FLAG → RESOLVE.
+              Minting happens at{" "}
+              <Link href="/assets/new" className="underline">
+                /assets/new
+              </Link>
+              .
             </p>
           </div>
         </div>
@@ -588,13 +490,6 @@ export function LifecycleContent() {
                   </Link>
                 </Button>
               </>
-            ) : stepStates.mint?.completed ? (
-              <div className="space-y-4">
-                <div className="text-center py-2">
-                  <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                  <p className="text-sm font-medium">Extracting Token ID...</p>
-                </div>
-              </div>
             ) : (
               <div className="space-y-4">
                 <div className="text-center py-2">
@@ -639,186 +534,26 @@ export function LifecycleContent() {
             <CardDescription>{LIFECYCLE_STEPS[currentStep]?.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Step 1: Mint */}
-            {currentStep === 0 && (
-              <>
-                {!showAdvanced ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Product Name *</Label>
-                        <Input
-                          value={productName}
-                          onChange={(e) => setProductName(e.target.value)}
-                          placeholder="e.g., Nike Air Max 90"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Brand</Label>
-                        <Input
-                          value={productBrand}
-                          onChange={(e) => setProductBrand(e.target.value)}
-                          placeholder="e.g., Nike"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>SKU / Serial</Label>
-                        <Input
-                          value={productSKU}
-                          onChange={(e) => setProductSKU(e.target.value)}
-                          placeholder="e.g., CW2288-111"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Category</Label>
-                        <select
-                          value={productCategory}
-                          onChange={(e) => setProductCategory(e.target.value)}
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                        >
-                          <option value="general">General</option>
-                          <option value="footwear">Footwear</option>
-                          <option value="apparel">Apparel</option>
-                          <option value="electronics">Electronics</option>
-                          <option value="luxury">Luxury Goods</option>
-                          <option value="pharmaceutical">Pharmaceutical</option>
-                          <option value="automotive">Automotive</option>
-                          <option value="defense">Defense / Gov</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Manufacturing Origin</Label>
-                        <Input
-                          value={productOrigin}
-                          onChange={(e) => setProductOrigin(e.target.value)}
-                          placeholder="e.g., Ho Chi Minh City, Vietnam"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input
-                          value={productDescription}
-                          onChange={(e) => setProductDescription(e.target.value)}
-                          placeholder="Brief product description"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Product Image</Label>
-                      <div className="flex gap-3 items-start">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              value={productImage}
-                              onChange={(e) => {
-                                setProductImage(e.target.value);
-                                setImagePreview("");
-                              }}
-                              placeholder="ipfs://... or https://... (optional)"
-                              className="font-mono text-sm"
-                            />
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleImageUpload}
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={imageUploading}
-                              className="shrink-0"
-                            >
-                              {imageUploading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Upload className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {imageUploading
-                              ? "Uploading to IPFS..."
-                              : productImage
-                                ? "Image pinned to IPFS"
-                                : "Upload a photo or paste a URL. If empty, a generated SVG is used."}
-                          </p>
-                        </div>
-                        {(imagePreview || productImage) && (
-                          <div className="w-16 h-16 rounded-md border border-border overflow-hidden shrink-0 bg-muted">
-                            {imagePreview ? (
-                              <img
-                                src={imagePreview}
-                                alt="Preview"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : productImage ? (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvanced(true)}
-                      className="text-xs text-muted-foreground hover:text-foreground underline"
-                    >
-                      Switch to raw metadata URI
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>Metadata URI (Advanced)</Label>
-                    <Input
-                      value={metadataURI}
-                      onChange={(e) => setMetadataURI(e.target.value)}
-                      placeholder="ipfs://... or data:application/json;base64,..."
-                      className="font-mono text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvanced(false)}
-                      className="text-xs text-muted-foreground hover:text-foreground underline"
-                    >
-                      Switch to product form
-                    </button>
-                  </div>
-                )}
-                <Button
-                  onClick={handleMint}
-                  disabled={mintPending || mintConfirming || (!showAdvanced && !productName)}
-                  className="w-full"
-                >
-                  {mintPending || mintConfirming ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {mintPending ? "Confirm in wallet..." : "Minting..."}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Mint Digital Twin
-                    </>
-                  )}
+            {/* Step 1: Mint — RETIRED (META-T18). Minting is DB-first via
+                tagit-services at /assets/new; this harness only continues an
+                existing token's lifecycle. */}
+            {currentStep === 0 && !tokenId && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-primary/50 bg-primary/10 p-4">
+                  <p className="text-sm">
+                    Minting has moved to the <strong>Mint Asset</strong> form, which mints through
+                    tagit-services (DB-first, relayer-signed) instead of a raw wallet transaction.
+                    Mint there, then enter the new token id under &quot;Resume Existing Token&quot;
+                    to continue its lifecycle here.
+                  </p>
+                </div>
+                <Button asChild className="w-full">
+                  <Link href="/assets/new">
+                    <Package className="h-4 w-4 mr-2" />
+                    Open Mint Asset form
+                  </Link>
                 </Button>
-                {stepStates.mint?.completed && mintedTokenId && (
-                  <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3">
-                    <p className="text-sm font-medium text-green-700">
-                      Token #{mintedTokenId.toString()} minted successfully
-                    </p>
-                  </div>
-                )}
-              </>
+              </div>
             )}
 
             {/* Step 2: Bind */}

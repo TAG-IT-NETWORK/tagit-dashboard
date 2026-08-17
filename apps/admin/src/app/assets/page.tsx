@@ -397,7 +397,7 @@ function AssetsContent() {
             )}
           </Button>
           <Button asChild>
-            <Link href="/assets?action=mint">
+            <Link href="/assets/new">
               <Plus className="h-4 w-4 mr-2" />
               Mint Asset
             </Link>

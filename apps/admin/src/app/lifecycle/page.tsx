@@ -22,13 +22,9 @@ import {
   shortenAddress,
 } from "@tagit/contracts";
 
-// ---------- Static metadata for known demo tokens ----------
-
-const ASSET_METADATA: Record<string, { name: string; msrp?: string }> = {
-  "18": { name: "TAG IT Sneaker", msrp: "$199.99" },
-  "19": { name: "Nike Air Max 90", msrp: "$149.99" },
-  "20": { name: "Rolex Submariner", msrp: "$8,100" },
-};
+// META-T18: the hardcoded demo-token metadata map (ASSET_METADATA) is GONE.
+// Product identity lives in the tagit-services catalog; this console shows
+// token ids only. Do not reintroduce hardcoded product names or prices here.
 
 // ---------- Types ----------
 
@@ -105,15 +101,70 @@ export default function LifecyclePage() {
   });
 
   // Write hooks
-  const { mint, hash: mintHash, isPending: mintPending, isConfirming: mintConfirming, isSuccess: mintSuccess, error: mintError, tokenId: mintedTokenId } = useMint();
-  const { bindTag, hash: bindHash, isPending: bindPending, isConfirming: bindConfirming, isSuccess: bindSuccess, error: bindError } = useBindTag();
-  const { activate, hash: activateHash, isPending: activatePending, isConfirming: activateConfirming, isSuccess: activateSuccess, error: activateError } = useActivate();
-  const { claim, hash: claimHash, isPending: claimPending, isConfirming: claimConfirming, isSuccess: claimSuccess, error: claimError } = useClaim();
-  const { flag, hash: flagHash, isPending: flagPending, isConfirming: flagConfirming, isSuccess: flagSuccess, error: flagError } = useFlag();
-  const { recycle, hash: recycleHash, isPending: recyclePending, isConfirming: recycleConfirming, isSuccess: recycleSuccess, error: recycleError } = useRecycle();
+  const {
+    mint,
+    hash: mintHash,
+    isPending: mintPending,
+    isConfirming: mintConfirming,
+    isSuccess: mintSuccess,
+    error: mintError,
+    tokenId: mintedTokenId,
+  } = useMint();
+  const {
+    bindTag,
+    hash: bindHash,
+    isPending: bindPending,
+    isConfirming: bindConfirming,
+    isSuccess: bindSuccess,
+    error: bindError,
+  } = useBindTag();
+  const {
+    activate,
+    hash: activateHash,
+    isPending: activatePending,
+    isConfirming: activateConfirming,
+    isSuccess: activateSuccess,
+    error: activateError,
+  } = useActivate();
+  const {
+    claim,
+    hash: claimHash,
+    isPending: claimPending,
+    isConfirming: claimConfirming,
+    isSuccess: claimSuccess,
+    error: claimError,
+  } = useClaim();
+  const {
+    flag,
+    hash: flagHash,
+    isPending: flagPending,
+    isConfirming: flagConfirming,
+    isSuccess: flagSuccess,
+    error: flagError,
+  } = useFlag();
+  const {
+    recycle,
+    hash: recycleHash,
+    isPending: recyclePending,
+    isConfirming: recycleConfirming,
+    isSuccess: recycleSuccess,
+    error: recycleError,
+  } = useRecycle();
 
   // Pending state for any write
-  const anyPending = mintPending || mintConfirming || bindPending || bindConfirming || activatePending || activateConfirming || claimPending || claimConfirming || flagPending || flagConfirming || recyclePending || recycleConfirming;
+  const anyPending =
+    mintPending ||
+    mintConfirming ||
+    bindPending ||
+    bindConfirming ||
+    activatePending ||
+    activateConfirming ||
+    claimPending ||
+    claimConfirming ||
+    flagPending ||
+    flagConfirming ||
+    recyclePending ||
+    recycleConfirming;
 
   const addEvent = useCallback(
     (message: string, txHash?: string) => {
@@ -123,7 +174,7 @@ export default function LifecyclePage() {
       ]);
       setEventId((prev) => prev + 1);
     },
-    [eventId]
+    [eventId],
   );
 
   // Track transaction events
@@ -132,7 +183,10 @@ export default function LifecyclePage() {
   }, [mintHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (mintSuccess) { addEvent(`Minted token #${mintedTokenId?.toString() ?? "?"}`, mintHash); refetch(); }
+    if (mintSuccess) {
+      addEvent(`Minted token #${mintedTokenId?.toString() ?? "?"}`, mintHash);
+      refetch();
+    }
   }, [mintSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -140,7 +194,10 @@ export default function LifecyclePage() {
   }, [bindHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (bindSuccess) { addEvent(`Tag bound!`, bindHash); refetch(); }
+    if (bindSuccess) {
+      addEvent(`Tag bound!`, bindHash);
+      refetch();
+    }
   }, [bindSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -148,7 +205,10 @@ export default function LifecyclePage() {
   }, [activateHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activateSuccess) { addEvent(`Asset activated!`, activateHash); refetch(); }
+    if (activateSuccess) {
+      addEvent(`Asset activated!`, activateHash);
+      refetch();
+    }
   }, [activateSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -156,7 +216,10 @@ export default function LifecyclePage() {
   }, [claimHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (claimSuccess) { addEvent(`Asset claimed!`, claimHash); refetch(); }
+    if (claimSuccess) {
+      addEvent(`Asset claimed!`, claimHash);
+      refetch();
+    }
   }, [claimSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -164,7 +227,10 @@ export default function LifecyclePage() {
   }, [flagHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (flagSuccess) { addEvent(`Asset flagged!`, flagHash); refetch(); }
+    if (flagSuccess) {
+      addEvent(`Asset flagged!`, flagHash);
+      refetch();
+    }
   }, [flagSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -172,7 +238,10 @@ export default function LifecyclePage() {
   }, [recycleHash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (recycleSuccess) { addEvent(`Asset recycled!`, recycleHash); refetch(); }
+    if (recycleSuccess) {
+      addEvent(`Asset recycled!`, recycleHash);
+      refetch();
+    }
   }, [recycleSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Log errors
@@ -203,7 +272,9 @@ export default function LifecyclePage() {
   function handleMint() {
     if (!address) return;
     const checksumAddress = getAddress(address);
-    const uri = mintMetadataURI || `data:application/json;base64,${btoa(JSON.stringify({ name: "Test Asset", description: "Demo" }))}`;
+    const uri =
+      mintMetadataURI ||
+      `data:application/json;base64,${btoa(JSON.stringify({ name: "Test Asset", description: "Demo" }))}`;
     mint(checksumAddress, uri);
   }
 
@@ -398,8 +469,7 @@ export default function LifecyclePage() {
             const stateColor = STATE_COLORS[asset.state] ?? STATE_COLORS[0];
             const stateLabel = STATE_LABELS[asset.state] ?? "UNKNOWN";
             const next = NEXT_ACTION[asset.state];
-            const meta = ASSET_METADATA[asset.tokenId.toString()];
-            const displayName = meta?.name ?? `Token #${asset.tokenId.toString()}`;
+            const displayName = `Token #${asset.tokenId.toString()}`;
 
             return (
               <div
@@ -410,13 +480,8 @@ export default function LifecyclePage() {
                   <div>
                     <p className="text-xs text-gray-500">#{asset.tokenId.toString()}</p>
                     <p className="text-lg font-semibold text-white">{displayName}</p>
-                    {meta?.msrp && (
-                      <p className="text-xs text-teal-400">{meta.msrp}</p>
-                    )}
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full border text-xs font-bold ${stateColor}`}
-                  >
+                  <span className={`px-3 py-1 rounded-full border text-xs font-bold ${stateColor}`}>
                     {stateLabel}
                   </span>
                 </div>
@@ -460,9 +525,7 @@ export default function LifecyclePage() {
         </h2>
         <div className="space-y-1 max-h-48 overflow-y-auto font-mono text-xs">
           {events.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">
-              Transactions will appear here...
-            </p>
+            <p className="text-gray-500 text-center py-4">Transactions will appear here...</p>
           ) : (
             events.map((ev) => (
               <div key={ev.id} className="flex items-center gap-2 text-gray-300">
