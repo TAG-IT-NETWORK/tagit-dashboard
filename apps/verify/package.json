@@ -17,7 +17,9 @@
     "//test:mcp": "Conformance + safety suite for POST /mcp. Needs a prior `next build`; starts two servers and the archive-rpc-stub. Includes the closed-tool-set guard.",
     "typecheck": "tsc --noEmit",
     "test:rpc-split": "tsx scripts/test-rpc-split.ts",
-    "//test:rpc-split": "Proves the capped BASE_SEPOLIA_RPC_URL never reaches the client bundle. Rebuilds with sentinel values."
+    "//test:rpc-split": "Proves the capped BASE_SEPOLIA_RPC_URL never reaches the client bundle. Rebuilds with sentinel values.",
+    "test:redirects": "tsx scripts/test-redirects.ts",
+    "//test:redirects": "Asserts the P0.4 alias table fires AND does not shadow real routes. Needs a prior `next build`."
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.29.2",
