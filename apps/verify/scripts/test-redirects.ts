@@ -35,7 +35,9 @@ function ok(cond: boolean, label: string, detail?: unknown): void {
     return;
   }
   failures++;
-  console.log(`  FAIL  ${label}${detail === undefined ? "" : `\n        got: ${JSON.stringify(detail)}`}`);
+  console.log(
+    `  FAIL  ${label}${detail === undefined ? "" : `\n        got: ${JSON.stringify(detail)}`}`,
+  );
 }
 
 /** Raw fetch with redirects OFF — we are asserting on the hop itself. */
@@ -70,7 +72,10 @@ async function waitForPort(port: number, timeoutMs = 60_000): Promise<void> {
   while (Date.now() < deadline) {
     const up = await new Promise<boolean>((resolve) => {
       const sock = createConnection({ port, host: "127.0.0.1" })
-        .on("connect", () => { sock.destroy(); resolve(true); })
+        .on("connect", () => {
+          sock.destroy();
+          resolve(true);
+        })
         .on("error", () => resolve(false));
     });
     if (up) return;
@@ -100,17 +105,17 @@ async function main(): Promise<void> {
 
   console.log("\nTHE LOAD-BEARING PART — real routes are not shadowed");
   for (const p of [
-    "/",                                   // home
-    "/sun",                                // SUN tap landing
-    "/mcp",                                // MCP JSON-RPC endpoint
-    "/asset/5",                            // the canonical route itself
-    "/tag/04A1B2C3D4E580",                 // chip fallback
-    "/api/asset/5",                        // public JSON read
-    "/api/verify",                         // stable mobile-app contract
+    "/", // home
+    "/sun", // SUN tap landing
+    "/mcp", // MCP JSON-RPC endpoint
+    "/asset/5", // the canonical route itself
+    "/tag/04A1B2C3D4E580", // chip fallback
+    "/api/asset/5", // public JSON read
+    "/api/verify", // stable mobile-app contract
     "/robots.txt",
     "/sitemap.xml",
     "/.well-known/mcp.json",
-    "/01/09506000134352/21/TEST123",       // GS1 Digital Link resolver
+    "/01/09506000134352/21/TEST123", // GS1 Digital Link resolver
   ]) {
     await expectNotShadowed(p);
   }
@@ -128,11 +133,20 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((err) => { console.error(err); process.exitCode = 1; })
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
   .finally(() => {
     // `next start` forks a next-server grandchild that survives SIGTERM on the
     // parent and keeps the port held — the exact failure that once let a whole
     // suite assert against a stale build. Kill the group.
-    if (server?.pid) { try { process.kill(-server.pid, "SIGKILL"); } catch { /* already gone */ } }
+    if (server?.pid) {
+      try {
+        process.kill(-server.pid, "SIGKILL");
+      } catch {
+        /* already gone */
+      }
+    }
     server?.kill("SIGKILL");
   });

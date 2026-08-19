@@ -1,45 +1,51 @@
 /**
  * /sitemap.xml for verify.tagit.network (Next generates the file from this).
  *
- * This is the inbound discovery path. Nothing on the public internet links to
- * this host — zero <a href> anchors across all 30 pages of the www sitemap — so
- * a crawler has no way to walk here. Declaring this sitemap in robots.txt and
- * submitting it in Search Console is what replaces the missing links.
+ * META-T17: entries come from the tagit-services API, NOT a hardcoded list of
+ * verdicts. Only tokens the API reports as PUBLIC and ANCHORED are listed —
+ * restricted items and unanchored drafts never reach the sitemap, which is
+ * the per-asset privacy control SEC-ANVS-001 threat 4 asked for.
  *
- * CURATED, NOT ENUMERATED — read the rationale on SHOWCASE_TOKENS in
- * @/lib/site before adding ids. The short version: totalSupply() is 52, this
- * lists 5, and that gap is a deliberate control for SEC-ANVS-001 threat 4
- * (registry enumeration) whose real mitigation — a per-asset privacy flag — is
- * not built yet. Do not replace this with a loop over totalSupply().
+ * Source order (see fetchPublicSitemapEntries in @/lib/services):
+ *   1. GET {SERVICES_URL}/api/v1/assets/public — the dedicated public list.
+ *   2. Until that endpoint ships: the curated candidate ids below are probed
+ *      through the detail API and filtered to public+anchored. The candidate
+ *      list is ids only — no states, no timestamps, no verdicts; all of that
+ *      now comes from the API at request time.
  *
- * WHAT IS DELIBERATELY ABSENT
- * ───────────────────────────
- *   • Tap routes (/sun, /01/…). They need a physical NTAG 424 DNA cryptogram;
- *     a crawler fetching one gets a 400 and burns an uncached RPC read. They
- *     are Disallow:'d in robots.ts for that same cost reason.
- *   • /api/* — including /api/asset/{id}, which robots.ts explicitly ALLOWS.
- *     Allowing and listing are different asks: robots.txt governs fetching, a
- *     sitemap requests *indexing*, and a JSON document has nothing to index.
- *     The API is for agents that call it directly, not for a search index.
- *   • /tag/{uid} — a 307 to /asset/{id}. Sitemaps should list destinations,
- *     never redirects.
- *   • Unminted ids. They render a truthful "No Record" page that also carries
- *     `robots: { index: false }` from generateMetadata(); listing an id we
- *     simultaneously ask not to index is a self-contradicting sitemap.
+ * A services outage degrades to the home page alone rather than failing the
+ * route — a missing sitemap entry is recoverable, a 500 sitemap is not.
  *
- * NO CHAIN READ HAPPENS HERE, ON PURPOSE. It is tempting to fetch each token's
- * live state at build time to derive <lastmod>. That would make `next build`
- * depend on a reachable RPC endpoint, and @/lib/contract.server throws in
- * production when BASE_SEPOLIA_RPC_URL is unset — a throw deliberately placed
- * at call time precisely so the build does NOT require the capped key. Reading
- * the chain from this file would convert that documented property into a build
- * failure. The verified timestamps are therefore checked in as data in
- * @/lib/site, alongside the cast command to re-verify them.
+ * WHAT IS DELIBERATELY ABSENT (unchanged from the pre-cutover rationale):
+ *   • Tap routes (/sun, /01/…) — need a physical NTAG 424 DNA cryptogram.
+ *   • /api/* — robots.txt governs fetching; a sitemap requests indexing, and
+ *     a JSON document has nothing to index.
+ *   • /tag/{uid} — a 307; sitemaps list destinations, never redirects.
+ *   • Unminted/restricted ids — they render noindex pages.
  */
 import type { MetadataRoute } from "next";
-import { SHOWCASE_TOKENS, siteUrl } from "@/lib/site";
+import { fetchPublicSitemapEntries } from "@/lib/services";
+import { siteUrl } from "@/lib/site";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+/** Regenerate hourly at runtime so new anchored tokens appear without a deploy. */
+export const revalidate = 3600;
+
+/**
+ * Candidate ids for the probe fallback — IDS ONLY. Everything else about them
+ * (visibility, anchor state, lastmod) is resolved from the services API at
+ * request time. Kept deliberately small until /api/v1/assets/public ships;
+ * do not grow this as a substitute for that endpoint.
+ */
+const CANDIDATE_TOKEN_IDS = ["1", "5", "18", "19", "20", "35", "52"] as const;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  let entries: Awaited<ReturnType<typeof fetchPublicSitemapEntries>> = [];
+  try {
+    entries = await fetchPublicSitemapEntries(CANDIDATE_TOKEN_IDS);
+  } catch {
+    entries = [];
+  }
+
   return [
     {
       url: siteUrl("/"),
@@ -49,19 +55,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 1,
     },
-    ...SHOWCASE_TOKENS.map((token) => ({
-      url: siteUrl(`/asset/${token.tokenId}`),
-      // The token's last on-chain lifecycle transition — literally the last
-      // time this page's verdict changed. See @/lib/site.
-      lastModified: new Date(token.lastModified),
-      // Lifecycle transitions are human-paced and rare: a claimed or recycled
-      // asset may never change again. "weekly" over-reports slightly, which is
-      // the right direction — it keeps the verdict fresh in the index without
-      // claiming the daily churn of a news page.
+    ...entries.map((entry) => ({
+      url: siteUrl(`/asset/${entry.tokenId}`),
+      lastModified: entry.lastModified,
+      // Lifecycle/metadata transitions are human-paced and rare; "weekly"
+      // over-reports slightly, which is the right direction.
       changeFrequency: "weekly" as const,
-      // Below the home page, equal to each other. These are five siblings
-      // demonstrating five lifecycle states; ranking them against one another
-      // would assert a preference that does not exist.
       priority: 0.8,
     })),
   ];

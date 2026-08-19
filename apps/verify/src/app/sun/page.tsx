@@ -10,7 +10,8 @@
  */
 import Link from "next/link";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
-import { CONTRACT_ADDRESS, getMetadataForToken, getBuyConfigForToken } from "@/lib/contract";
+import { CONTRACT_ADDRESS } from "@/lib/contract";
+import { loadProduct } from "@/lib/dpp";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
@@ -32,7 +33,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "bad-params") {
     return (
       <Shell>
-        <StatusHero tone="warn" glyph="?" title="Bad SUN URL" sub="Missing picc or cmac parameters." />
+        <StatusHero
+          tone="warn"
+          glyph="?"
+          title="Bad SUN URL"
+          sub="Missing picc or cmac parameters."
+        />
         <p className="text-center text-xs text-gray-500 font-mono">
           Expected: /sun?picc=&lt;hex&gt;&amp;cmac=&lt;hex&gt;
         </p>
@@ -59,7 +65,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "counterfeit") {
     return (
       <Shell>
-        <StatusHero tone="bad" glyph="✗" title="Counterfeit" sub="This tap failed cryptographic verification." />
+        <StatusHero
+          tone="bad"
+          glyph="✗"
+          title="Counterfeit"
+          sub="This tap failed cryptographic verification."
+        />
         <div
           className="rounded-2xl border border-red-500/30 p-5 mb-5 animate-fadeUp"
           style={{ background: "rgba(239,68,68,0.08)", animationDelay: "0.35s" }}
@@ -84,7 +95,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
           title="Chip Authentic"
           sub="Cryptographically verified, but not yet bound on-chain."
         />
-        <DataCard rows={[["UID", formatUid(res.uid)], ["Tap counter", String(res.counter)]]} />
+        <DataCard
+          rows={[
+            ["UID", formatUid(res.uid)],
+            ["Tap counter", String(res.counter)],
+          ]}
+        />
       </Shell>
     );
   }
@@ -98,10 +114,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   }
 
   // ── Resolved ───────────────────────────────────────────────────────────────
-  const meta = getMetadataForToken(res.tokenId.toString());
+  // Product identity from the tagit-services assets API (META-T17 — the old
+  // hardcoded metadata map is gone).
+  const product = await loadProduct(res.tokenId.toString());
   const state = STATES[res.asset.state] ?? STATES[0];
   const authentic = isAuthenticState(res.asset.state);
-  const displayName = meta.productName || `Token #${res.tokenId}`;
+  const displayName = product.name || `Token #${res.tokenId}`;
 
   return (
     <Shell>
@@ -117,7 +135,11 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
                 ? "Retired"
                 : "Not Bound"
         }
-        sub={authentic ? "Verified on-chain via NTAG 424 DNA SUN" : STATE_DESCRIPTIONS[res.asset.state] ?? ""}
+        sub={
+          authentic
+            ? "Verified on-chain via NTAG 424 DNA SUN"
+            : (STATE_DESCRIPTIONS[res.asset.state] ?? "")
+        }
       />
 
       <div className="flex justify-center mb-8 animate-fadeUp" style={{ animationDelay: "0.25s" }}>
@@ -140,11 +162,9 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
       {res.asset.state === 3 && (
         <div className="mt-5">
-          <BuyWidget
-            tokenId={res.tokenId.toString()}
-            productName={displayName}
-            priceUsdc={getBuyConfigForToken(res.tokenId.toString()).priceUsdc}
-          />
+          {/* Price comes from the pricing API inside the widget; it hides
+              itself when there is no live listing. */}
+          <BuyWidget tokenId={res.tokenId.toString()} productName={displayName} />
         </div>
       )}
 

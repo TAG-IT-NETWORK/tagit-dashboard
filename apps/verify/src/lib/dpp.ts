@@ -17,7 +17,8 @@
  * currently rests on the on-chain anchor in `evidence`. Issuer-DID signing
  * (Ed25519 / SD-JWT for role-scoped disclosure) is the phase-2 follow-up.
  */
-import { CONTRACT_ADDRESS, getMetadataForToken } from "./contract";
+import { CONTRACT_ADDRESS } from "./contract";
+import { fetchAsset, heroMedia } from "./services";
 import { STATES, STATE_DESCRIPTIONS } from "./states";
 
 /** Base Sepolia — the primary chain the verifier reads (CAIP-2 eip155:84532). */
@@ -33,6 +34,7 @@ const IPFS_GATEWAY = "https://w3s.link/ipfs/";
 
 /** HTTPS hosts we trust to dereference a metadata source server-side. */
 const ALLOWED_META_HOSTS = new Set([
+  "media.tagit.network", // TAG IT media CDN (CloudFront in front of S3)
   "w3s.link",
   "ipfs.io",
   "cloudflare-ipfs.com",
@@ -121,26 +123,47 @@ export async function fetchProductMetadata(metaSource?: string | null): Promise<
 }
 
 /**
- * Resolve a token's product fields: off-chain IPFS metadata (via ?meta= or the
- * static map's pointer) overlaid on the static demo map. One source of truth
- * for both the HTML page and the JSON-LD endpoint.
+ * Resolve a token's product fields from the tagit-services assets API
+ * (META-T17 cutover — the old hardcoded ASSET_METADATA map is gone). One
+ * source of truth for the HTML pages, the tap routes and the JSON-LD/VC
+ * endpoints. A `?meta=` IPFS override (tap routes only) is still overlaid on
+ * top for chips personalized with an explicit metadata pointer.
+ *
+ * Restricted items resolve to an EMPTY product: the services API redacts the
+ * DTO, and this function must not resurrect product copy from anywhere else.
+ * A services outage also resolves to empty — a metadata outage must never
+ * block a verdict.
  */
 export async function loadProduct(
   tokenId: string,
   metaParam?: string | null,
 ): Promise<ProductMetadata> {
-  const staticMeta = getMetadataForToken(tokenId);
-  const remote = await fetchProductMetadata(metaParam || staticMeta.meta);
+  const lookup = await fetchAsset(tokenId);
+  const base: ProductMetadata = {};
+  if (lookup.kind === "record") {
+    const { dto } = lookup;
+    base.name = dto.product?.name ?? dto.name;
+    base.brand = dto.product?.brand;
+    base.description = dto.description;
+    base.image = heroMedia(dto)?.url;
+    base.images = dto.media?.map((m) => m.url);
+    base.sku = dto.product?.sku;
+    base.origin = dto.product?.origin;
+  }
+
+  if (!metaParam) return base;
+
+  const remote = await fetchProductMetadata(metaParam);
   return {
-    name: remote.name || staticMeta.productName,
-    brand: remote.brand,
-    description: remote.description,
-    image: remote.image,
-    images: remote.images,
-    sku: remote.sku,
-    origin: remote.origin,
+    name: remote.name || base.name,
+    brand: remote.brand || base.brand,
+    description: remote.description || base.description,
+    image: remote.image || base.image,
+    images: remote.images ?? base.images,
+    sku: remote.sku || base.sku,
+    origin: remote.origin || base.origin,
     size: remote.size,
-    msrp: remote.msrp || staticMeta.msrp,
+    msrp: remote.msrp,
   };
 }
 

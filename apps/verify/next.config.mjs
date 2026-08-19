@@ -36,6 +36,15 @@ const TOKEN_ID = "\\d{1,78}";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    // Hero images render through the CUSTOM loader in src/lib/media.ts, which
+    // maps widths onto the pre-baked CDN variants — Vercel's optimizer is
+    // never invoked for them. This allowlist is defense-in-depth so no other
+    // next/image usage can ever route a foreign host through the optimizer.
+    remotePatterns: [
+      { protocol: "https", hostname: "media.tagit.network" },
+    ],
+  },
   async redirects() {
     return [
       // The shape a model guesses first: bare id at the root.
