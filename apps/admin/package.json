@@ -17,7 +17,7 @@
     "test:all": "pnpm test && pnpm test:e2e"
   },
   "dependencies": {
-    "@rainbow-me/rainbowkit": "^2.2.2",
+    "@rainbow-me/rainbowkit": "^2.2.10",
     "@tagit/auth": "workspace:*",
     "@tagit/config": "workspace:*",
     "@tagit/contracts": "workspace:*",
