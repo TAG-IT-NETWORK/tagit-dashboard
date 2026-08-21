@@ -23,6 +23,7 @@ import {
   X,
   Coins,
   Factory,
+  UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -41,6 +42,9 @@ const navigation = [
   { name: "BD Agent", href: "/adagent", icon: Bot },
   { name: "Influencer", href: "/influencer", icon: Megaphone },
   { name: "Demo", href: "/demo", icon: Play },
+  // META-T32: admin_users roster CRUD. Visible to everyone; the role
+  // middleware sends non-admins to /403.
+  { name: "Team", href: "/team", icon: UsersRound },
 ];
 
 // Testing section

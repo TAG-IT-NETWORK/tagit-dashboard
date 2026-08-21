@@ -7,7 +7,9 @@
 #
 # Server-side secrets to mark sensitive (NOT the public NEXT_PUBLIC_* build vars):
 #   apps/business : TAGIT_SERVICES_API_KEY
-#   apps/admin    : PINATA_JWT, SITE_PASSWORD, A2A_API_KEY
+#   apps/admin    : PINATA_JWT, A2A_API_KEY, AUTH_SECRET, AUTH_GOOGLE_SECRET,
+#                   SERVICES_API_KEY, RELAYER_API_KEY
+#                   (SITE_PASSWORD retired by META-T32 — Google sign-in + roles)
 #   apps/verify   : SDM_MASTER_KEY, SERVICES_API_KEY
 set -euo pipefail
 KEY="${1:?usage: vercel-set-sensitive.sh KEY [environment]}"
