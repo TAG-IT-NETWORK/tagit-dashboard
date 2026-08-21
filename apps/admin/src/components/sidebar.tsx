@@ -24,12 +24,14 @@ import {
   Coins,
   Factory,
   UsersRound,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Assets", href: "/assets", icon: Package },
+  { name: "Catalog", href: "/catalog", icon: BookOpen },
   { name: "Assembly Line", href: "/assembly-line", icon: Factory },
   { name: "Users", href: "/users", icon: Users },
   { name: "Badges", href: "/badges", icon: BadgeCheck },
