@@ -19,7 +19,7 @@
  *   5. result: tokenId + txHash + link to the verify page.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -31,22 +31,15 @@ import {
   Input,
   Label,
 } from "@tagit/ui";
-import { ArrowLeft, ExternalLink, ImageIcon, Loader2, Package, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Package } from "lucide-react";
 import { isValidUsdcString } from "@/lib/usdc";
+import { MediaPanel, type UploadedMedia } from "@/components/media-panel";
 
 const VERIFY_URL = process.env.NEXT_PUBLIC_VERIFY_URL || "https://verify.tagit.network";
 
 const CATEGORIES = ["cosmetics", "apparel", "watches", "electronics", "other"] as const;
 
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
-
-interface UploadedMedia {
-  sha256: string;
-  mime: string;
-  url: string;
-  role: "hero" | "gallery";
-  fileName: string;
-}
 
 interface MintSuccess {
   tokenId: string;
@@ -66,11 +59,8 @@ export default function NewAssetPage() {
   const [description, setDescription] = useState("");
   const [to, setTo] = useState("");
 
-  // Media
+  // Media (upload flow lives in the shared MediaPanel — META-T18 proxy)
   const [media, setMedia] = useState<UploadedMedia[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Price
   const [priceUsdc, setPriceUsdc] = useState("");
@@ -83,54 +73,6 @@ export default function NewAssetPage() {
   const priceValid = priceUsdc === "" || isValidUsdcString(priceUsdc);
   const toValid = ADDR_RE.test(to);
   const canSubmit = !submitting && name.trim().length > 0 && toValid && priceValid;
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadError(null);
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/media-proxy", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `upload failed (${res.status})`);
-      }
-      const sha256: string | undefined = data.sha256 ?? data.media?.sha256;
-      const mime: string = data.mime ?? data.media?.mime ?? file.type ?? "image/webp";
-      const url: string | undefined =
-        data.url ??
-        data.media?.url ??
-        (sha256 ? `https://media.tagit.network/i/${sha256}/lg.webp` : undefined);
-      if (!sha256 || !url) {
-        throw new Error("media pipeline returned no sha256/url");
-      }
-      setMedia((prev) => [
-        ...prev,
-        {
-          sha256,
-          mime,
-          url,
-          role: prev.length === 0 ? "hero" : "gallery",
-          fileName: file.name,
-        },
-      ]);
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const removeMedia = (sha256: string) => {
-    setMedia((prev) => {
-      const next = prev.filter((m) => m.sha256 !== sha256);
-      // Keep exactly one hero: promote the first remaining entry.
-      return next.map((m, i) => ({ ...m, role: i === 0 ? "hero" : "gallery" }) as UploadedMedia);
-    });
-  };
 
   const docDraft = useMemo(
     () => ({
@@ -376,48 +318,8 @@ export default function NewAssetPage() {
             First upload becomes the hero image.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {media.map((m) => (
-            <div
-              key={m.sha256}
-              className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{m.fileName}</span>
-                <span className="text-xs text-muted-foreground uppercase">{m.role}</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => removeMedia(m.sha256)}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleUpload}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Uploading…
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload image
-              </>
-            )}
-          </Button>
-          {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+        <CardContent>
+          <MediaPanel media={media} onChange={setMedia} />
         </CardContent>
       </Card>
 

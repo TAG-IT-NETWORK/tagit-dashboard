@@ -14,6 +14,7 @@ import {
   parseTokenIdInput,
   templateStatusStyle,
   templateThumbUrl,
+  usdc6ToDecimalInput,
   workingCopySnapshot,
 } from "@/lib/catalog/template-logic";
 import type { TemplateDto, TemplateVersionDto } from "@/lib/catalog/template-types";
@@ -92,6 +93,20 @@ describe("formatUsdc6Display", () => {
     expect(formatUsdc6Display("12.5")).toBeNull();
     expect(formatUsdc6Display("-1")).toBeNull();
     expect(formatUsdc6Display("")).toBeNull();
+  });
+});
+
+describe("usdc6ToDecimalInput", () => {
+  it("round-trips minor units to the input decimal format", () => {
+    expect(usdc6ToDecimalInput("22500000")).toBe("22.5");
+    expect(usdc6ToDecimalInput("22000000")).toBe("22");
+    expect(usdc6ToDecimalInput("1")).toBe("0.000001");
+    expect(usdc6ToDecimalInput("0")).toBe("0");
+  });
+
+  it("returns empty string for null/malformed", () => {
+    expect(usdc6ToDecimalInput(null)).toBe("");
+    expect(usdc6ToDecimalInput("x")).toBe("");
   });
 });
 

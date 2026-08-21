@@ -102,6 +102,19 @@ export function formatUsdc6Display(priceUsdc6: string | null | undefined): strin
   return `$${minorToDecimalString(cents, 2)}`;
 }
 
+/**
+ * "22500000" → "22.5" — usdc-6 minor units back to the decimal-string input
+ * format parseUsdcString accepts (trailing zeros trimmed, integer amounts
+ * lose the dot). Null/malformed → "" (empty input field).
+ */
+export function usdc6ToDecimalInput(priceUsdc6: string | null | undefined): string {
+  if (priceUsdc6 === null || priceUsdc6 === undefined || !/^\d{1,30}$/.test(priceUsdc6)) return "";
+  const raw = minorToDecimalString(BigInt(priceUsdc6), 6);
+  const [whole, fraction = ""] = raw.split(".");
+  const trimmed = fraction.replace(/0+$/, "");
+  return trimmed === "" ? whole : `${whole}.${trimmed}`;
+}
+
 /** MSRP minor units + ISO code → "1 200.00 USD"-style display (null when unset). */
 export function formatMsrpDisplay(
   amount: number | null | undefined,
