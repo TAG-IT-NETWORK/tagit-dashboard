@@ -56,13 +56,18 @@ const SESSION_ONLY_PATHS = ["/403"] as const;
  * unlisted needs only `viewer` (signed-in, read-only).
  *
  * Some prefixes are claimed ahead of the pages that will live there
- * (/catalog, /batch, /bind, /prices, /recovery ship in sibling META-P2
- * tasks): the middleware contract is established here so those pages land
- * pre-gated.
+ * (/batch, /bind, /prices, /recovery ship in sibling META-P2 tasks): the
+ * middleware contract is established here so those pages land pre-gated.
+ *
+ * /catalog (META-T33) and /assets (META-T36) READ pages are deliberately
+ * viewer-level (unlisted): their UIs render read-only for viewers. Catalog
+ * WRITES all go through /api/catalog-proxy, whose mutating routes re-check
+ * the session role server-side (operator+ via canMutateCatalog; publish is
+ * admin-only via canPublishCatalog) — the path map cannot see HTTP methods,
+ * so the write/read split is enforced in the proxies.
  */
 export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = [
   // operator — drafts + media + batches + binding
-  ["/catalog", "operator"],
   ["/assets/new", "operator"],
   ["/assembly-line", "operator"],
   ["/batch", "operator"],

@@ -29,6 +29,12 @@ interface PublishRailProps {
   versions: TemplateVersionDto[];
   publishState: PublishState;
   writable: boolean;
+  /**
+   * Publish is admin-only (META-T32 role map) while draft writes + archive
+   * stay editor-level — the proxy enforces this server-side; this prop only
+   * keeps the button honest.
+   */
+  canPublish: boolean;
   /** Refetch detail after publish/archive (versions list changed). */
   onChanged: () => void;
 }
@@ -40,6 +46,7 @@ export function PublishRail({
   versions,
   publishState,
   writable,
+  canPublish,
   onChanged,
 }: PublishRailProps) {
   const [busy, setBusy] = useState<"publish" | "archive" | null>(null);
@@ -104,11 +111,13 @@ export function PublishRail({
         <div className="flex flex-col gap-2">
           <Button
             onClick={() => post("publish")}
-            disabled={!canWrite || busy !== null}
+            disabled={!canWrite || !canPublish || busy !== null}
             title={
-              publishState.latestVersion > 0 && !publishState.workingDirty
-                ? "Working copy matches the latest snapshot — publishing inserts an identical version"
-                : undefined
+              !canPublish
+                ? "Publishing requires the admin role"
+                : publishState.latestVersion > 0 && !publishState.workingDirty
+                  ? "Working copy matches the latest snapshot — publishing inserts an identical version"
+                  : undefined
             }
           >
             {busy === "publish" ? (

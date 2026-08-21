@@ -4,6 +4,7 @@ import {
   MAX_TOKEN_IDS,
   buildJsonDiff,
   canMutateCatalog,
+  canPublishCatalog,
   computePublishState,
   deepJsonEqual,
   diffHasChanges,
@@ -54,14 +55,23 @@ function versionOf(t: TemplateDto, version: number): TemplateVersionDto {
 }
 
 describe("canMutateCatalog", () => {
-  it("blocks viewers only", () => {
+  it("allows editors and admins, blocks viewers", () => {
     expect(canMutateCatalog("viewer")).toBe(false);
     expect(canMutateCatalog("editor")).toBe(true);
     expect(canMutateCatalog("admin")).toBe(true);
   });
 
-  it("pre-T32 (null role) keeps writes enabled", () => {
-    expect(canMutateCatalog(null)).toBe(true);
+  it("post-T32: null role (unauthenticated / not enrolled) fails closed", () => {
+    expect(canMutateCatalog(null)).toBe(false);
+  });
+});
+
+describe("canPublishCatalog", () => {
+  it("admin only", () => {
+    expect(canPublishCatalog("admin")).toBe(true);
+    expect(canPublishCatalog("editor")).toBe(false);
+    expect(canPublishCatalog("viewer")).toBe(false);
+    expect(canPublishCatalog(null)).toBe(false);
   });
 });
 

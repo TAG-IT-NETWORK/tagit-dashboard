@@ -23,13 +23,23 @@ export const PROPAGATE_JOB_ID_RE = /^pjob_[0-9A-Za-z]{1,64}$/;
 export type CatalogRole = "admin" | "editor" | "viewer";
 
 /**
- * Write gate for the catalog surface: viewers are read-only. `null` means "no
- * authenticated session on this base" (META-T32 not landed) — the proxies'
- * server-side API keys are then the only credential, so writes stay enabled
- * rather than dead-locking the console pre-auth.
+ * Write gate for the catalog surface: viewers are read-only. META-T32 landed
+ * the admin session + roster roles, so `null` now means "unauthenticated or
+ * not enrolled in admin_users" and FAILS CLOSED (pre-T32 it kept writes
+ * enabled to avoid dead-locking the console before any session existed).
+ * Publishing is stricter still — admin only, see canPublishCatalog.
  */
 export function canMutateCatalog(role: CatalogRole | null): boolean {
-  return role !== "viewer";
+  return role === "editor" || role === "admin";
+}
+
+/**
+ * Publish gate (META-T32 role map: publish/prices are admin-level). Editors
+ * (dashboard `operator` role) may edit drafts, media and overrides; only
+ * admins may snapshot a working copy into a live template version.
+ */
+export function canPublishCatalog(role: CatalogRole | null): boolean {
+  return role === "admin";
 }
 
 // ──────────────────────────────────────────────

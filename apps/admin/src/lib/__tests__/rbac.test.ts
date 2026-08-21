@@ -64,9 +64,13 @@ describe("requiredRoleFor — the per-path role map", () => {
     ["/users", "viewer"],
     ["/governance", "viewer"],
     ["/", "viewer"],
+    // META-T33/T36 read surfaces render read-only for viewers; catalog
+    // WRITES are role-gated inside /api/catalog-proxy (methods are invisible
+    // to the path map) — operator+ to mutate, admin to publish.
+    ["/catalog", "viewer"],
+    ["/catalog/tpl_42", "viewer"],
+    ["/api/catalog-proxy/templates", "viewer"],
     // operator — drafts + media + batches + binding
-    ["/catalog", "operator"],
-    ["/catalog/drafts/42", "operator"],
     ["/assets/new", "operator"],
     ["/assembly-line", "operator"],
     ["/batch", "operator"],
@@ -91,8 +95,8 @@ describe("requiredRoleFor — the per-path role map", () => {
   });
 
   it("longest prefix wins: /catalog/publish escalates above /catalog", () => {
-    expect(requiredRoleFor("/catalog")).toBe("operator");
-    expect(requiredRoleFor("/catalog/publishing-guide")).toBe("operator"); // segment-safe
+    expect(requiredRoleFor("/catalog")).toBe("viewer");
+    expect(requiredRoleFor("/catalog/publishing-guide")).toBe("viewer"); // segment-safe
     expect(requiredRoleFor("/catalog/publish")).toBe("admin");
   });
 
@@ -167,6 +171,12 @@ describe("evaluateAccess — the middleware decision table", () => {
     expect(evaluateAccess("/assets/new", viewer)).toBe("forbidden");
     expect(evaluateAccess("/api/media-proxy", viewer)).toBe("forbidden");
     expect(evaluateAccess("/team", viewer)).toBe("forbidden");
+  });
+
+  it("viewer: catalog reads allowed (write role checks live in the proxies)", () => {
+    expect(evaluateAccess("/catalog", viewer)).toBe("allow");
+    expect(evaluateAccess("/api/catalog-proxy/templates", viewer)).toBe("allow");
+    expect(evaluateAccess("/catalog/publish", viewer)).toBe("forbidden");
   });
 
   it("operator: + drafts/media/batches/binding, still not admin surfaces", () => {

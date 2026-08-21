@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getActor } from "@/lib/actor";
+import { getActorRole } from "@/lib/actor-role";
+import { canMutateCatalog } from "@/lib/catalog/template-logic";
 import { validateOverridesDoc } from "@/lib/catalog/logic";
 
 /**
@@ -35,6 +37,13 @@ export async function PUT(req: Request, { params }: { params: { tokenId: string 
       { ok: false, error: "tokenId must be a numeric string" },
       { status: 400 },
     );
+  }
+
+  // META-T32 role map: overrides are a catalog write — operator ("editor")
+  // and above. The middleware already session-gates this path; this is the
+  // proxy's own role check (defense in depth).
+  if (!canMutateCatalog(await getActorRole())) {
+    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
   }
 
   const apiKey = process.env.SERVICES_API_KEY;

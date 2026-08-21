@@ -24,6 +24,7 @@ import { PublishRail } from "@/components/catalog/publish-rail";
 import { StatusChip } from "@/components/catalog/status-chip";
 import {
   canMutateCatalog,
+  canPublishCatalog,
   computePublishState,
   type CatalogRole,
 } from "@/lib/catalog/template-logic";
@@ -105,6 +106,7 @@ export function TemplateEditor({ id, role }: TemplateEditorProps) {
   );
 
   const writable = canMutateCatalog(role);
+  const canPublish = canPublishCatalog(role);
   const editable = writable && template?.status !== "archived";
 
   if (loading && !template) {
@@ -213,6 +215,7 @@ export function TemplateEditor({ id, role }: TemplateEditorProps) {
           versions={versions}
           publishState={publishState}
           writable={writable}
+          canPublish={canPublish}
           onChanged={() => {
             setForkNotice(false);
             void load();
