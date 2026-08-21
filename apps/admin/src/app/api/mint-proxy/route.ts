@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { actorHeader, getActor } from "@/lib/actor";
+
 /**
  * POST /api/mint-proxy — server-side proxy for the minimal mint form
  * (META-T18). Forwards to tagit-services with BOTH credentials injected
@@ -70,10 +72,13 @@ export async function POST(req: Request) {
     );
   }
 
+  // REQ-S-16 (META-T32): name the signed-in human on every mutating call.
+  const actor = await getActor();
   const authHeaders = {
     "content-type": "application/json",
     authorization: `Bearer ${apiKey}`,
     ...(relayerKey ? { "x-relayer-key": relayerKey } : {}),
+    ...actorHeader(actor),
   };
 
   try {

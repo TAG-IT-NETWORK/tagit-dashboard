@@ -8,6 +8,14 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./test/setup.tsx"],
     globals: true,
+    server: {
+      deps: {
+        // next-auth ships ESM that imports "next/server" (extensionless);
+        // Node's resolver rejects that outside a bundler, so let Vite
+        // process these packages instead (META-T32).
+        inline: ["next-auth", "@auth/core"],
+      },
+    },
     include: ["**/*.test.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
     exclude: ["**/node_modules/**", "**/e2e/**"],
     coverage: {
