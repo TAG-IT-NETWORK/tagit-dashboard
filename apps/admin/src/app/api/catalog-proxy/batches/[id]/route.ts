@@ -4,11 +4,14 @@ import { BATCH_ID_RE } from "@/lib/catalog/batch-logic";
 import { batchesUpstream } from "@/lib/server/batches-upstream";
 
 /**
- * GET /api/catalog-proxy/batches/:id (META-T34) — step-2 status poll.
- * Pass-through to GET /api/v1/admin/batches/:id: batch row + per-token
- * progress ({expected, minted, tokens[]}) assembled from the catalog_items
- * rows as the mint continuation inserts them. Read-only — viewer-safe (the
- * middleware session gate is the outer wall, same posture as template GETs).
+ * GET /api/catalog-proxy/batches/:id (META-T34/T35) — batch + per-token
+ * progress. Pass-through to GET /api/v1/admin/batches/:id: batch row +
+ * {expected, minted, tokens[]} assembled from the catalog_items rows.
+ * Serves BOTH the wizard's step-2 status poll (T34) and the binding
+ * station's resumable queue rebuild (T35 — station.ts BATCH_ID_RE mirrors
+ * the one used here). Read-only — viewer-safe (the middleware session gate
+ * is the outer wall, same posture as template GETs); admin key injected
+ * server-side, no relayer tier.
  */
 
 export const runtime = "nodejs";
