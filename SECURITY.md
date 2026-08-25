@@ -1,3 +1,3 @@
 # Security
 
-Email: security@tagit.network
+Email: info@tagit.network
