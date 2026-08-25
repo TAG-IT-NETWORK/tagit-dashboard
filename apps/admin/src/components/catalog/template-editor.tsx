@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@tagit/ui";
-import { AlertTriangle, ArrowLeft, GitFork, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, GitFork, Layers, Loader2 } from "lucide-react";
 
 import { DetailsTab } from "@/components/catalog/details-tab";
 import { ItemsTab } from "@/components/catalog/items-tab";
@@ -154,6 +154,13 @@ export function TemplateEditor({ id, role }: TemplateEditorProps) {
             {template.id} · {template.slug}
           </p>
         </div>
+        {/* META-T34: batch mint wizard entry (quantity/CSV → mint → labels). */}
+        <Button variant="outline" size="sm" asChild className="ml-auto">
+          <Link href={`/catalog/${id}/batch`}>
+            <Layers className="h-4 w-4 mr-2" />
+            Batch mint
+          </Link>
+        </Button>
       </div>
 
       {!writable && (
