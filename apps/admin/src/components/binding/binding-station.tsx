@@ -51,7 +51,7 @@ import { useNfcBridge } from "@/lib/nfc-bridge";
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
-import { canMutateCatalog } from "@/lib/catalog/template-logic";
+import { canMutateCatalog, canPublishCatalog } from "@/lib/catalog/template-logic";
 import {
   canFixLastBind,
   currentToken,
@@ -97,6 +97,9 @@ function upstreamError(body: Record<string, unknown> | null, fallback: string): 
 
 export function BindingStation({ batchId, role, exceptionsTab }: BindingStationProps) {
   const writable = canMutateCatalog(role);
+  // Void + remint recycles on-chain (irreversible) — admin-only, same posture
+  // as batch unstick; the proxy + middleware enforce it server-side too.
+  const canVoid = canPublishCatalog(role);
   const bridge = useNfcBridge(true);
 
   const [state, dispatch] = useReducer(stationReducer, initialStationState);
@@ -390,7 +393,7 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
             state={state}
             graceLeftMs={graceLeftMs}
             fixEnabled={fixEnabled}
-            writable={writable}
+            canVoid={canVoid}
             onFix={() => setFixOpen(true)}
             onVoid={() => setVoidOpen(true)}
           />
@@ -607,14 +610,15 @@ function LastBindCard({
   state,
   graceLeftMs,
   fixEnabled,
-  writable,
+  canVoid,
   onFix,
   onVoid,
 }: {
   state: StationState;
   graceLeftMs: number;
   fixEnabled: boolean;
-  writable: boolean;
+  /** Admin-only: void + remint recycles the token on-chain (irreversible). */
+  canVoid: boolean;
   onFix: () => void;
   onVoid: () => void;
 }) {
@@ -659,7 +663,17 @@ function LastBindCard({
           >
             <Undo2 className="mr-1 h-3.5 w-3.5" /> Fix last bind{graceLeftMs > 0 ? ` (${seconds}s)` : ""}
           </Button>
-          <Button size="sm" variant="outline" onClick={onVoid} disabled={!writable}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onVoid}
+            disabled={!canVoid}
+            title={
+              canVoid
+                ? "Recycle this token on-chain and remint the content as a fresh token"
+                : "Requires the admin role (irreversible on-chain recycle)"
+            }
+          >
             <Recycle className="mr-1 h-3.5 w-3.5" /> Void + remint…
           </Button>
         </div>

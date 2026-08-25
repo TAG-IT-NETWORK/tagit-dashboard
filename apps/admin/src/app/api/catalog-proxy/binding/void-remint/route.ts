@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getActorRole } from "@/lib/actor-role";
-import { canMutateCatalog } from "@/lib/catalog/template-logic";
+import { canPublishCatalog } from "@/lib/catalog/template-logic";
 import { templatesUpstream } from "@/lib/server/templates-upstream";
 
 /**
@@ -12,6 +12,10 @@ import { templatesUpstream } from "@/lib/server/templates-upstream";
  * upstream — so this call carries the second-tier relayer key (server-side
  * only). Mandatory reason + X-Actor ride into the append-only exception log;
  * the station wizard adds its own confirm step on top.
+ *
+ * ADMIN-ONLY (week-b integration): recycle() is irreversible — same posture
+ * as batch unstick. The middleware role map pins the path at admin too;
+ * this in-route check is the defense-in-depth second wall.
  */
 
 export const runtime = "nodejs";
@@ -21,8 +25,11 @@ const TOKEN_ID_RE = /^\d+$/;
 const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export async function POST(req: Request) {
-  if (!canMutateCatalog(await getActorRole())) {
-    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
+  if (!canPublishCatalog(await getActorRole())) {
+    return NextResponse.json(
+      { ok: false, error: "void + remint requires the admin role" },
+      { status: 403 },
+    );
   }
   let body: Record<string, unknown>;
   try {

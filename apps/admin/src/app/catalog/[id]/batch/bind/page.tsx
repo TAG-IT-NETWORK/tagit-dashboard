@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import { BindingStation } from "@/components/binding/binding-station";
 import { ExceptionLog } from "@/components/binding/exception-log";
@@ -51,11 +52,24 @@ export default async function BatchBindPage({
   }
 
   const role = await getActorRole();
+  // Breadcrumb back up the T34→T35 chain: editor → batch wizard → station.
+  // With a tpl_ [id] the wizard link resumes the same batch (?batch=…);
+  // reached bare (bat_ as [id]) the best anchor we have is the catalog root.
+  const isTemplate = TEMPLATE_ID_RE.test(params.id);
   return (
-    <BindingStation
-      batchId={batchId}
-      role={role}
-      exceptionsTab={<ExceptionLog batchId={batchId} />}
-    />
+    <div className="space-y-4">
+      <Link
+        href={isTemplate ? `/catalog/${params.id}/batch?batch=${batchId}` : "/catalog"}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {isTemplate ? "Batch mint wizard" : "Catalog"}
+      </Link>
+      <BindingStation
+        batchId={batchId}
+        role={role}
+        exceptionsTab={<ExceptionLog batchId={batchId} />}
+      />
+    </div>
   );
 }

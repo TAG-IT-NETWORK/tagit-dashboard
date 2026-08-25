@@ -65,6 +65,13 @@ const SESSION_ONLY_PATHS = ["/403"] as const;
  * the session role server-side (operator+ via canMutateCatalog; publish is
  * admin-only via canPublishCatalog) — the path map cannot see HTTP methods,
  * so the write/read split is enforced in the proxies.
+ *
+ * A `*` prefix segment matches exactly ONE path segment — needed for the
+ * T34 batch action routes whose id sits mid-path
+ * (/api/catalog-proxy/batches/bat_…/execute). GET-only read routes on the
+ * same rails (/batches list+status, /binding/exceptions, /export.csv) stay
+ * viewer-level on purpose: the wizard/station pages render read-only for
+ * viewers, and every mutating route ALSO re-checks the role server-side.
  */
 export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = [
   // operator — drafts + media + batches + binding
@@ -74,6 +81,12 @@ export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = 
   ["/bind", "operator"],
   ["/api/media-proxy", "operator"],
   ["/api/mint-proxy", "operator"],
+  // operator — T34 batch execute + T35 binding writes
+  ["/api/catalog-proxy/batches/*/execute", "operator"],
+  ["/api/catalog-proxy/binding/bind", "operator"],
+  ["/api/catalog-proxy/binding/verify", "operator"],
+  ["/api/catalog-proxy/binding/reassign", "operator"],
+  ["/api/catalog-proxy/binding/skip-defective", "operator"],
   // admin — publish + prices + recovery + team
   ["/catalog/publish", "admin"],
   ["/publish", "admin"],
@@ -83,11 +96,24 @@ export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = 
   ["/resolve", "admin"],
   ["/team", "admin"],
   ["/api/team-proxy", "admin"],
+  // admin — T34 unstick (force-resets server state) + T35 void-remint
+  // (irreversible on-chain recycle)
+  ["/api/catalog-proxy/batches/*/unstick", "admin"],
+  ["/api/catalog-proxy/binding/void-remint", "admin"],
 ];
 
-/** Prefix match on whole path segments: /team, /team/x — but not /teammates. */
+/**
+ * Prefix match on whole path segments: /team, /team/x — but not /teammates.
+ * A `*` segment in the prefix matches exactly one non-empty path segment.
+ */
 function matchesPrefix(pathname: string, prefix: string): boolean {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+  if (!prefix.includes("*")) {
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
+  }
+  const want = prefix.split("/");
+  const got = pathname.split("/");
+  if (got.length < want.length) return false;
+  return want.every((seg, i) => (seg === "*" ? got[i].length > 0 : got[i] === seg));
 }
 
 export function isPublicPath(pathname: string): boolean {

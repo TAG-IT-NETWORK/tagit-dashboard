@@ -69,8 +69,9 @@ export function StepExport({ templateId, batch, progress }: StepExportProps) {
           Tokens minted to the treasury address stay pre-bind until each physical tag is attached at
           the binding station.
         </p>
+        {/* META-T35 binding station — lives under the wizard route (/batch/bind). */}
         <Link
-          href={`/catalog/${templateId}/bind?batch=${batch.id}`}
+          href={`/catalog/${templateId}/batch/bind?batch=${batch.id}`}
           className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
         >
           Hand off to binding station

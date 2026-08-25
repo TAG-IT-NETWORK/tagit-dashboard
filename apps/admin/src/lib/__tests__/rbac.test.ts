@@ -78,6 +78,19 @@ describe("requiredRoleFor — the per-path role map", () => {
     ["/bind", "operator"],
     ["/api/media-proxy", "operator"],
     ["/api/mint-proxy", "operator"],
+    // META-T34/T35 write rails — reads on the same prefixes stay viewer
+    // (wizard/station pages render read-only; proxies re-check server-side)
+    ["/api/catalog-proxy/batches", "viewer"],
+    ["/api/catalog-proxy/batches/bat_1", "viewer"],
+    ["/api/catalog-proxy/batches/bat_1/export.csv", "viewer"],
+    ["/api/catalog-proxy/batches/bat_1/execute", "operator"],
+    ["/api/catalog-proxy/binding/bind", "operator"],
+    ["/api/catalog-proxy/binding/verify", "operator"],
+    ["/api/catalog-proxy/binding/reassign", "operator"],
+    ["/api/catalog-proxy/binding/skip-defective", "operator"],
+    ["/api/catalog-proxy/binding/exceptions", "viewer"],
+    ["/api/catalog-proxy/batches/bat_1/unstick", "admin"],
+    ["/api/catalog-proxy/binding/void-remint", "admin"],
     // admin — publish + prices + recovery + team
     ["/catalog/publish", "admin"],
     ["/catalog/publish/42", "admin"],
@@ -103,6 +116,17 @@ describe("requiredRoleFor — the per-path role map", () => {
   it("matches whole path segments only (/teammates is NOT /team)", () => {
     expect(requiredRoleFor("/teammates")).toBe("viewer");
     expect(requiredRoleFor("/bindery")).toBe("viewer");
+  });
+
+  it("`*` matches exactly one non-empty segment (T34 batch action routes)", () => {
+    // one id segment of any shape
+    expect(requiredRoleFor("/api/catalog-proxy/batches/bat_abc123/execute")).toBe("operator");
+    expect(requiredRoleFor("/api/catalog-proxy/batches/anything/unstick")).toBe("admin");
+    // missing or empty id segment → no match, viewer default
+    expect(requiredRoleFor("/api/catalog-proxy/batches/execute")).toBe("viewer");
+    expect(requiredRoleFor("/api/catalog-proxy/batches//execute")).toBe("viewer");
+    // wildcard is a segment matcher, not a substring one
+    expect(requiredRoleFor("/api/catalog-proxy/batches/bat_1/executed")).toBe("viewer");
   });
 });
 
