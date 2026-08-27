@@ -18,6 +18,7 @@ import {
 } from "@tagit/contracts";
 import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
+import { useMetadataHash } from "@/lib/hooks/use-metadata-hash";
 import { BindTagModal } from "@/components/bind-tag-modal";
 import { TransferModal } from "@/components/transfer-modal";
 import { TransactionStatus } from "@/components/transaction-status";
@@ -88,11 +89,16 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   );
 }
 
+const ZERO_HASH = `0x${"0".repeat(64)}`;
+
 function AssetDetailContent({ id }: { id: string }) {
   const chainId = useChainId();
   const tokenId = BigInt(id);
 
   const { asset, isLoading: assetLoading, error: assetError, refetch } = useAsset(tokenId);
+  // Anchored canonical-doc hash straight from TAGITCore — replaces the old
+  // "Requires indexer" placeholder (META-T36).
+  const { metadataHash } = useMetadataHash(tokenId);
   const { state, stateName, isLoading: stateLoading } = useAssetState(tokenId);
   const { data: tagHash } = useTagByToken(tokenId);
   const {
@@ -357,7 +363,11 @@ function AssetDetailContent({ id }: { id: string }) {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Metadata</div>
-                  <span className="text-muted-foreground text-sm">Requires indexer</span>
+                  {metadataHash && metadataHash !== ZERO_HASH ? (
+                    <code className="text-sm break-all">{metadataHash}</code>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Not anchored</span>
+                  )}
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Timestamp</div>

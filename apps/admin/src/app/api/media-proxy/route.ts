@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { actorHeader, getActor } from "@/lib/actor";
+import { getActorRole } from "@/lib/actor-role";
+import { canMutateCatalog } from "@/lib/catalog/template-logic";
+
 /**
  * POST /api/media-proxy — server-side multipart pass-through to the
  * tagit-services media pipeline (POST {SERVICES_URL}/api/v1/media).
@@ -9,6 +13,13 @@ import { NextResponse } from "next/server";
  * multipart body upstream untouched and injects the Authorization header
  * server-side. The response (sha256, variant URLs, lqip, …) is passed back
  * verbatim — it never contains the key.
+ *
+ * REQ-S-16 (META-T32): the signed-in user's email is forwarded as X-Actor so
+ * the services audit log names the human behind the upload.
+ *
+ * WB-07: the route re-checks the session role in-route (operator+ via
+ * canMutateCatalog) like every other mutating proxy — the middleware is the
+ * first gate, never the only one.
  */
 
 export const runtime = "nodejs";
@@ -19,6 +30,12 @@ export const maxDuration = 60;
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 
 export async function POST(req: Request) {
+  // WB-07: in-route role re-check (operator+) — defense in depth behind the
+  // middleware path gate.
+  if (!canMutateCatalog(await getActorRole())) {
+    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
+  }
+
   const apiKey = process.env.SERVICES_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -32,6 +49,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "expected multipart/form-data" }, { status: 400 });
   }
 
+  const actor = await getActor();
+
   try {
     const upstream = await fetch(`${SERVICES_URL}/api/v1/media`, {
       method: "POST",
@@ -40,6 +59,7 @@ export async function POST(req: Request) {
         // browser's cookies or other headers.
         "content-type": contentType,
         authorization: `Bearer ${apiKey}`,
+        ...actorHeader(actor),
       },
       body: req.body,
       // Node fetch requires half-duplex for streamed request bodies.

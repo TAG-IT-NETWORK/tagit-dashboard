@@ -4,10 +4,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 /**
  * Unit tests for the media-proxy route handler: multipart pass-through with
  * the admin API key injected SERVER-SIDE only. Mocked fetch — no live
- * services, no network.
+ * services, no network. WB-07: the route re-checks the session role in-route
+ * (operator+), so the actor-role seam is mocked to an editor by default.
  */
 
 const TEST_KEY = "test-admin-key-do-not-leak";
+
+const actorRoleMock = vi.hoisted(() => ({
+  role: "editor" as "admin" | "editor" | "viewer" | null,
+}));
+vi.mock("@/lib/actor-role", () => ({
+  getActorRole: async () => actorRoleMock.role,
+}));
 
 async function loadHandler() {
   // Re-import fresh so the module reads the current env.
@@ -29,6 +37,7 @@ describe("POST /api/media-proxy", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    actorRoleMock.role = "editor";
     process.env.SERVICES_API_KEY = TEST_KEY;
     process.env.SERVICES_URL = "https://services.test";
     fetchMock = vi.fn(
@@ -107,6 +116,29 @@ describe("POST /api/media-proxy", () => {
     );
     expect(res.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("WB-07: viewer role gets 403 without touching upstream", async () => {
+    actorRoleMock.role = "viewer";
+    const POST = await loadHandler();
+    const res = await POST(multipartRequest());
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("WB-07: role-less session (null) fails closed with 403", async () => {
+    actorRoleMock.role = null;
+    const POST = await loadHandler();
+    const res = await POST(multipartRequest());
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("WB-07: admin passes the in-route gate", async () => {
+    actorRoleMock.role = "admin";
+    const POST = await loadHandler();
+    const res = await POST(multipartRequest());
+    expect(res.status).toBe(201);
   });
 
   it("maps upstream network failure to 502 without leaking the key", async () => {

@@ -66,6 +66,7 @@ const NAV_ITEMS = [
   "BD Agent",
   "Influencer",
   "Demo",
+  "Team",
 ];
 
 describe("Sidebar", () => {
