@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
 
 import { TEMPLATE_ID_RE } from "@/lib/catalog/template-logic";
-import { resolveItemRows } from "@/lib/server/templates-upstream";
+import { templatesUpstream } from "@/lib/server/templates-upstream";
 
 /**
- * GET /api/catalog-proxy/templates/:id/items?tokenIds=1,2,3 (META-T33) —
- * resolve an explicit token-id set into Items-table rows via the services
- * per-token detail DTO (admin key injected server-side).
+ * GET /api/catalog-proxy/templates/:id/items?cursor=&limit= (WB-05) —
+ * pass-through to the services template-items enumeration
+ * (GET /api/v1/admin/templates/:id/items): same row shape + keyset
+ * pagination as the org-wide admin catalog list, tenant-scoped THROUGH the
+ * template (a foreign template id 404s upstream). Replaces the old
+ * explicit-tokenIds fan-out over the public per-token DTO — the Items tab
+ * now enumerates real template linkage by default and uses the manual
+ * token-id input only as a client-side filter.
  *
- * LIMITATION (deliberate — see lib/server/templates-upstream.ts): services
- * main exposes no template→items enumeration endpoint, so the caller supplies
- * the token ids and rows carry no per-item template linkage; the Items tab
- * banner explains both. Capped at 100 ids per request to keep the fan-out
- * (one upstream GET per id, concurrency 8) polite.
+ * Read-only, viewer-safe (middleware session gate is the outer wall, same
+ * posture as the other template GETs); admin key injected server-side.
  */
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_ITEMS_PER_REQUEST = 100;
+/** Mirror of the services catalogListQuerySchema bounds (admin-list.ts). */
+const MAX_LIMIT = 100;
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   if (!TEMPLATE_ID_RE.test(params.id)) {
@@ -27,18 +30,27 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       { status: 400 },
     );
   }
-  const raw = new URL(req.url).searchParams.get("tokenIds") ?? "";
-  const tokenIds = raw.split(",").filter((t) => t !== "");
-  if (tokenIds.length === 0) {
-    return NextResponse.json({ ok: true, rows: [] });
-  }
-  if (tokenIds.length > MAX_ITEMS_PER_REQUEST || !tokenIds.every((t) => /^\d+$/.test(t))) {
+  const search = new URL(req.url).searchParams;
+  const cursor = search.get("cursor");
+  const limit = search.get("limit");
+  if (cursor !== null && !/^\d+$/.test(cursor)) {
     return NextResponse.json(
-      { ok: false, error: `tokenIds must be 1–${MAX_ITEMS_PER_REQUEST} decimal ids` },
+      { ok: false, error: "cursor must be a numeric token id" },
+      { status: 400 },
+    );
+  }
+  if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= MAX_LIMIT)) {
+    return NextResponse.json(
+      { ok: false, error: `limit must be an integer 1–${MAX_LIMIT}` },
       { status: 400 },
     );
   }
 
-  const rows = await resolveItemRows(tokenIds);
-  return NextResponse.json({ ok: true, rows });
+  const qs = new URLSearchParams();
+  if (cursor !== null) qs.set("cursor", cursor);
+  if (limit !== null) qs.set("limit", limit);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+
+  const res = await templatesUpstream(`/api/v1/admin/templates/${params.id}/items${suffix}`);
+  return NextResponse.json(res.body, { status: res.status });
 }

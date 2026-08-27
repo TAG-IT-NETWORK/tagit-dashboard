@@ -28,15 +28,16 @@ export function csvEscapeCell(value: string | number | null | undefined): string
 export const ITEMS_CSV_HEADER = [
   "tokenId",
   "name",
-  "sku",
-  "lifecycleState",
+  "serial",
+  "lifecycle",
+  "templateVersion",
   "anchorStatus",
   "anchoredVersion",
   "latestVersion",
   "verifyUrl",
 ] as const;
 
-/** Items-table export: one line per resolved row, CRLF-joined per RFC 4180. */
+/** Items-table export: one line per enumerated row, CRLF-joined per RFC 4180. */
 export function buildItemsCsv(rows: TemplateItemRow[], verifyBaseUrl: string): string {
   const lines = [ITEMS_CSV_HEADER.join(",")];
   for (const row of rows) {
@@ -44,8 +45,9 @@ export function buildItemsCsv(rows: TemplateItemRow[], verifyBaseUrl: string): s
       [
         csvEscapeCell(row.tokenId),
         csvEscapeCell(row.name),
-        csvEscapeCell(row.sku),
-        csvEscapeCell(row.lifecycleState),
+        csvEscapeCell(row.serial),
+        csvEscapeCell(row.lifecycle),
+        csvEscapeCell(row.templateVersion),
         csvEscapeCell(row.anchorStatus),
         csvEscapeCell(row.anchoredVersion),
         csvEscapeCell(row.latestVersion),

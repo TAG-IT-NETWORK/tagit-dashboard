@@ -1,15 +1,27 @@
 /**
- * Types for the /assets catalog registry (META-T36).
+ * Types for the /assets catalog registry (META-T36; WB-04).
  *
- * The registry is built from the tagit-services catalog surface:
- *   GET /api/v1/assets/public       → org-wide enumeration (tokenId list)
- *   GET /api/v1/assets/:tokenId     → per-token detail DTO (verification,
- *                                     product, price, media blocks)
+ * The registry rows come from the tagit-services ADMIN catalog list
+ * (GET /api/v1/admin/catalog — src/catalog/admin-list.ts CatalogListItem):
+ * keyset-paginated by token id, tenant-scoped, and INCLUSIVE of restricted,
+ * unanchored and drifted items — the old public-enumeration fan-out
+ * (GET /api/v1/assets/public + per-token DTOs) only ever saw
+ * public+confirmed rows. The per-token detail DTO
+ * (GET /api/v1/assets/:tokenId) still backs the slide-over.
  *
- * The detail DTO shapes below mirror tagit-services src/api/assets.ts
- * (buildAssetDetail). Fields the admin console does not render are omitted —
- * unknown extra fields are simply ignored by the mappers.
+ * Shapes below mirror the services source — fields the admin console does
+ * not render are omitted; unknown extra fields are ignored by the mappers.
  */
+
+/** catalog_items.lifecycle values (services itemLifecycleEnum). */
+export const CATALOG_LIFECYCLES = [
+  "draft",
+  "minted",
+  "bound",
+  "anchored",
+  "recycled",
+] as const;
+export type CatalogLifecycle = (typeof CATALOG_LIFECYCLES)[number];
 
 /** Verification block of the services detail DTO (trust-rule fields). */
 export interface VerificationBlock {
@@ -43,17 +55,20 @@ export type AnchorVerdict = "confirmed" | "pending" | "drift";
 /** Result of comparing the on-chain metadataHash against the served jcs_hash. */
 export type IntegrityResult = "match" | "mismatch" | "unknown";
 
-/** One row of the org-wide registry table. */
+/** One row of the org-wide registry table (admin catalog list item). */
 export interface RegistryRow {
   tokenId: string;
-  /** Item is visibility-restricted — the public DTO serves a protected stub. */
+  /** visibility === 'restricted' — admin sees the data, badge marks it. */
   restricted: boolean;
   name: string | null;
-  image: string | null;
-  /** Numeric lifecycle state code (chain enum; null when restricted). */
-  stateCode: number | null;
-  lifecycleState: string | null;
-  /** A non-zero tagHash is bound. */
+  /** Template linkage — real values from the admin list (WB-04). */
+  templateId: string | null;
+  templateVersion: number | null;
+  /** tagit.serial from the latest metadata doc. */
+  serial: string | null;
+  /** catalog_items.lifecycle (draft | minted | bound | anchored | recycled). */
+  lifecycle: string | null;
+  /** tag_hash present — the physical tag is bound. */
   bound: boolean;
   priceDisplay: string | null;
   saleState: PriceBlock["saleState"] | null;
@@ -65,8 +80,8 @@ export interface RegistryRow {
 
 /** URL-search-param driven registry filters (server-rendered). */
 export interface RegistryFilters {
-  /** Lifecycle state code filter (chain enum 0–6), or null = all. */
-  state: number | null;
+  /** catalog_items.lifecycle filter, or null = all. */
+  lifecycle: CatalogLifecycle | null;
   /** Only items missing product metadata. */
   needsInfo: boolean;
   /** Only items whose anchor verdict is drift. */

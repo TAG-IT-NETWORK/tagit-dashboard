@@ -38,6 +38,12 @@ export interface TemplateDto {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * catalog_items count for this template (WB-05) — attached by the services
+   * list/detail routes via serializeTemplate extras; absent on write-path
+   * responses.
+   */
+  itemsCount?: number;
 }
 
 /**
@@ -109,27 +115,38 @@ export interface PropagateJobDto {
 }
 
 /**
- * One row of the editor's Items table. Assembled by the items proxy from the
- * public per-token detail DTO (GET /api/v1/assets/:tokenId) — tagit-services
- * main ships NO template→items enumeration endpoint (see items proxy notes),
- * so rows are resolved from an explicit token-id set and the public DTO,
- * which does not expose per-item template linkage.
+ * One row of the editor's Items table (WB-05): the services template-items
+ * enumeration (GET /api/v1/admin/templates/:id/items — same row shape as
+ * GET /api/v1/admin/catalog, services admin-list.ts CatalogListItem). Rows
+ * carry REAL template linkage (adopted templateVersion) — the old public
+ * per-token fan-out is gone.
  */
 export interface TemplateItemRow {
   tokenId: string;
-  found: boolean;
-  restricted: boolean;
   name: string | null;
-  image: string | null;
-  lifecycleState: string | null;
-  sku: string | null;
+  /** tagit.serial from the latest metadata doc. */
+  serial: string | null;
+  /** catalog_items.lifecycle (draft | minted | bound | anchored | recycled). */
+  lifecycle: string | null;
+  /** Snapshot version the item was adopted/rendered from. */
+  templateVersion: number | null;
+  bound: boolean;
+  restricted: boolean;
   anchoredVersion: number | null;
   latestVersion: number | null;
   anchorStatus: string | null;
+  /** Metadata-anchor drift flag (server-computed; verdict re-derived in UI). */
+  drift: boolean;
+  needsProductInfo: boolean;
 }
 
+/** GET /api/v1/admin/templates/:id/items envelope (via the items proxy). */
 export interface TemplateItemsResponse {
   ok: boolean;
-  rows: TemplateItemRow[];
+  templateId?: string;
+  count?: number;
+  items?: unknown[];
+  nextCursor?: string | null;
   error?: string;
+  message?: string;
 }

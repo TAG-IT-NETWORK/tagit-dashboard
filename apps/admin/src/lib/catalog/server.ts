@@ -1,30 +1,29 @@
 /**
- * Server-side catalog registry fetchers (META-T36). Server components and
- * route handlers ONLY — this module reads SERVICES_API_KEY, which must never
- * reach a client bundle.
+ * Server-side catalog registry fetchers (META-T36; WB-04). Server components
+ * and route handlers ONLY — this module reads SERVICES_API_KEY, which must
+ * never reach a client bundle.
  *
- * LIMITATION (deliberate, see task notes): tagit-services ships no org-wide
- * ADMIN catalog list endpoint yet — the admin surface is per-token
- * (templates/batches/binding). The registry is therefore assembled from the
- * public enumeration (GET /api/v1/assets/public: visibility='public' AND
- * anchor_status='confirmed' rows only) plus the per-token detail DTO. Items
- * that are restricted, unanchored, or mid-drift do NOT appear in that
- * enumeration; an admin list endpoint would lift this.
+ * WB-04: the registry reads the org-wide ADMIN catalog list
+ * (GET /api/v1/admin/catalog — keyset pagination by token id, tenant-scoped,
+ * server-side lifecycle/drift/needsProductInfo filters). This replaced the
+ * old 150-token public fan-out (GET /api/v1/assets/public + one detail GET
+ * per token), which could only ever see public+confirmed items — restricted,
+ * unanchored and drifted rows now appear. NOTE: the cursor is the last
+ * SCANNED row, so a filtered page may be sparse (fewer rows than the limit)
+ * while nextCursor is still set — keep paging until nextCursor is null.
  */
 
-import { buildRegistryRow } from "./logic";
-import type { RegistryRow } from "./types";
+import { registryRowFromAdminItem } from "./logic";
+import type { RegistryFilters, RegistryRow } from "./types";
 
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 
-/** Upper bound on per-token detail fetches for one page render. */
-export const MAX_REGISTRY_SCAN = 150;
-const DETAIL_CONCURRENCY = 8;
+/** Page size for the admin list (services caps limit at 100). */
+export const REGISTRY_PAGE_LIMIT = 50;
 const FETCH_TIMEOUT_MS = 10_000;
 
 function authHeaders(): Record<string, string> {
-  // The list/detail reads are public today, but send the admin key when
-  // configured so the registry keeps working if the surface moves behind auth.
+  // The admin catalog list sits behind apiKeyAuth — the key is required.
   const apiKey = process.env.SERVICES_API_KEY;
   return apiKey ? { authorization: `Bearer ${apiKey}` } : {};
 }
@@ -47,17 +46,6 @@ async function fetchJson(path: string): Promise<{ status: number; body: unknown 
   }
 }
 
-/** GET /api/v1/assets/public → ascending tokenId list. */
-export async function fetchPublicTokenIds(): Promise<string[] | null> {
-  const res = await fetchJson("/api/v1/assets/public");
-  if (!res || res.status !== 200) return null;
-  const body = res.body as { assets?: Array<{ tokenId?: unknown }> } | null;
-  if (!body || !Array.isArray(body.assets)) return null;
-  return body.assets
-    .map((a) => (typeof a?.tokenId === "string" ? a.tokenId : null))
-    .filter((id): id is string => id !== null);
-}
-
 /** GET /api/v1/assets/:tokenId → raw detail body (null on network failure). */
 export async function fetchAssetDetail(tokenId: string): Promise<unknown | null> {
   if (!/^\d+$/.test(tokenId)) return null;
@@ -68,60 +56,60 @@ export async function fetchAssetDetail(tokenId: string): Promise<unknown | null>
 
 export interface RegistryResult {
   rows: RegistryRow[];
-  /** Total tokens in the services enumeration (before the scan cap). */
-  total: number;
-  /** True when total exceeded MAX_REGISTRY_SCAN and the tail was skipped. */
-  truncated: boolean;
-  /** Set when the services catalog could not be reached at all. */
+  /** Keyset cursor for the next page (last scanned token id), or null. */
+  nextCursor: string | null;
+  /** Set when the services catalog could not be reached / rejected the call. */
   error: string | null;
 }
 
-/** Concurrency-limited map — keeps the per-token detail fan-out polite. */
-async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
-  );
-  return results;
-}
-
 /**
- * Assemble the org-wide registry: enumerate public tokens, then fetch each
- * token's detail DTO (concurrency-limited) and map to table rows. A token
- * whose detail fetch fails degrades to a minimal row rather than vanishing.
+ * One page of the org-wide registry: GET /api/v1/admin/catalog with the
+ * filters mapped onto the server-side query params. The admin key is
+ * injected server-side; rows map through registryRowFromAdminItem (the
+ * drift verdict is recomputed client-side).
  */
-export async function fetchRegistry(): Promise<RegistryResult> {
-  const ids = await fetchPublicTokenIds();
-  if (ids === null) {
+export async function fetchRegistry(
+  filters: RegistryFilters,
+  cursor?: string,
+): Promise<RegistryResult> {
+  const params = new URLSearchParams();
+  params.set("limit", String(REGISTRY_PAGE_LIMIT));
+  if (cursor !== undefined && /^\d+$/.test(cursor)) params.set("cursor", cursor);
+  if (filters.lifecycle !== null) params.set("lifecycle", filters.lifecycle);
+  if (filters.drift) params.set("drift", "true");
+  if (filters.needsInfo) params.set("needsProductInfo", "true");
+
+  const res = await fetchJson(`/api/v1/admin/catalog?${params.toString()}`);
+  if (!res) {
     return {
       rows: [],
-      total: 0,
-      truncated: false,
-      error: "Could not reach the services catalog (GET /api/v1/assets/public)",
+      nextCursor: null,
+      error: "Could not reach the services catalog (GET /api/v1/admin/catalog)",
+    };
+  }
+  const body = res.body as
+    | { ok?: unknown; items?: unknown; nextCursor?: unknown; error?: unknown; message?: unknown }
+    | null;
+  if (res.status !== 200 || body?.ok !== true || !Array.isArray(body.items)) {
+    const detail =
+      typeof body?.error === "string"
+        ? body.error
+        : typeof body?.message === "string"
+          ? body.message
+          : `services admin catalog returned ${res.status}`;
+    return {
+      rows: [],
+      nextCursor: null,
+      error:
+        res.status === 401
+          ? `${detail} — is SERVICES_API_KEY configured on the server?`
+          : detail,
     };
   }
 
-  const scanned = ids.slice(0, MAX_REGISTRY_SCAN);
-  const rows = await mapLimit(scanned, DETAIL_CONCURRENCY, async (tokenId) => {
-    const body = await fetchAssetDetail(tokenId);
-    return buildRegistryRow(tokenId, body);
-  });
-
   return {
-    rows,
-    total: ids.length,
-    truncated: ids.length > scanned.length,
+    rows: body.items.map(registryRowFromAdminItem),
+    nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
     error: null,
   };
 }

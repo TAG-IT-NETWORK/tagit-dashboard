@@ -355,3 +355,41 @@ describe("BATCH_ID_RE", () => {
     expect(BATCH_ID_RE.test("bat_")).toBe(false);
   });
 });
+
+// ── WB-01: cmacVerified surfacing ───────────────────────────────────────────
+
+describe("cmacVerified (WB-01)", () => {
+  it("SUN_OK carries the server CMAC verdict into state and the last bind", () => {
+    let s = loadedState();
+    s = stationReducer(s, { type: "TAP", uid: UID });
+    expect(s.cmacVerified).toBeNull(); // no server verify yet for this tap
+    s = stationReducer(s, { type: "SUN_OK", cmacVerified: true });
+    expect(s.cmacVerified).toBe(true);
+    s = stationReducer(s, { type: "BIND_OK", txHash: null, at: 1 });
+    expect(s.lastBind?.cmacVerified).toBe(true);
+  });
+
+  it("counter-only check (cmacVerified false / omitted) never reads as verified", () => {
+    let s = loadedState();
+    s = stationReducer(s, { type: "TAP", uid: UID });
+    s = stationReducer(s, { type: "SUN_OK" }); // legacy shape — no claim
+    expect(s.cmacVerified).toBe(false);
+    s = stationReducer(s, { type: "BIND_OK", txHash: null, at: 1 });
+    expect(s.lastBind?.cmacVerified).toBe(false);
+
+    let t = loadedState();
+    t = stationReducer(t, { type: "TAP", uid: UID });
+    t = stationReducer(t, { type: "SUN_OK", cmacVerified: false });
+    expect(t.cmacVerified).toBe(false);
+  });
+
+  it("a fresh TAP resets the previous tap's CMAC verdict", () => {
+    let s = loadedState();
+    s = stationReducer(s, { type: "TAP", uid: UID });
+    s = stationReducer(s, { type: "SUN_OK", cmacVerified: true });
+    s = stationReducer(s, { type: "BIND_OK", txHash: null, at: 1 });
+    s = stationReducer(s, { type: "ADVANCE" });
+    s = stationReducer(s, { type: "TAP", uid: "04:00:00:00:00:00:02" });
+    expect(s.cmacVerified).toBeNull();
+  });
+});

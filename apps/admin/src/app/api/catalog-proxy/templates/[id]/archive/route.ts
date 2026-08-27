@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getActorRole } from "@/lib/actor-role";
-import { TEMPLATE_ID_RE, canMutateCatalog } from "@/lib/catalog/template-logic";
+import { TEMPLATE_ID_RE, canPublishCatalog } from "@/lib/catalog/template-logic";
 import { templatesUpstream } from "@/lib/server/templates-upstream";
 
 /**
@@ -21,8 +21,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       { status: 400 },
     );
   }
-  if (!canMutateCatalog(await getActorRole())) {
-    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
+  if (!canPublishCatalog(await getActorRole())) {
+    // WB-06: archive retires a live template — admin-level, matching the
+    // middleware PATH_ROLES pin.
+    return NextResponse.json({ ok: false, error: "archive requires the admin role" }, { status: 403 });
   }
   const res = await templatesUpstream(`/api/v1/admin/templates/${params.id}/archive`, {
     method: "POST",

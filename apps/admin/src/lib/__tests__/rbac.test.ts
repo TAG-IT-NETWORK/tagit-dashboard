@@ -65,11 +65,10 @@ describe("requiredRoleFor — the per-path role map", () => {
     ["/governance", "viewer"],
     ["/", "viewer"],
     // META-T33/T36 read surfaces render read-only for viewers; catalog
-    // WRITES are role-gated inside /api/catalog-proxy (methods are invisible
-    // to the path map) — operator+ to mutate, admin to publish.
+    // WRITES are role-gated by method-scoped entries (WB-06) AND re-checked
+    // inside /api/catalog-proxy — operator+ to mutate, admin to publish.
     ["/catalog", "viewer"],
     ["/catalog/tpl_42", "viewer"],
-    ["/api/catalog-proxy/templates", "viewer"],
     // operator — drafts + media + batches + binding
     ["/assets/new", "operator"],
     ["/assembly-line", "operator"],
@@ -91,9 +90,11 @@ describe("requiredRoleFor — the per-path role map", () => {
     ["/api/catalog-proxy/binding/exceptions", "viewer"],
     ["/api/catalog-proxy/batches/bat_1/unstick", "admin"],
     ["/api/catalog-proxy/binding/void-remint", "admin"],
+    // WB-06: template lifecycle verbs are admin (any method — POST-only routes)
+    ["/api/catalog-proxy/templates/tpl_42/publish", "admin"],
+    ["/api/catalog-proxy/templates/tpl_42/archive", "admin"],
+    ["/api/catalog-proxy/templates/tpl_42/propagate", "admin"],
     // admin — publish + prices + recovery + team
-    ["/catalog/publish", "admin"],
-    ["/catalog/publish/42", "admin"],
     ["/publish", "admin"],
     ["/prices", "admin"],
     ["/pricing", "admin"],
@@ -107,10 +108,26 @@ describe("requiredRoleFor — the per-path role map", () => {
     expect(requiredRoleFor(pathname)).toBe(role);
   });
 
-  it("longest prefix wins: /catalog/publish escalates above /catalog", () => {
+  it("longest prefix wins: templates/*/publish escalates above the POST templates entry", () => {
     expect(requiredRoleFor("/catalog")).toBe("viewer");
     expect(requiredRoleFor("/catalog/publishing-guide")).toBe("viewer"); // segment-safe
-    expect(requiredRoleFor("/catalog/publish")).toBe("admin");
+    // WB-06: the dead /catalog/publish page entry is gone — plain viewer path.
+    expect(requiredRoleFor("/catalog/publish")).toBe("viewer");
+    expect(requiredRoleFor("/api/catalog-proxy/templates/tpl_1/publish", "POST")).toBe("admin");
+  });
+
+  it("WB-06: method-scoped template create/update entries", () => {
+    // GET list/detail through the proxy stays viewer-level (read surfaces).
+    expect(requiredRoleFor("/api/catalog-proxy/templates", "GET")).toBe("viewer");
+    expect(requiredRoleFor("/api/catalog-proxy/templates/tpl_1", "GET")).toBe("viewer");
+    expect(requiredRoleFor("/api/catalog-proxy/templates/tpl_1/items", "GET")).toBe("viewer");
+    // Create (POST collection) and update (PUT :id) are operator.
+    expect(requiredRoleFor("/api/catalog-proxy/templates", "POST")).toBe("operator");
+    expect(requiredRoleFor("/api/catalog-proxy/templates/tpl_1", "PUT")).toBe("operator");
+    // lowercase method normalizes
+    expect(requiredRoleFor("/api/catalog-proxy/templates", "post")).toBe("operator");
+    // Unknown method (omitted) FAILS CLOSED: method-scoped entries apply.
+    expect(requiredRoleFor("/api/catalog-proxy/templates")).toBe("operator");
   });
 
   it("matches whole path segments only (/teammates is NOT /team)", () => {
@@ -197,26 +214,52 @@ describe("evaluateAccess — the middleware decision table", () => {
     expect(evaluateAccess("/team", viewer)).toBe("forbidden");
   });
 
-  it("viewer: catalog reads allowed (write role checks live in the proxies)", () => {
+  it("viewer: catalog reads allowed, template writes forbidden (WB-06 method scope)", () => {
     expect(evaluateAccess("/catalog", viewer)).toBe("allow");
-    expect(evaluateAccess("/api/catalog-proxy/templates", viewer)).toBe("allow");
-    expect(evaluateAccess("/catalog/publish", viewer)).toBe("forbidden");
+    expect(evaluateAccess("/api/catalog-proxy/templates", viewer, "GET")).toBe("allow");
+    expect(evaluateAccess("/api/catalog-proxy/templates", viewer, "POST")).toBe("forbidden");
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1", viewer, "PUT")).toBe("forbidden");
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1/publish", viewer, "POST")).toBe(
+      "forbidden",
+    );
   });
 
-  it("operator: + drafts/media/batches/binding, still not admin surfaces", () => {
+  it("operator: + drafts/media/batches/binding + template create/update, not admin verbs", () => {
     expect(evaluateAccess("/catalog", operator)).toBe("allow");
     expect(evaluateAccess("/assets/new", operator)).toBe("allow");
     expect(evaluateAccess("/api/mint-proxy", operator)).toBe("allow");
     expect(evaluateAccess("/bind", operator)).toBe("allow");
-    expect(evaluateAccess("/catalog/publish", operator)).toBe("forbidden");
+    expect(evaluateAccess("/api/catalog-proxy/templates", operator, "POST")).toBe("allow");
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1", operator, "PUT")).toBe("allow");
+    // WB-06: publish/archive/propagate are admin-level
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1/publish", operator, "POST")).toBe(
+      "forbidden",
+    );
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1/archive", operator, "POST")).toBe(
+      "forbidden",
+    );
+    expect(evaluateAccess("/api/catalog-proxy/templates/tpl_1/propagate", operator, "POST")).toBe(
+      "forbidden",
+    );
     expect(evaluateAccess("/prices", operator)).toBe("forbidden");
     expect(evaluateAccess("/team", operator)).toBe("forbidden");
     expect(evaluateAccess("/api/team-proxy", operator)).toBe("forbidden");
   });
 
   it("admin: everything", () => {
-    for (const p of ["/dashboard", "/catalog", "/catalog/publish", "/prices", "/recovery", "/resolve", "/team", "/api/team-proxy"]) {
-      expect(evaluateAccess(p, admin)).toBe("allow");
+    for (const p of [
+      "/dashboard",
+      "/catalog",
+      "/prices",
+      "/recovery",
+      "/resolve",
+      "/team",
+      "/api/team-proxy",
+      "/api/catalog-proxy/templates/tpl_1/publish",
+      "/api/catalog-proxy/templates/tpl_1/archive",
+      "/api/catalog-proxy/templates/tpl_1/propagate",
+    ]) {
+      expect(evaluateAccess(p, admin, "POST")).toBe("allow");
     }
   });
 });
@@ -240,5 +283,19 @@ describe("matcher mirror (MUST stay in sync with src/middleware.ts config.matche
     ]) {
       expect(isGatedByMatcher(p)).toBe(false);
     }
+  });
+
+  it("WB-08: the extension exclusion does NOT apply under /api/ — no gate bypass", () => {
+    for (const p of [
+      "/api/team-proxy/foo.png",
+      "/api/media-proxy/x.svg",
+      "/api/catalog-proxy/templates/evil.map",
+      "/api/mint-proxy/a.txt",
+    ]) {
+      expect(isGatedByMatcher(p)).toBe(true);
+    }
+    // Non-/api static assets stay excluded.
+    expect(isGatedByMatcher("/apidocs.png")).toBe(false);
+    expect(isGatedByMatcher("/logo.webp")).toBe(false);
   });
 });

@@ -7,8 +7,9 @@
  * — where the CURRENT step is always derived from the batch's server-side
  * state (wizardStepForBatch), never from client memory. That makes the wizard
  * resumable across sessions: land here with ?batch=bat_… (or click a row in
- * the "Recent batches" rail, persisted per template in localStorage since
- * services ships no batch-list endpoint) and you re-enter mid-mint.
+ * the "Recent batches" rail — WB-09: served from GET /api/v1/admin/batches
+ * ?templateId= via the proxy, cross-machine and tenant-scoped; localStorage
+ * is only the offline fallback) and you re-enter mid-mint.
  *
  * All traffic goes through /api/catalog-proxy/batches* (admin + relayer keys
  * server-side, REQ-S-16 X-Actor forwarded); viewer role renders read-only.
@@ -24,9 +25,11 @@ import { StepCreate } from "@/components/batch/step-create";
 import { StepExport } from "@/components/batch/step-export";
 import { StepMint } from "@/components/batch/step-mint";
 import {
+  RECENT_BATCH_CAP,
   WIZARD_STEPS,
   isBatchInFlight,
   parseRecentBatches,
+  parseServerBatchList,
   recentBatchesKey,
   upsertRecentBatch,
   wizardStepForBatch,
@@ -61,19 +64,42 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
   const [loadingStatus, setLoadingStatus] = useState(initialBatchId !== null);
   const [templateName, setTemplateName] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentBatch[]>([]);
+  const [recentSource, setRecentSource] = useState<"server" | "local">("local");
   const [pollNonce, setPollNonce] = useState(0);
 
-  // Recent-batch memory (per template) — the cross-session "batch list".
-  useEffect(() => {
+  // Recent-batches rail (WB-09): server truth from the batch-list proxy
+  // (cross-machine, tenant-scoped); localStorage ONLY as offline fallback.
+  const refreshRecent = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/catalog-proxy/batches?templateId=${encodeURIComponent(templateId)}&limit=${RECENT_BATCH_CAP}`,
+        { cache: "no-store" },
+      );
+      const data: unknown = await res.json();
+      const batches = res.ok ? parseServerBatchList(data) : null;
+      if (batches !== null) {
+        setRecent(batches);
+        setRecentSource("server");
+        return;
+      }
+    } catch {
+      // fall through to the offline fallback
+    }
     try {
       setRecent(parseRecentBatches(localStorage.getItem(recentBatchesKey(templateId))));
     } catch {
       setRecent([]);
     }
+    setRecentSource("local");
   }, [templateId]);
+
+  useEffect(() => {
+    void refreshRecent();
+  }, [refreshRecent]);
 
   const remember = useCallback(
     (b: BatchDto) => {
+      // Offline cache for the fallback path; the server list is the truth.
       setRecent((prev) => {
         const next = upsertRecentBatch(prev, {
           id: b.id,
@@ -178,8 +204,9 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
       remember(b);
       setBatchId(b.id);
       router.replace(`/catalog/${templateId}/batch?batch=${b.id}`, { scroll: false });
+      void refreshRecent();
     },
-    [remember, router, templateId],
+    [refreshRecent, remember, router, templateId],
   );
 
   const step: WizardStep = batchId === null ? "create" : wizardStepForBatch(batch?.state ?? null);
@@ -273,12 +300,18 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
           )}
         </div>
 
-        {/* Recent batches rail — resume rows (per-template, this browser) */}
+        {/* Recent batches rail (WB-09) — server batch list; localStorage only
+            as offline fallback */}
         <aside className="space-y-2">
           <h2 className="text-sm font-medium text-muted-foreground">Recent batches</h2>
+          {recentSource === "local" && (
+            <p className="text-xs text-yellow-500">
+              Services batch list unreachable — showing this browser&apos;s offline cache.
+            </p>
+          )}
           {recent.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              None yet in this browser. A batch is also resumable by URL:{" "}
+              No batches for this template yet. A batch is also resumable by URL:{" "}
               <span className="font-mono">?batch=bat_…</span>
             </p>
           ) : (

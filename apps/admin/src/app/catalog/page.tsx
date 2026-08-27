@@ -17,9 +17,8 @@ import { fetchTemplatesList } from "@/lib/server/templates-upstream";
  * GET /api/v1/admin/templates (admin key stays server-side); the archived
  * toggle is a URL search param so the filter survives reload/share.
  *
- * Item count column: tagit-services main exposes no per-template item count
- * (no template→items enumeration endpoint) — rendered as "—" with the reason
- * in the tooltip rather than a fabricated number.
+ * Item count column (WB-05): each list row carries `itemsCount` from the
+ * services template serializer (ONE grouped catalog_items query upstream).
  */
 
 export const dynamic = "force-dynamic";
@@ -84,7 +83,7 @@ export default async function CatalogPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Price</th>
                 <th className="px-4 py-3 font-medium">Version</th>
-                <th className="px-4 py-3 font-medium" title="tagit-services exposes no per-template item enumeration/count endpoint yet">
+                <th className="px-4 py-3 font-medium" title="catalog_items rendered from this template (services itemsCount)">
                   Items
                 </th>
               </tr>
@@ -139,11 +138,17 @@ function TemplateRow({ template: t }: { template: TemplateDto }) {
         {msrp && <div className="text-xs text-muted-foreground">MSRP {msrp}</div>}
       </td>
       <td className="px-4 py-2 font-mono text-xs">{t.version > 0 ? `v${t.version}` : "draft"}</td>
-      <td
-        className="px-4 py-2 text-muted-foreground"
-        title="tagit-services exposes no per-template item enumeration/count endpoint yet — see the editor's Items tab"
-      >
-        —
+      <td className="px-4 py-2 font-mono text-xs">
+        {typeof t.itemsCount === "number" ? (
+          t.itemsCount
+        ) : (
+          <span
+            className="text-muted-foreground"
+            title="itemsCount missing from the services response"
+          >
+            —
+          </span>
+        )}
       </td>
     </tr>
   );

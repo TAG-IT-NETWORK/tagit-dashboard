@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   anchorVerdict,
   applyRegistryFilters,
-  buildRegistryRow,
   compareIntegrity,
   hasDrift,
   needsProductInfo,
   parseRegistryFilters,
   registryHref,
+  registryRowFromAdminItem,
   validateOverridesDoc,
 } from "../logic";
 import type { RegistryRow } from "../types";
@@ -146,95 +146,104 @@ describe("validateOverridesDoc", () => {
 });
 
 // ──────────────────────────────────────────────
-// buildRegistryRow (detail DTO → row)
+// registryRowFromAdminItem (admin catalog list item → row, WB-04)
 // ──────────────────────────────────────────────
 
-describe("buildRegistryRow", () => {
-  const fullDetail = {
+describe("registryRowFromAdminItem", () => {
+  /** GET /api/v1/admin/catalog item — services admin-list.ts CatalogListItem. */
+  const fullItem = {
     tokenId: "7",
-    stateCode: 2,
-    lifecycleState: "BOUND",
     name: "Sun Chip #7",
-    image: "https://cdn.example/hero.webp",
-    tagHash: HASH_A,
-    product: { name: "Sun Chip #7", brand: "TAG IT", sku: "SUN-7" },
-    price: { priceUsdc6: "19990000", display: "19.99 USDC", saleState: "listed" },
-    verification: {
-      anchoredVersion: 2,
-      latestVersion: 2,
-      anchorStatus: "confirmed",
-      metadataHash: HASH_A,
-      verified: true,
-    },
+    templateId: "tpl_sun",
+    templateVersion: 2,
+    serial: "SN-0007",
+    lifecycle: "bound",
+    bound: true,
+    visibility: "public",
+    saleState: "listed",
+    priceUsdc6: "19990000",
+    priceDisplay: "$19.99",
+    anchorStatus: "confirmed",
+    latestVersion: 2,
+    anchoredVersion: 2,
+    heroMediaSha: "ab".repeat(32),
+    drift: false,
+    needsProductInfo: false,
+    updatedAt: "2026-08-01T00:00:00.000Z",
   };
 
-  it("maps a full public detail body", () => {
-    const row = buildRegistryRow("7", fullDetail);
+  it("maps a full admin list item", () => {
+    const row = registryRowFromAdminItem(fullItem);
     expect(row).toMatchObject({
       tokenId: "7",
       restricted: false,
       name: "Sun Chip #7",
-      image: "https://cdn.example/hero.webp",
-      stateCode: 2,
+      templateId: "tpl_sun",
+      templateVersion: 2,
+      serial: "SN-0007",
+      lifecycle: "bound",
       bound: true,
-      priceDisplay: "19.99 USDC",
+      priceDisplay: "$19.99",
       saleState: "listed",
       verdict: "confirmed",
       hasProductInfo: true,
     });
-    expect(row.verification?.metadataHash).toBe(HASH_A);
+    expect(row.verification).toMatchObject({
+      anchoredVersion: 2,
+      latestVersion: 2,
+      anchorStatus: "confirmed",
+    });
   });
 
-  it("derives a drift verdict from the verification block", () => {
-    const row = buildRegistryRow("7", {
-      ...fullDetail,
-      verification: { ...fullDetail.verification, latestVersion: 3 },
-    });
+  it("recomputes the drift verdict client-side (latestVersion > anchoredVersion)", () => {
+    const row = registryRowFromAdminItem({ ...fullItem, latestVersion: 3, drift: true });
     expect(row.verdict).toBe("drift");
   });
 
-  it("treats a zero tagHash as unbound", () => {
-    const row = buildRegistryRow("7", { ...fullDetail, tagHash: ZERO });
-    expect(row.bound).toBe(false);
+  it("recomputes drift from anchorStatus='drift' too", () => {
+    const row = registryRowFromAdminItem({ ...fullItem, anchorStatus: "drift", drift: true });
+    expect(row.verdict).toBe("drift");
   });
 
-  it("marks restricted stubs and hides their placeholder branding", () => {
-    const row = buildRegistryRow("9", {
-      tokenId: "9",
-      restricted: true,
-      name: "TAG IT Protected Asset",
-      image: "https://cdn.example/logo.png",
-      verification: { status: "protected" },
-    });
+  it("keeps restricted items VISIBLE with a restricted marker (admin view)", () => {
+    const row = registryRowFromAdminItem({ ...fullItem, visibility: "restricted" });
     expect(row.restricted).toBe(true);
-    expect(row.name).toBeNull();
-    expect(row.image).toBeNull();
+    expect(row.name).toBe("Sun Chip #7"); // admin sees the data
+  });
+
+  it("maps an unanchored item to a pending verdict (never green)", () => {
+    const row = registryRowFromAdminItem({
+      ...fullItem,
+      anchorStatus: "pending",
+      latestVersion: 1,
+      anchoredVersion: null,
+    });
     expect(row.verdict).toBe("pending");
   });
 
-  it("degrades a failed/missing detail body to a minimal pending row", () => {
-    const row = buildRegistryRow("11", null);
+  it("degrades a malformed entry to a minimal pending row", () => {
+    const row = registryRowFromAdminItem(null);
     expect(row).toMatchObject({
-      tokenId: "11",
+      tokenId: "",
       restricted: false,
       name: null,
+      templateId: null,
+      serial: null,
+      lifecycle: null,
       bound: false,
       verdict: "pending",
-      hasProductInfo: false,
     });
   });
 
-  it("detects missing product info (needs-product-info)", () => {
-    const bare = buildRegistryRow("12", {
-      tokenId: "12",
-      stateCode: 1,
-      lifecycleState: "MINTED",
+  it("maps needsProductInfo onto the needs-product-info filter", () => {
+    const bare = registryRowFromAdminItem({
+      ...fullItem,
+      name: null,
+      needsProductInfo: true,
     });
     expect(bare.hasProductInfo).toBe(false);
     expect(needsProductInfo(bare)).toBe(true);
-    expect(needsProductInfo(buildRegistryRow("7", fullDetail))).toBe(false);
-    // Restricted rows are unknowable — never counted as needing info.
-    expect(needsProductInfo({ restricted: true, hasProductInfo: false })).toBe(false);
+    expect(needsProductInfo(registryRowFromAdminItem(fullItem))).toBe(false);
   });
 });
 
@@ -247,9 +256,10 @@ function rowWith(patch: Partial<RegistryRow>): RegistryRow {
     tokenId: "1",
     restricted: false,
     name: "Item",
-    image: null,
-    stateCode: 2,
-    lifecycleState: "BOUND",
+    templateId: "tpl_1",
+    templateVersion: 1,
+    serial: null,
+    lifecycle: "bound",
     bound: true,
     priceDisplay: null,
     saleState: null,
@@ -261,77 +271,92 @@ function rowWith(patch: Partial<RegistryRow>): RegistryRow {
 }
 
 describe("parseRegistryFilters", () => {
-  it("parses state, needsInfo and drift params", () => {
-    expect(parseRegistryFilters({ state: "3", needsInfo: "1", drift: "1" })).toEqual({
-      state: 3,
+  it("parses lifecycle, needsInfo and drift params", () => {
+    expect(parseRegistryFilters({ lifecycle: "minted", needsInfo: "1", drift: "1" })).toEqual({
+      lifecycle: "minted",
       needsInfo: true,
       drift: true,
     });
   });
 
   it("defaults to no filters", () => {
-    expect(parseRegistryFilters({})).toEqual({ state: null, needsInfo: false, drift: false });
+    expect(parseRegistryFilters({})).toEqual({
+      lifecycle: null,
+      needsInfo: false,
+      drift: false,
+    });
   });
 
-  it("ignores malformed state values", () => {
-    for (const state of ["7", "-1", "abc", "2.5", ""]) {
-      expect(parseRegistryFilters({ state }).state, state).toBeNull();
+  it("ignores malformed lifecycle values", () => {
+    for (const lifecycle of ["BOUND", "activated", "3", "", "x"]) {
+      expect(parseRegistryFilters({ lifecycle }).lifecycle, lifecycle).toBeNull();
     }
   });
 
   it("takes the first value of repeated params", () => {
-    expect(parseRegistryFilters({ state: ["4", "5"] }).state).toBe(4);
+    expect(parseRegistryFilters({ lifecycle: ["draft", "bound"] }).lifecycle).toBe("draft");
   });
 });
 
 describe("applyRegistryFilters", () => {
   const rows = [
-    rowWith({ tokenId: "1", stateCode: 2, verdict: "confirmed" }),
-    rowWith({ tokenId: "2", stateCode: 3, verdict: "drift" }),
-    rowWith({ tokenId: "3", stateCode: 3, hasProductInfo: false, verdict: "pending" }),
-    rowWith({ tokenId: "4", restricted: true, stateCode: null, hasProductInfo: false }),
+    rowWith({ tokenId: "1", lifecycle: "bound", verdict: "confirmed" }),
+    rowWith({ tokenId: "2", lifecycle: "anchored", verdict: "drift" }),
+    rowWith({ tokenId: "3", lifecycle: "anchored", hasProductInfo: false, verdict: "pending" }),
+    rowWith({ tokenId: "4", restricted: true, lifecycle: "minted" }),
   ];
 
   it("passes everything through with no filters", () => {
     expect(
-      applyRegistryFilters(rows, { state: null, needsInfo: false, drift: false }),
+      applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: false }),
     ).toHaveLength(4);
   });
 
-  it("filters by lifecycle state code", () => {
-    const out = applyRegistryFilters(rows, { state: 3, needsInfo: false, drift: false });
+  it("filters by catalog lifecycle", () => {
+    const out = applyRegistryFilters(rows, {
+      lifecycle: "anchored",
+      needsInfo: false,
+      drift: false,
+    });
     expect(out.map((r) => r.tokenId)).toEqual(["2", "3"]);
   });
 
-  it("filters by needs-product-info (restricted rows excluded)", () => {
-    const out = applyRegistryFilters(rows, { state: null, needsInfo: true, drift: false });
+  it("filters by needs-product-info", () => {
+    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: true, drift: false });
     expect(out.map((r) => r.tokenId)).toEqual(["3"]);
   });
 
   it("filters by drift verdict", () => {
-    const out = applyRegistryFilters(rows, { state: null, needsInfo: false, drift: true });
+    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: true });
     expect(out.map((r) => r.tokenId)).toEqual(["2"]);
   });
 
   it("ANDs filters together", () => {
-    const out = applyRegistryFilters(rows, { state: 3, needsInfo: true, drift: true });
+    const out = applyRegistryFilters(rows, { lifecycle: "anchored", needsInfo: true, drift: true });
     expect(out).toHaveLength(0);
   });
 });
 
 describe("registryHref", () => {
   it("omits defaults entirely", () => {
-    expect(registryHref({ state: null, needsInfo: false, drift: false })).toBe("/assets");
+    expect(registryHref({ lifecycle: null, needsInfo: false, drift: false })).toBe("/assets");
   });
 
   it("encodes active filters", () => {
-    expect(registryHref({ state: 5, needsInfo: true, drift: true })).toBe(
-      "/assets?state=5&needsInfo=1&drift=1",
+    expect(registryHref({ lifecycle: "minted", needsInfo: true, drift: true })).toBe(
+      "/assets?lifecycle=minted&needsInfo=1&drift=1",
     );
   });
 
+  it("appends a valid keyset cursor and rejects a malformed one", () => {
+    const filters = { lifecycle: null, needsInfo: false, drift: false } as const;
+    expect(registryHref(filters, "42")).toBe("/assets?cursor=42");
+    expect(registryHref(filters, null)).toBe("/assets");
+    expect(registryHref(filters, "abc")).toBe("/assets");
+  });
+
   it("round-trips through parseRegistryFilters", () => {
-    const filters = { state: 2, needsInfo: true, drift: false };
+    const filters = { lifecycle: "bound" as const, needsInfo: true, drift: false };
     const href = registryHref(filters);
     const qs = Object.fromEntries(new URL(`http://x${href}`).searchParams.entries());
     expect(parseRegistryFilters(qs)).toEqual(filters);

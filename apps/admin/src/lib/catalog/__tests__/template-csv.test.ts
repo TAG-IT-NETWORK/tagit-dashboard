@@ -6,15 +6,17 @@ import type { TemplateItemRow } from "@/lib/catalog/template-types";
 function makeRow(overrides: Partial<TemplateItemRow> = {}): TemplateItemRow {
   return {
     tokenId: "42",
-    found: true,
-    restricted: false,
     name: "PDRN Capsule Cream",
-    image: null,
-    lifecycleState: "CLAIMED",
-    sku: "CW2288-111",
+    serial: "SN-0042",
+    lifecycle: "anchored",
+    templateVersion: 2,
+    bound: true,
+    restricted: false,
     anchoredVersion: 2,
     latestVersion: 2,
     anchorStatus: "confirmed",
+    drift: false,
+    needsProductInfo: false,
     ...overrides,
   };
 }

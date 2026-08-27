@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getActorRole } from "@/lib/actor-role";
-import { MAX_TOKEN_IDS, TEMPLATE_ID_RE, canMutateCatalog } from "@/lib/catalog/template-logic";
+import { MAX_TOKEN_IDS, TEMPLATE_ID_RE, canPublishCatalog } from "@/lib/catalog/template-logic";
 import { templatesUpstream } from "@/lib/server/templates-upstream";
 
 /**
@@ -30,8 +30,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       { status: 400 },
     );
   }
-  if (!canMutateCatalog(await getActorRole())) {
-    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
+  if (!canPublishCatalog(await getActorRole())) {
+    // WB-06: propagate relayer-broadcasts a re-anchor per item — admin-level,
+    // matching the middleware PATH_ROLES pin.
+    return NextResponse.json(
+      { ok: false, error: "propagate requires the admin role" },
+      { status: 403 },
+    );
   }
 
   let body: { tokenIds?: unknown };

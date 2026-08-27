@@ -10,9 +10,12 @@ import {
   diffHasChanges,
   formatMsrpDisplay,
   formatUsdc6Display,
+  itemsBehindLatest,
   mediaListFromAttributes,
   mergeMediaIntoAttributes,
   parseTokenIdInput,
+  readTemplateItemRow,
+  readTemplateItemsPage,
   templateStatusStyle,
   templateThumbUrl,
   usdc6ToDecimalInput,
@@ -313,5 +316,113 @@ describe("template media attributes", () => {
     );
     expect(templateThumbUrl([{ trait_type: "Volume", value: "100ml" }])).toBeNull();
     expect(templateThumbUrl(null)).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────
+// Template-items enumeration page (WB-05)
+// ──────────────────────────────────────────────
+
+/** Services admin-list.ts CatalogListItem, JSON-serialized. */
+function makeItem(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    tokenId: "42",
+    name: "PDRN Capsule Cream",
+    templateId: "tpl_01ABC",
+    templateVersion: 2,
+    serial: "SN-0042",
+    lifecycle: "anchored",
+    bound: true,
+    visibility: "public",
+    saleState: "not_for_sale",
+    priceUsdc6: null,
+    priceDisplay: null,
+    anchorStatus: "confirmed",
+    latestVersion: 2,
+    anchoredVersion: 2,
+    heroMediaSha: null,
+    drift: false,
+    needsProductInfo: false,
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("readTemplateItemRow (WB-05)", () => {
+  it("maps a full enumeration item", () => {
+    expect(readTemplateItemRow(makeItem())).toEqual({
+      tokenId: "42",
+      name: "PDRN Capsule Cream",
+      serial: "SN-0042",
+      lifecycle: "anchored",
+      templateVersion: 2,
+      bound: true,
+      restricted: false,
+      anchoredVersion: 2,
+      latestVersion: 2,
+      anchorStatus: "confirmed",
+      drift: false,
+      needsProductInfo: false,
+    });
+  });
+
+  it("marks restricted visibility and needs-product-info", () => {
+    const row = readTemplateItemRow(
+      makeItem({ visibility: "restricted", name: null, needsProductInfo: true }),
+    );
+    expect(row).toMatchObject({ restricted: true, name: null, needsProductInfo: true });
+  });
+
+  it("drops malformed entries (bad/missing tokenId, non-objects)", () => {
+    expect(readTemplateItemRow(null)).toBeNull();
+    expect(readTemplateItemRow("x")).toBeNull();
+    expect(readTemplateItemRow(makeItem({ tokenId: "abc" }))).toBeNull();
+    expect(readTemplateItemRow(makeItem({ tokenId: undefined }))).toBeNull();
+  });
+});
+
+describe("readTemplateItemsPage (WB-05)", () => {
+  it("parses an {ok, items, nextCursor} envelope", () => {
+    const page = readTemplateItemsPage({
+      ok: true,
+      templateId: "tpl_01ABC",
+      count: 2,
+      items: [makeItem(), makeItem({ tokenId: "43" }), { junk: true }],
+      nextCursor: "43",
+    });
+    expect(page).not.toBeNull();
+    expect(page!.rows.map((r) => r.tokenId)).toEqual(["42", "43"]);
+    expect(page!.nextCursor).toBe("43");
+  });
+
+  it("normalizes a missing/last-page cursor to null", () => {
+    expect(readTemplateItemsPage({ ok: true, items: [] })!.nextCursor).toBeNull();
+    expect(readTemplateItemsPage({ ok: true, items: [], nextCursor: null })!.nextCursor).toBeNull();
+  });
+
+  it("returns null for error envelopes and garbage", () => {
+    expect(readTemplateItemsPage(null)).toBeNull();
+    expect(readTemplateItemsPage({ ok: false, error: "boom" })).toBeNull();
+    expect(readTemplateItemsPage({ ok: true, items: "nope" })).toBeNull();
+  });
+});
+
+describe("itemsBehindLatest (WB-05 drift banner from enumerated rows)", () => {
+  const rows = [
+    readTemplateItemRow(makeItem({ tokenId: "1", templateVersion: 1 }))!,
+    readTemplateItemRow(makeItem({ tokenId: "2", templateVersion: 2 }))!,
+    readTemplateItemRow(makeItem({ tokenId: "3", templateVersion: null }))!,
+  ];
+
+  it("returns exactly the rows rendering an older snapshot", () => {
+    expect(itemsBehindLatest(rows, 2).map((r) => r.tokenId)).toEqual(["1"]);
+  });
+
+  it("never-adopted rows (templateVersion null) are not behind", () => {
+    expect(itemsBehindLatest(rows, 2).some((r) => r.tokenId === "3")).toBe(false);
+  });
+
+  it("empty when nothing is published yet", () => {
+    expect(itemsBehindLatest(rows, 0)).toEqual([]);
   });
 });

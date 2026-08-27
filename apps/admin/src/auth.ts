@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 
 import { fetchAdminRole } from "@/lib/admin-role";
 import { parseRole } from "@/lib/rbac";
+import { SESSION_MAX_AGE_SECONDS, shouldRefreshRole } from "@/lib/role-refresh";
 
 /**
  * NextAuth v5 (Auth.js) — Google sign-in for the admin dashboard (META-T32).
@@ -18,6 +19,12 @@ import { parseRole } from "@/lib/rbac";
  * A Google account that is not enrolled signs in fine but carries role null —
  * the middleware sends it to /403 everywhere.
  *
+ * WB-02: the cached role also re-resolves WITHOUT user cooperation — every
+ * request whose cached role is older than ROLE_TTL_MS (5 min) refetches it
+ * (roleFetchedAt claim, pure decision in src/lib/role-refresh.ts). A demoted
+ * user loses power within 5 minutes; a user deleted from the roster resolves
+ * null and becomes no-role. Session + JWT lifetime is capped at 12 h.
+ *
  * Env (see .env.example): AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET (provider infers
  * both), AUTH_SECRET. Builds and unit tests run without any of them — config
  * is only asserted per-request.
@@ -27,7 +34,8 @@ import { parseRole } from "@/lib/rbac";
 // UI signs in/out via the /api/auth/* pages instead.
 export const { handlers, auth } = NextAuth({
   providers: [Google],
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
+  jwt: { maxAge: SESSION_MAX_AGE_SECONDS },
   // Vercel terminates TLS in front of us; the forwarded Host header is
   // platform-controlled, so it is safe to trust for callback URLs.
   trustHost: true,
@@ -35,8 +43,15 @@ export const { handlers, auth } = NextAuth({
     async jwt({ token, account, trigger }) {
       const email = typeof token.email === "string" ? token.email : "";
       const freshSignIn = account !== undefined && account !== null;
-      if (email && (freshSignIn || trigger === "update")) {
+      const refresh = shouldRefreshRole({
+        freshSignIn,
+        trigger,
+        roleFetchedAt: token.roleFetchedAt,
+        now: Date.now(),
+      });
+      if (email && refresh) {
         token.role = await fetchAdminRole(email);
+        token.roleFetchedAt = Date.now();
       }
       return token;
     },

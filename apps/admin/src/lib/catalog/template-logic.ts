@@ -7,6 +7,7 @@
 import type {
   TemplateAttribute,
   TemplateDto,
+  TemplateItemRow,
   TemplateStatus,
   TemplateVersionDto,
 } from "./template-types";
@@ -218,6 +219,80 @@ export function computePublishState(
     latest !== undefined && !deepJsonEqual(workingCopySnapshot(template), latest.snapshot);
   const itemsDrift = latestVersion === 0 ? "none" : latestVersion >= 2 ? "behind" : "info";
   return { latestVersion, workingDirty, itemsDrift };
+}
+
+// ──────────────────────────────────────────────
+// Template-items enumeration page (WB-05)
+// ──────────────────────────────────────────────
+
+function readItemString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * Map one GET /api/v1/admin/templates/:id/items entry (services admin-list.ts
+ * CatalogListItem) onto an Items-table row. Malformed entries return null and
+ * are dropped rather than corrupting the table.
+ */
+export function readTemplateItemRow(raw: unknown): TemplateItemRow | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const item = raw as Record<string, unknown>;
+  const tokenId =
+    typeof item.tokenId === "string"
+      ? item.tokenId
+      : typeof item.tokenId === "number"
+        ? String(item.tokenId)
+        : null;
+  if (tokenId === null || !/^\d+$/.test(tokenId)) return null;
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+  return {
+    tokenId,
+    name: readItemString(item.name),
+    serial: readItemString(item.serial),
+    lifecycle: readItemString(item.lifecycle),
+    templateVersion: num(item.templateVersion),
+    bound: item.bound === true,
+    restricted: item.visibility === "restricted",
+    anchoredVersion: num(item.anchoredVersion),
+    latestVersion: num(item.latestVersion),
+    anchorStatus: readItemString(item.anchorStatus),
+    drift: item.drift === true,
+    needsProductInfo: item.needsProductInfo === true,
+  };
+}
+
+/**
+ * Parse one enumeration-page envelope ({ok, items, nextCursor}) into rows +
+ * cursor. Null = the body is not a page at all (surface the error instead).
+ */
+export function readTemplateItemsPage(
+  body: unknown,
+): { rows: TemplateItemRow[]; nextCursor: string | null } | null {
+  if (typeof body !== "object" || body === null) return null;
+  const env = body as { ok?: unknown; items?: unknown; nextCursor?: unknown };
+  if (env.ok !== true || !Array.isArray(env.items)) return null;
+  const rows = env.items
+    .map(readTemplateItemRow)
+    .filter((r): r is TemplateItemRow => r !== null);
+  return {
+    rows,
+    nextCursor: typeof env.nextCursor === "string" ? env.nextCursor : null,
+  };
+}
+
+/**
+ * WB-05 drift banner input: enumerated items still rendering a snapshot older
+ * than the latest published version (an item with no adopted version yet is
+ * not "behind" — it was never rendered from any snapshot).
+ */
+export function itemsBehindLatest(
+  rows: TemplateItemRow[],
+  latestVersion: number,
+): TemplateItemRow[] {
+  if (latestVersion <= 0) return [];
+  return rows.filter(
+    (r) => r.templateVersion !== null && r.templateVersion < latestVersion,
+  );
 }
 
 // ──────────────────────────────────────────────

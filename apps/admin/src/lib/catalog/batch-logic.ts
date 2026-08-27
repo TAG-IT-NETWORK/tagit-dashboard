@@ -401,17 +401,45 @@ export function validateQuantity(value: string): { quantity: number | null; erro
 // ──────────────────────────────────────────────
 
 /**
- * tagit-services ships NO batch-list endpoint (the admin rail is per-id), so
- * "the batch list for this template" is client-side memory: every batch this
- * browser created or opened is remembered per template in localStorage and
- * rendered as resume rows. The URL (?batch=bat_…) remains the canonical
- * cross-machine resume path.
+ * WB-09: the "Recent batches" rail reads the SERVER batch list
+ * (GET /api/v1/admin/batches?templateId= via the proxy — newest first,
+ * tenant-scoped, cross-machine). localStorage is kept ONLY as the offline
+ * fallback (services unreachable), and the URL (?batch=bat_…) remains a
+ * direct resume path.
  */
 export interface RecentBatch {
   id: string;
   size: number;
   state: string;
   createdAt: string;
+}
+
+/**
+ * Parse the services batch-list envelope ({ok, batches:[{id, state,
+ * quantity, createdAt, …}]}) into rail rows. Null = not a list envelope
+ * (fall back to localStorage); malformed rows are dropped.
+ */
+export function parseServerBatchList(body: unknown): RecentBatch[] | null {
+  if (typeof body !== "object" || body === null) return null;
+  const env = body as { ok?: unknown; batches?: unknown };
+  if (env.ok !== true || !Array.isArray(env.batches)) return null;
+  const rows: RecentBatch[] = [];
+  for (const raw of env.batches) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const b = raw as Record<string, unknown>;
+    if (typeof b.id !== "string" || !BATCH_ID_RE.test(b.id)) continue;
+    if (typeof b.state !== "string") continue;
+    const size =
+      typeof b.quantity === "number" && Number.isFinite(b.quantity) ? b.quantity : null;
+    if (size === null) continue;
+    rows.push({
+      id: b.id,
+      size,
+      state: b.state,
+      createdAt: typeof b.createdAt === "string" ? b.createdAt : "",
+    });
+  }
+  return rows;
 }
 
 export const RECENT_BATCH_CAP = 10;

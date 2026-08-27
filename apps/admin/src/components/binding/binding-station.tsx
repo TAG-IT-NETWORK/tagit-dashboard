@@ -238,6 +238,18 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
           });
           return;
         }
+        // WB-01: CMAC_INVALID is a cryptographic SDMMAC mismatch — a hard
+        // tamper alert. NEVER bind such a chip.
+        if (verifyRes.body?.reason === "CMAC_INVALID") {
+          dispatch({
+            type: "SUN_FAIL",
+            kind: "tamper",
+            message:
+              "CMAC invalid — the chip's SDM MAC failed cryptographic verification. Do not bind or attach this chip.",
+            at: Date.now(),
+          });
+          return;
+        }
         if (!verifyRes.ok || verifyRes.body?.verified !== true) {
           dispatch({
             type: "SUN_FAIL",
@@ -247,7 +259,9 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
           });
           return;
         }
-        dispatch({ type: "SUN_OK" });
+        // cmacVerified:false = counter-only check (SDM key not provisioned
+        // upstream) — surfaced as an amber badge instead of full green.
+        dispatch({ type: "SUN_OK", cmacVerified: verifyRes.body?.cmacVerified === true });
 
         // 2. Bind via the relayer proxy.
         const bindRes = await proxyJson("/api/catalog-proxy/binding/bind", {
@@ -533,19 +547,19 @@ function NextUpCard({
           </p>
         )}
         {state.phase === "binding" && (
-          <p className="flex items-center gap-2 text-sm">
-            <ShieldCheck className="h-4 w-4 text-green-500" />
-            SUN verified —
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <CmacBadge cmacVerified={state.cmacVerified === true} />
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             binding via relay…
           </p>
         )}
         {state.phase === "bound" && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             <span>
               Bound. Advancing — or press <kbd className="rounded border px-1">Enter</kbd>.
             </span>
+            <CmacBadge cmacVerified={state.cmacVerified === true} />
             <Button size="sm" variant="outline" onClick={onAdvance}>
               Next
             </Button>
@@ -638,6 +652,7 @@ function LastBindCard({
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <AnchorBadge status={lastBind.anchorStatus} />
+          <CmacBadge cmacVerified={lastBind.cmacVerified} />
           {lastBind.txHash && (
             <code className="text-xs text-muted-foreground">{lastBind.txHash.slice(0, 10)}…{lastBind.txHash.slice(-6)}</code>
           )}
@@ -679,6 +694,31 @@ function LastBindCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * WB-01: SUN check depth for a tap/bind. Full green ONLY when the server
+ * cryptographically verified the SDMMAC; amber = counter-only check (SDM key
+ * not provisioned upstream), so the operator knows the crypto rail was not
+ * exercised.
+ */
+function CmacBadge({ cmacVerified }: { cmacVerified: boolean }) {
+  if (cmacVerified) {
+    return (
+      <Badge variant="success" className="gap-1">
+        <ShieldCheck className="h-3 w-3" /> SUN + CMAC verified
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="secondary"
+      className="gap-1 bg-yellow-500/15 text-yellow-500"
+      title="Verified via SUN counter + on-chain state only — the SDM master key is not provisioned on the server, so the chip's CMAC was not cryptographically checked."
+    >
+      <ShieldAlert className="h-3 w-3" /> counter-only check (SDM key not provisioned)
+    </Badge>
   );
 }
 

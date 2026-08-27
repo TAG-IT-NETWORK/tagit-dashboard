@@ -233,6 +233,11 @@ export interface LastBind {
   boundAt: number;
   txHash: string | null;
   anchorStatus: AnchorStatus;
+  /**
+   * WB-01: true when the server cryptographically verified the SDMMAC for
+   * this tap; false = counter-only check (SDM key not provisioned upstream).
+   */
+  cmacVerified: boolean;
 }
 
 export type LogKind = "bound" | "sun_fail" | "bind_fail" | "skipped" | "reassigned" | "voided";
@@ -252,6 +257,12 @@ export interface StationState {
   phase: StationPhase;
   /** UID of the chip currently being verified/bound. */
   tapUid: string | null;
+  /**
+   * Server verdict for the CURRENT tap's SDMMAC (WB-01): true = CMAC
+   * cryptographically verified, false = counter-only check (SDM key not
+   * provisioned upstream), null = no server verify yet for this tap.
+   */
+  cmacVerified: boolean | null;
   sunFail: { kind: SunFailKind; message: string } | null;
   bindError: string | null;
   lastBind: LastBind | null;
@@ -264,6 +275,7 @@ export const initialStationState: StationState = {
   tokens: [],
   phase: "loading",
   tapUid: null,
+  cmacVerified: null,
   sunFail: null,
   bindError: null,
   lastBind: null,
@@ -275,7 +287,8 @@ export type StationAction =
   | { type: "LOAD"; tokens: StationToken[] }
   | { type: "LOAD_FAILED" }
   | { type: "TAP"; uid: string }
-  | { type: "SUN_OK" }
+  /** cmacVerified omitted = false (counter-only check, WB-01). */
+  | { type: "SUN_OK"; cmacVerified?: boolean }
   | { type: "SUN_FAIL"; kind: SunFailKind; message: string; at: number }
   | { type: "BIND_OK"; txHash: string | null; at: number }
   | { type: "BIND_FAIL"; error: string; at: number }
@@ -334,11 +347,18 @@ export function stationReducer(state: StationState, action: StationAction): Stat
       return state.phase === "loading" ? { ...state, phase: "idle" } : state;
     case "TAP": {
       if (state.phase !== "idle" || currentToken(state) === null) return state;
-      return { ...state, phase: "verifying", tapUid: action.uid, sunFail: null, bindError: null };
+      return {
+        ...state,
+        phase: "verifying",
+        tapUid: action.uid,
+        cmacVerified: null,
+        sunFail: null,
+        bindError: null,
+      };
     }
     case "SUN_OK":
       if (state.phase !== "verifying") return state;
-      return { ...state, phase: "binding" };
+      return { ...state, phase: "binding", cmacVerified: action.cmacVerified === true };
     case "SUN_FAIL": {
       if (state.phase !== "verifying") return state;
       const token = currentToken(state);
@@ -373,6 +393,7 @@ export function stationReducer(state: StationState, action: StationAction): Stat
           boundAt: action.at,
           txHash: action.txHash,
           anchorStatus: "unknown",
+          cmacVerified: state.cmacVerified === true,
         },
         boundCount: state.boundCount + 1,
         sessionLog: log(state, {

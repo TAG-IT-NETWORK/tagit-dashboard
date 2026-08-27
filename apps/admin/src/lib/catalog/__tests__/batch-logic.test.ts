@@ -12,6 +12,7 @@ import {
   isBatchInFlight,
   parseRecentBatches,
   parseRfc4180,
+  parseServerBatchList,
   upsertRecentBatch,
   validateQuantity,
   wizardStepForBatch,
@@ -267,5 +268,53 @@ describe("recent batches", () => {
 describe("basescanTxUrl", () => {
   it("links to Base Sepolia (the only live chain)", () => {
     expect(basescanTxUrl("0xabc")).toBe("https://sepolia.basescan.org/tx/0xabc");
+  });
+});
+
+// ── WB-09: server batch list → Recent-batches rail ──────────────────────────
+
+describe("parseServerBatchList (WB-09)", () => {
+  const serverBatch = {
+    id: "bat_01HZX",
+    templateId: "tpl_1",
+    state: "minted",
+    quantity: 25,
+    minted: 25,
+    createdAt: "2026-08-20T10:00:00.000Z",
+  };
+
+  it("maps the {ok, batches} envelope onto rail rows", () => {
+    expect(parseServerBatchList({ ok: true, count: 1, batches: [serverBatch] })).toEqual([
+      { id: "bat_01HZX", size: 25, state: "minted", createdAt: "2026-08-20T10:00:00.000Z" },
+    ]);
+  });
+
+  it("returns null for non-list envelopes (triggers the localStorage fallback)", () => {
+    expect(parseServerBatchList(null)).toBeNull();
+    expect(parseServerBatchList({ ok: false, error: "boom" })).toBeNull();
+    expect(parseServerBatchList({ ok: true, batches: "nope" })).toBeNull();
+  });
+
+  it("drops malformed rows instead of corrupting the rail", () => {
+    const rows = parseServerBatchList({
+      ok: true,
+      batches: [
+        serverBatch,
+        { id: "not-a-batch-id", state: "minted", quantity: 1, createdAt: "x" },
+        { id: "bat_2", state: "minted", quantity: "25", createdAt: "x" },
+        null,
+      ],
+    });
+    expect(rows).toEqual([
+      { id: "bat_01HZX", size: 25, state: "minted", createdAt: "2026-08-20T10:00:00.000Z" },
+    ]);
+  });
+
+  it("tolerates a missing createdAt (empty string)", () => {
+    const rows = parseServerBatchList({
+      ok: true,
+      batches: [{ id: "bat_3", state: "validated", quantity: 2 }],
+    });
+    expect(rows).toEqual([{ id: "bat_3", size: 2, state: "validated", createdAt: "" }]);
   });
 });

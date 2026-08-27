@@ -20,5 +20,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     role?: Role | null;
+    /** Epoch ms when `role` was last resolved from services (WB-02 TTL). */
+    roleFetchedAt?: number;
   }
 }

@@ -21,10 +21,15 @@ import { evaluateAccess, isApiPath, parseRole } from "@/lib/rbac";
  */
 export default auth((req) => {
   const { pathname, search } = req.nextUrl;
-  const decision = evaluateAccess(pathname, {
-    authenticated: req.auth !== null && req.auth !== undefined,
-    role: parseRole(req.auth?.user?.role),
-  });
+  const decision = evaluateAccess(
+    pathname,
+    {
+      authenticated: req.auth !== null && req.auth !== undefined,
+      role: parseRole(req.auth?.user?.role),
+    },
+    // WB-06: method-scoped PATH_ROLES entries (template create/update).
+    req.method,
+  );
 
   if (decision === "allow") return NextResponse.next();
 
@@ -47,8 +52,10 @@ export default auth((req) => {
 export const config = {
   // MUST stay an inline literal (Next parses it statically). Mirrored by
   // GATE_MATCHER_RE in src/lib/rbac.ts — keep the two in sync (pinned by the
-  // rbac unit tests). Skips Next internals and /public static assets.
+  // rbac unit tests). Skips Next internals and /public static assets — but
+  // the static-extension exclusion does NOT apply under /api/ (WB-08):
+  // /api/team-proxy/foo.png must hit the gate like any other API call.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|(?!api/).*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*)",
   ],
 };

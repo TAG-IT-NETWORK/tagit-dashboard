@@ -52,28 +52,35 @@ const SESSION_ONLY_PATHS = ["/403"] as const;
 
 /**
  * Minimum role per path prefix — LONGEST matching prefix wins, so
- * /catalog/publish (admin) escalates above /catalog (operator). Anything
- * unlisted needs only `viewer` (signed-in, read-only).
+ * /api/catalog-proxy/templates/*\/publish (admin) escalates above the
+ * templates prefix (operator writes). Anything unlisted needs only `viewer`
+ * (signed-in, read-only).
  *
  * Some prefixes are claimed ahead of the pages that will live there
  * (/batch, /bind, /prices, /recovery ship in sibling META-P2 tasks): the
  * middleware contract is established here so those pages land pre-gated.
  *
  * /catalog (META-T33) and /assets (META-T36) READ pages are deliberately
- * viewer-level (unlisted): their UIs render read-only for viewers. Catalog
- * WRITES all go through /api/catalog-proxy, whose mutating routes re-check
- * the session role server-side (operator+ via canMutateCatalog; publish is
- * admin-only via canPublishCatalog) — the path map cannot see HTTP methods,
- * so the write/read split is enforced in the proxies.
+ * viewer-level (unlisted): their UIs render read-only for viewers.
+ *
+ * WB-06: an entry may carry an optional METHOD list — it then applies only
+ * to those HTTP methods, which lets the template create/update writes
+ * (POST /api/catalog-proxy/templates, PUT /api/catalog-proxy/templates/:id)
+ * be pinned at operator while the GET list/detail on the same paths stays
+ * viewer-level. When the caller cannot supply a method the method-scoped
+ * entries still apply (fail closed). Every mutating proxy ALSO re-checks the
+ * role server-side (defense in depth).
  *
  * A `*` prefix segment matches exactly ONE path segment — needed for the
  * T34 batch action routes whose id sits mid-path
  * (/api/catalog-proxy/batches/bat_…/execute). GET-only read routes on the
- * same rails (/batches list+status, /binding/exceptions, /export.csv) stay
- * viewer-level on purpose: the wizard/station pages render read-only for
- * viewers, and every mutating route ALSO re-checks the role server-side.
+ * same rails (/batches list+status, /binding/exceptions, /export.csv,
+ * /templates/*\/items) stay viewer-level on purpose: the wizard/station
+ * pages render read-only for viewers.
  */
-export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = [
+export const PATH_ROLES: ReadonlyArray<
+  readonly [prefix: string, role: Role, methods?: readonly string[]]
+> = [
   // operator — drafts + media + batches + binding
   ["/assets/new", "operator"],
   ["/assembly-line", "operator"],
@@ -81,6 +88,10 @@ export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = 
   ["/bind", "operator"],
   ["/api/media-proxy", "operator"],
   ["/api/mint-proxy", "operator"],
+  // operator — T33 template create/update (WB-06, method-scoped: the GET
+  // list/detail on the same paths stays viewer-level)
+  ["/api/catalog-proxy/templates", "operator", ["POST"]],
+  ["/api/catalog-proxy/templates/*", "operator", ["PUT"]],
   // operator — T34 batch execute + T35 binding writes
   ["/api/catalog-proxy/batches/*/execute", "operator"],
   ["/api/catalog-proxy/binding/bind", "operator"],
@@ -88,7 +99,6 @@ export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = 
   ["/api/catalog-proxy/binding/reassign", "operator"],
   ["/api/catalog-proxy/binding/skip-defective", "operator"],
   // admin — publish + prices + recovery + team
-  ["/catalog/publish", "admin"],
   ["/publish", "admin"],
   ["/prices", "admin"],
   ["/pricing", "admin"],
@@ -96,6 +106,11 @@ export const PATH_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = 
   ["/resolve", "admin"],
   ["/team", "admin"],
   ["/api/team-proxy", "admin"],
+  // admin — T33 template lifecycle verbs (WB-06): publish snapshots a live
+  // version, archive retires it, propagate relayer-broadcasts re-renders
+  ["/api/catalog-proxy/templates/*/publish", "admin"],
+  ["/api/catalog-proxy/templates/*/archive", "admin"],
+  ["/api/catalog-proxy/templates/*/propagate", "admin"],
   // admin — T34 unstick (force-resets server state) + T35 void-remint
   // (irreversible on-chain recycle)
   ["/api/catalog-proxy/batches/*/unstick", "admin"],
@@ -128,10 +143,19 @@ export function isApiPath(pathname: string): boolean {
   return matchesPrefix(pathname, "/api");
 }
 
-/** Minimum role required for a path (longest matching prefix, default viewer). */
-export function requiredRoleFor(pathname: string): Role {
+/**
+ * Minimum role required for a path (longest matching prefix, default viewer).
+ * Method-scoped entries (WB-06) apply only when `method` matches — or always
+ * when the caller omits the method (fail closed: an unknown method must be
+ * assumed to be the gated one).
+ */
+export function requiredRoleFor(pathname: string, method?: string): Role {
+  const normalized = method?.toUpperCase();
   let best: { prefix: string; role: Role } | null = null;
-  for (const [prefix, role] of PATH_ROLES) {
+  for (const [prefix, role, methods] of PATH_ROLES) {
+    if (methods !== undefined && normalized !== undefined && !methods.includes(normalized)) {
+      continue;
+    }
     if (!matchesPrefix(pathname, prefix)) continue;
     if (best === null || prefix.length > best.prefix.length) best = { prefix, role };
   }
@@ -148,15 +172,19 @@ export type AccessDecision = "allow" | "signin" | "forbidden";
  * - no session                 → signin   (redirect / 401 for APIs)
  * - /403 itself                → allow    (any signed-in user, even role-less)
  * - role below the path's need → forbidden (redirect to /403 / 403 for APIs)
+ *
+ * `method` feeds the WB-06 method-scoped entries; omitting it treats every
+ * method-scoped entry as applicable (fail closed).
  */
 export function evaluateAccess(
   pathname: string,
   session: { authenticated: boolean; role: Role | null },
+  method?: string,
 ): AccessDecision {
   if (isPublicPath(pathname)) return "allow";
   if (!session.authenticated) return "signin";
   if (isSessionOnlyPath(pathname)) return "allow";
-  return hasRole(session.role, requiredRoleFor(pathname)) ? "allow" : "forbidden";
+  return hasRole(session.role, requiredRoleFor(pathname, method)) ? "allow" : "forbidden";
 }
 
 // ── Matcher mirror ───────────────────────────────────────────────────────────
@@ -165,10 +193,12 @@ export function evaluateAccess(
  * Mirror of the static `config.matcher` regex in src/middleware.ts — Next.js
  * requires the real matcher to be an inline literal, so the two MUST be kept
  * in sync by hand (the rbac unit tests pin this one). Excluded: Next
- * internals and static assets served from /public.
+ * internals and static assets served from /public. WB-08: the extension
+ * exclusion does NOT apply to /api/ paths — an extension-shaped API URL
+ * (/api/team-proxy/foo.png) must never skip the gate.
  */
 export const GATE_MATCHER_RE =
-  /^\/(?!_next\/static|_next\/image|favicon\.ico|.*\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*/;
+  /^\/(?!_next\/static|_next\/image|favicon\.ico|(?!api\/).*\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*/;
 
 /** True when the middleware matcher would run the gate for this path. */
 export function isGatedByMatcher(pathname: string): boolean {

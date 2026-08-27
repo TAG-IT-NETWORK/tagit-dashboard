@@ -6,13 +6,14 @@
 
 import type {
   AnchorVerdict,
+  CatalogLifecycle,
   IntegrityResult,
-  PriceBlock,
   ProductBlock,
   RegistryFilters,
   RegistryRow,
   VerificationBlock,
 } from "./types";
+import { CATALOG_LIFECYCLES } from "./types";
 
 // ──────────────────────────────────────────────
 // Anchor verdict (REQ-S-12 tri-state) + drift dot
@@ -133,34 +134,11 @@ export function validateOverridesDoc(text: string): OverridesValidation {
 }
 
 // ──────────────────────────────────────────────
-// Detail DTO → registry row mapping
+// Admin catalog list item → registry row mapping (WB-04)
 // ──────────────────────────────────────────────
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function readVerification(value: unknown): VerificationBlock | null {
-  if (!isPlainObject(value)) return null;
-  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
-  return {
-    anchoredVersion: num(value.anchoredVersion),
-    latestVersion: num(value.latestVersion),
-    anchorStatus: readString(value.anchorStatus),
-    metadataHash: readString(value.metadataHash),
-    verified: value.verified === true,
-  };
-}
-
-function readPrice(value: unknown): PriceBlock | null {
-  if (!isPlainObject(value)) return null;
-  const saleState = value.saleState;
-  return {
-    priceUsdc6: readString(value.priceUsdc6),
-    display: readString(value.display),
-    saleState:
-      saleState === "listed" || saleState === "sold" ? saleState : "not_for_sale",
-  };
 }
 
 export function readProduct(value: unknown): ProductBlock | null {
@@ -174,41 +152,56 @@ export function readProduct(value: unknown): ProductBlock | null {
 }
 
 /**
- * Map one services asset-detail JSON body (or restricted stub) into a
- * registry row. Tolerant of missing blocks — the DTO's additive blocks only
- * exist for migrated/anchored items.
+ * Map one GET /api/v1/admin/catalog item (services admin-list.ts
+ * CatalogListItem, JSON-serialized) onto a registry row. Tolerant of missing
+ * fields — a malformed entry degrades to a minimal pending row rather than
+ * throwing mid-page. The anchor verdict is recomputed CLIENT-SIDE from the
+ * verification numbers via {@link anchorVerdict} (the drift logic is kept
+ * here, not blindly trusted from the wire), which matches the server's
+ * definition: anchor_status='drift' OR latestVersion > anchoredVersion.
  */
-export function buildRegistryRow(tokenId: string, body: unknown): RegistryRow {
-  const detail = isPlainObject(body) ? body : {};
-  const restricted = detail.restricted === true;
-  const verification = readVerification(detail.verification);
-  const price = readPrice(detail.price);
-  const product = readProduct(detail.product);
-  const name = readString(detail.name) ?? product?.name ?? null;
-  const tagHash = readString(detail.tagHash);
-  const hasProductInfo = Boolean(product && (product.name || product.brand || product.sku));
+export function registryRowFromAdminItem(item: unknown): RegistryRow {
+  const raw = isPlainObject(item) ? item : {};
+  const tokenId =
+    typeof raw.tokenId === "string"
+      ? raw.tokenId
+      : typeof raw.tokenId === "number"
+        ? String(raw.tokenId)
+        : "";
+  const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+  const verification: VerificationBlock = {
+    anchoredVersion: num(raw.anchoredVersion),
+    latestVersion: num(raw.latestVersion),
+    anchorStatus: readString(raw.anchorStatus),
+    // On-chain hash comparison stays a slide-over concern (integrity check).
+    metadataHash: null,
+    verified: false,
+  };
+  const saleState = raw.saleState;
 
   return {
     tokenId,
-    restricted,
-    // The restricted stub's placeholder name/image are intentionally not
-    // rendered as product data.
-    name: restricted ? null : name,
-    image: restricted ? null : readString(detail.image),
-    stateCode: typeof detail.stateCode === "number" ? detail.stateCode : null,
-    lifecycleState: readString(detail.lifecycleState),
-    bound: Boolean(tagHash && tagHash.toLowerCase() !== ZERO_HASH),
-    priceDisplay: price?.display ?? null,
-    saleState: price?.saleState ?? null,
+    restricted: raw.visibility === "restricted",
+    name: readString(raw.name),
+    templateId: readString(raw.templateId),
+    templateVersion: num(raw.templateVersion),
+    serial: readString(raw.serial),
+    lifecycle: readString(raw.lifecycle),
+    bound: raw.bound === true,
+    priceDisplay: readString(raw.priceDisplay),
+    saleState:
+      saleState === "listed" || saleState === "sold" || saleState === "not_for_sale"
+        ? saleState
+        : null,
     verification,
-    verdict: restricted ? "pending" : anchorVerdict(verification),
-    hasProductInfo,
+    verdict: anchorVerdict(verification),
+    hasProductInfo: raw.needsProductInfo !== true,
   };
 }
 
-/** needs-product-info: knowable only for unrestricted rows. */
-export function needsProductInfo(row: Pick<RegistryRow, "restricted" | "hasProductInfo">): boolean {
-  return !row.restricted && !row.hasProductInfo;
+/** needs-product-info: no metadata version exists yet (admin list flag). */
+export function needsProductInfo(row: Pick<RegistryRow, "hasProductInfo">): boolean {
+  return !row.hasProductInfo;
 }
 
 // ──────────────────────────────────────────────
@@ -221,34 +214,51 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Parse ?state=N&needsInfo=1&drift=1 into typed filters. Bad input → no filter. */
+/**
+ * Parse ?lifecycle=bound&needsInfo=1&drift=1 into typed filters. Bad input →
+ * no filter. (WB-04: filters are catalog lifecycles now — the admin list
+ * speaks catalog_items.lifecycle, not the chain state enum.)
+ */
 export function parseRegistryFilters(searchParams: SearchParams): RegistryFilters {
-  const rawState = firstParam(searchParams.state);
-  const state =
-    rawState !== undefined && /^[0-6]$/.test(rawState) ? Number.parseInt(rawState, 10) : null;
+  const rawLifecycle = firstParam(searchParams.lifecycle);
+  const lifecycle = (CATALOG_LIFECYCLES as readonly string[]).includes(rawLifecycle ?? "")
+    ? (rawLifecycle as CatalogLifecycle)
+    : null;
   return {
-    state,
+    lifecycle,
     needsInfo: firstParam(searchParams.needsInfo) === "1",
     drift: firstParam(searchParams.drift) === "1",
   };
 }
 
-/** Apply the registry filters (AND semantics) to the mapped rows. */
+/**
+ * Apply the registry filters (AND semantics) to the mapped rows. The server
+ * already filters the page (lifecycle/drift/needsProductInfo query params) —
+ * this re-filter is the client-side correctness authority for whatever the
+ * wire returned (defense in depth, same stance as the services JS re-filter).
+ */
 export function applyRegistryFilters(rows: RegistryRow[], filters: RegistryFilters): RegistryRow[] {
   return rows.filter((row) => {
-    if (filters.state !== null && row.stateCode !== filters.state) return false;
+    if (filters.lifecycle !== null && row.lifecycle !== filters.lifecycle) return false;
     if (filters.needsInfo && !needsProductInfo(row)) return false;
     if (filters.drift && row.verdict !== "drift") return false;
     return true;
   });
 }
 
-/** Build an /assets href for the given filters, omitting defaults. */
-export function registryHref(filters: RegistryFilters): string {
+/**
+ * Build an /assets href for the given filters (+ optional keyset cursor),
+ * omitting defaults. Filter toggles intentionally DROP the cursor — changing
+ * the filter restarts pagination from the first page.
+ */
+export function registryHref(filters: RegistryFilters, cursor?: string | null): string {
   const params = new URLSearchParams();
-  if (filters.state !== null) params.set("state", String(filters.state));
+  if (filters.lifecycle !== null) params.set("lifecycle", filters.lifecycle);
   if (filters.needsInfo) params.set("needsInfo", "1");
   if (filters.drift) params.set("drift", "1");
+  if (cursor !== undefined && cursor !== null && /^\d+$/.test(cursor)) {
+    params.set("cursor", cursor);
+  }
   const qs = params.toString();
   return qs ? `/assets?${qs}` : "/assets";
 }

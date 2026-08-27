@@ -119,75 +119,8 @@ export async function fetchTemplatesList(): Promise<{
   return { templates: templates as TemplateDto[], error: null };
 }
 
-// ──────────────────────────────────────────────
-// Items resolution (Items tab)
-// ──────────────────────────────────────────────
-
-const DETAIL_CONCURRENCY = 8;
-
-/**
- * LIMITATION (deliberate — see task notes): tagit-services main ships NO
- * template→items enumeration endpoint (the admin rail is per-token:
- * templates/batches/binding; propagate/adopt take EXPLICIT tokenIds). Items
- * are therefore resolved from an explicit token-id set through the public
- * per-token detail DTO (GET /api/v1/assets/:tokenId — buildAssetDetail in
- * services src/api/assets.ts), which carries name/lifecycle/verification but
- * no per-item template linkage. An admin items endpoint would lift this.
- */
-export async function resolveItemRows(
-  tokenIds: string[],
-): Promise<Array<Record<string, unknown>>> {
-  const results: Array<Record<string, unknown>> = new Array(tokenIds.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < tokenIds.length) {
-      const index = next++;
-      const tokenId = tokenIds[index];
-      const res = await templatesUpstream(`/api/v1/assets/${tokenId}`);
-      results[index] = toItemRow(tokenId, res.status, res.body);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(DETAIL_CONCURRENCY, tokenIds.length) }, () => worker()),
-  );
-  return results;
-}
-
-/** Map one detail DTO onto the Items-table row shape (TemplateItemRow). */
-export function toItemRow(
-  tokenId: string,
-  status: number,
-  body: Record<string, unknown>,
-): Record<string, unknown> {
-  const restricted = body.restricted === true || body.protected === true;
-  if (status !== 200 || restricted) {
-    return {
-      tokenId,
-      found: status === 200,
-      restricted,
-      name: null,
-      image: null,
-      lifecycleState: null,
-      sku: null,
-      anchoredVersion: null,
-      latestVersion: null,
-      anchorStatus: null,
-    };
-  }
-  const product = (body.product ?? {}) as Record<string, unknown>;
-  const verification = (body.verification ?? {}) as Record<string, unknown>;
-  return {
-    tokenId,
-    found: true,
-    restricted: false,
-    name: typeof body.name === "string" ? body.name : null,
-    image: typeof body.image === "string" ? body.image : null,
-    lifecycleState: typeof body.lifecycleState === "string" ? body.lifecycleState : null,
-    sku: typeof product.sku === "string" ? product.sku : null,
-    anchoredVersion:
-      typeof verification.anchoredVersion === "number" ? verification.anchoredVersion : null,
-    latestVersion:
-      typeof verification.latestVersion === "number" ? verification.latestVersion : null,
-    anchorStatus: typeof verification.anchorStatus === "string" ? verification.anchorStatus : null,
-  };
-}
+// NOTE (WB-05): the old explicit-tokenIds items resolution
+// (resolveItemRows/toItemRow — a per-token fan-out over the public detail
+// DTO) is gone. The Items tab enumerates the services template-items
+// endpoint (GET /api/v1/admin/templates/:id/items) through the items proxy
+// route instead, which carries real template linkage and keyset pagination.

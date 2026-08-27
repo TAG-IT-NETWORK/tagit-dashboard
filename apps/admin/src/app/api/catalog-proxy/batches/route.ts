@@ -6,10 +6,17 @@ import { TEMPLATE_ID_RE, canMutateCatalog } from "@/lib/catalog/template-logic";
 import { batchesUpstream } from "@/lib/server/batches-upstream";
 
 /**
- * POST /api/catalog-proxy/batches (META-T34) — step-1 create/validate.
+ * /api/catalog-proxy/batches (META-T34).
  *
- * Client body is ALWAYS JSON here; the proxy translates onto the two upstream
- * shapes (batch-router.ts):
+ * GET ?templateId=&limit= (WB-09) — pass-through to the services batch list
+ * (GET /api/v1/admin/batches: newest first, tenant-scoped through the
+ * template, minted counts included). Backs the wizard's "Recent batches"
+ * rail — localStorage is only the offline fallback now. Read-only,
+ * viewer-safe (middleware session gate is the outer wall, same posture as
+ * the batch-status GET).
+ *
+ * POST — step-1 create/validate. Client body is ALWAYS JSON here; the proxy
+ * translates onto the two upstream shapes (batch-router.ts):
  *   { templateId, quantity }  → JSON POST /api/v1/admin/batches
  *   { templateId, csv }       → text/csv POST /api/v1/admin/batches?templateId=…
  *
@@ -25,6 +32,38 @@ export const dynamic = "force-dynamic";
 
 /** Client-side cap well under the upstream express text() 5mb limit. */
 const MAX_CSV_BYTES = 2_000_000;
+
+/** Mirror of the services batchListQuerySchema limit bound (batch-router.ts). */
+const MAX_LIST_LIMIT = 50;
+
+export async function GET(req: Request) {
+  const search = new URL(req.url).searchParams;
+  const templateId = search.get("templateId");
+  const limit = search.get("limit");
+  if (templateId !== null && !TEMPLATE_ID_RE.test(templateId)) {
+    return NextResponse.json(
+      { ok: false, error: "templateId must be a template id (tpl_…)" },
+      { status: 400 },
+    );
+  }
+  if (
+    limit !== null &&
+    !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= MAX_LIST_LIMIT)
+  ) {
+    return NextResponse.json(
+      { ok: false, error: `limit must be an integer 1–${MAX_LIST_LIMIT}` },
+      { status: 400 },
+    );
+  }
+
+  const qs = new URLSearchParams();
+  if (templateId !== null) qs.set("templateId", templateId);
+  if (limit !== null) qs.set("limit", limit);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+
+  const res = await batchesUpstream(`/api/v1/admin/batches${suffix}`);
+  return NextResponse.json(res.body, { status: res.status });
+}
 
 export async function POST(req: Request) {
   if (!canMutateCatalog(await getActorRole())) {

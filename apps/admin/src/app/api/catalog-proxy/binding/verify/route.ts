@@ -5,11 +5,18 @@ import { canMutateCatalog } from "@/lib/catalog/template-logic";
 import { templatesUpstream } from "@/lib/server/templates-upstream";
 
 /**
- * POST /api/catalog-proxy/binding/verify (META-T35, REQ-S-21) — SUN check for
- * the chip on the antenna BEFORE bindTag. Pass-through to the services
- * POST /verify oracle rail ({tokenId, nfcPayload:{uid, cmac, counter}}):
- * counter anti-replay + oracle proof. Proxied so the station stays same-origin
- * (no CORS) and the services credentials stay server-side.
+ * POST /api/catalog-proxy/binding/verify (META-T35, REQ-S-21; WB-01) — SUN
+ * check for the chip on the antenna BEFORE bindTag. Pass-through to the
+ * ADMIN rail POST /api/v1/admin/binding/verify ({tokenId, nfcPayload:{uid,
+ * cmac, counter}}): the SAME shared SUN core as the public verify (AN12196
+ * SDMMAC + DB-backed counter anti-replay + oracle proof) but behind
+ * apiKeyAuth with NO x402 gate — the station must never ride the paid public
+ * rail. Tenancy: services scopes the tokenId through catalog_items first, so
+ * a foreign token 404s before any counter/key work. The response carries
+ * `cmacVerified` (false when SDM_MASTER_KEY is not provisioned upstream —
+ * counter-only check) and `reason:'CMAC_INVALID'` on a cryptographic MAC
+ * mismatch; the station UI surfaces both. Proxied so the station stays
+ * same-origin (no CORS) and the services credentials stay server-side.
  *
  * Gated at operator level like the bind rail — a verify consumes the SUN
  * counter for the token, so it is part of the bind flow, not a public read.
@@ -56,7 +63,7 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  const res = await templatesUpstream("/verify", {
+  const res = await templatesUpstream("/api/v1/admin/binding/verify", {
     method: "POST",
     body: { tokenId: Number(tokenId), nfcPayload: { uid, cmac, counter } },
   });

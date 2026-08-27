@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { actorHeader, getActor } from "@/lib/actor";
+import { getActorRole } from "@/lib/actor-role";
+import { canMutateCatalog } from "@/lib/catalog/template-logic";
 
 /**
  * POST /api/mint-proxy — server-side proxy for the minimal mint form
@@ -29,6 +31,12 @@ const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 const USDC_RE = /^(0|[1-9]\d{0,11})(\.\d{1,6})?$/;
 
 export async function POST(req: Request) {
+  // WB-07: in-route role re-check (operator+) — defense in depth behind the
+  // middleware path gate, same as every other mutating proxy.
+  if (!canMutateCatalog(await getActorRole())) {
+    return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
+  }
+
   const apiKey = process.env.SERVICES_API_KEY;
   const relayerKey = process.env.RELAYER_API_KEY;
   if (!apiKey) {
