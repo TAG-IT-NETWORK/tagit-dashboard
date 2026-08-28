@@ -17,6 +17,28 @@ export interface AnchorVerdict {
 
 const ZERO_HASH_RE = /^0x0+$/;
 
+/**
+ * True when a newer product-doc version exists than the one whose anchor is
+ * confirmed on-chain — i.e. an edit is still propagating (META-T37).
+ *
+ * This drives a SUBTLE HINT ONLY. The tri-state anchorVerdict below stays the
+ * authoritative statement about metadata integrity; this predicate never
+ * changes a tone, and the hint it gates links to nothing. Both versions must
+ * be present numbers: a null anchoredVersion is "not yet anchored" (the
+ * verdict band's yellow state), not "propagating".
+ */
+export function newerVersionPropagating(
+  verification: AssetVerificationBlock | undefined | null,
+): boolean {
+  if (!verification) return false;
+  const { latestVersion, anchoredVersion } = verification;
+  return (
+    typeof latestVersion === "number" &&
+    typeof anchoredVersion === "number" &&
+    latestVersion > anchoredVersion
+  );
+}
+
 export function anchorVerdict(
   verification: AssetVerificationBlock | undefined | null,
 ): AnchorVerdict {
