@@ -357,9 +357,12 @@ export default async function AssetVerifyPage({ params }: PageProps) {
           server price and hides itself when there is no live listing. */}
       <AssetClientIsland tokenId={tokenId} stateCode={stateCode} productName={displayName} />
 
-      {/* Below-the-fold provenance timeline, inside its own Suspense boundary
-          (META-T37): the verdict band + identity above are in the first flush;
-          the eth_getLogs history scan streams in behind them. */}
+      {/* Below-the-fold provenance timeline, loaded CLIENT-SIDE after mount
+          (DASH-T37-SUSPENSE-ISR): this route is SSG/ISR and Next 14 does not
+          stream static renders, so a Suspense boundary here made a cold
+          cache-miss block first paint on the eth_getLogs history scan. The
+          static HTML carries only the skeleton; the island fetches
+          /api/asset/[tokenId]/provenance — zero timeline work in this render. */}
       <ProvenanceTimeline tokenId={tokenId} />
 
       <Disclosure />
