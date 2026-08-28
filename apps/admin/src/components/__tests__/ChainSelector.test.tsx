@@ -11,50 +11,53 @@ vi.mock("wagmi", () => ({
   useSwitchChain: () => mockUseSwitchChain(),
 }));
 
-// Mock @tagit/config
+// Mock @tagit/config. supportedChains still carries the retired mirrors —
+// exactly the condition the selector must filter (META-T37): wagmi keeps
+// recognising them, the header must not render badges for them.
 vi.mock("@tagit/config", () => ({
   supportedChains: [
     { id: 421614, name: "Arbitrum Sepolia" },
     { id: 11155420, name: "OP Sepolia" },
     { id: 84532, name: "Base Sepolia" },
   ],
-  getPrimaryChainId: vi.fn().mockReturnValue(421614),
-  getChainRole: vi.fn((id: number) => (id === 421614 ? "primary" : "mirror")),
+  getPrimaryChainId: vi.fn().mockReturnValue(84532),
+  getChainRole: vi.fn((id: number) => (id === 84532 ? "primary" : "mirror")),
   isMultiChainEnabled: vi.fn().mockReturnValue(true),
 }));
 
 describe("ChainSelector", () => {
   beforeEach(() => {
-    mockUseChainId.mockReturnValue(421614);
+    mockUseChainId.mockReturnValue(84532);
     mockUseSwitchChain.mockReturnValue({ switchChain: vi.fn() });
   });
 
-  it("renders all three supported chains", () => {
+  it("renders only Base Sepolia — the retired mirrors never appear", () => {
     render(<ChainSelector />);
-    expect(screen.getByText("Arbitrum Sepolia")).toBeInTheDocument();
-    expect(screen.getByText("OP Sepolia")).toBeInTheDocument();
     expect(screen.getByText("Base Sepolia")).toBeInTheDocument();
+    expect(screen.queryByText("Arbitrum Sepolia")).not.toBeInTheDocument();
+    expect(screen.queryByText("OP Sepolia")).not.toBeInTheDocument();
+  });
+
+  it("filters the retired chains even when supportedChains still lists them", () => {
+    render(<ChainSelector />);
+    expect(screen.getAllByRole("button")).toHaveLength(1);
   });
 
   it("marks the active chain with primary styling", () => {
-    mockUseChainId.mockReturnValue(421614);
+    mockUseChainId.mockReturnValue(84532);
     render(<ChainSelector />);
     const buttons = screen.getAllByRole("button");
-    const arbButton = buttons.find((b) => b.textContent?.includes("Arbitrum Sepolia"));
-    expect(arbButton).toHaveClass("bg-primary");
+    const baseButton = buttons.find((b) => b.textContent?.includes("Base Sepolia"));
+    expect(baseButton).toHaveClass("bg-primary");
   });
 
-  it("shows primary/mirror role labels when multi-chain is enabled", () => {
+  it("keeps the (Primary) role label and shows no (Mirror) badge", () => {
     render(<ChainSelector />);
     expect(screen.getByText("(Primary)")).toBeInTheDocument();
+    expect(screen.queryByText("(Mirror)")).not.toBeInTheDocument();
   });
 
-  it("renders Base Sepolia with correct chain ID 84532", () => {
-    const { getByText } = render(<ChainSelector />);
-    expect(getByText("Base Sepolia")).toBeInTheDocument();
-  });
-
-  it("calls switchChain when a chain button is clicked", async () => {
+  it("calls switchChain when the Base Sepolia button is clicked", async () => {
     const mockSwitchChain = vi.fn();
     mockUseSwitchChain.mockReturnValue({ switchChain: mockSwitchChain });
     const { getByText } = render(<ChainSelector />);

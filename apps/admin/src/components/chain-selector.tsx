@@ -9,16 +9,22 @@ import {
 } from "@tagit/config";
 
 const chainLabels: Record<number, string> = {
-  421614: "Arbitrum Sepolia",
-  11155420: "OP Sepolia",
   84532: "Base Sepolia",
 };
 
 const chainColors: Record<number, string> = {
-  421614: "bg-blue-500",
-  11155420: "bg-red-500",
   84532: "bg-blue-600",
 };
+
+/**
+ * RETIRED chains (META-T37): the Arbitrum Sepolia and OP Sepolia mirrors are
+ * gone — Base Sepolia (84532) is the only live chain. They are filtered here
+ * rather than removed from @tagit/config's supportedChains so wagmi keeps
+ * recognising a wallet still parked on a retired chain (and can switch it
+ * back) while the header stops advertising badges for chains that no longer
+ * carry TAG IT state.
+ */
+const RETIRED_CHAIN_IDS = new Set<number>([421614, 11155420]);
 
 export function ChainSelector() {
   const chainId = useChainId();
@@ -27,10 +33,10 @@ export function ChainSelector() {
   const multiChain = isMultiChainEnabled();
   const primaryId = getPrimaryChainId();
 
-  // When multi-chain is disabled, only show the primary chain
-  const visibleChains = multiChain
-    ? supportedChains
-    : supportedChains.filter((c) => c.id === primaryId);
+  // Retired mirrors never render; when multi-chain is disabled, only the
+  // primary chain shows.
+  const liveChains = supportedChains.filter((c) => !RETIRED_CHAIN_IDS.has(c.id));
+  const visibleChains = multiChain ? liveChains : liveChains.filter((c) => c.id === primaryId);
 
   return (
     <div className="flex items-center gap-2">
