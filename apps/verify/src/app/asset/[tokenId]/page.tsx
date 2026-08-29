@@ -35,12 +35,14 @@ import { CONTRACT_ADDRESS } from "@/lib/contract";
 // about which chain a verdict was read from.
 import { CHAIN_ID, CHAIN_NAME } from "@/lib/dpp";
 import { fetchAsset, heroMedia, type AssetLookup } from "@/lib/services";
-import { anchorVerdict } from "@/lib/anchor-verdict";
+import { anchorVerdict, newerVersionPropagating } from "@/lib/anchor-verdict";
 import { buildProductJsonLd } from "@/lib/jsonld";
 import { siteUrl } from "@/lib/site";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { HeroImage } from "@/components/hero-image";
+import { PriceBlock } from "@/components/price-block";
+import { ProvenanceTimeline } from "@/components/provenance-timeline";
 import { CHAIN_READ_TTL_SECONDS } from "@/lib/cache";
 import { AssetClientIsland } from "./asset-client";
 
@@ -251,6 +253,7 @@ export default async function AssetVerifyPage({ params }: PageProps) {
   const state = STATES[stateCode] ?? STATES[0];
   const hero = heroMedia(dto);
   const anchor = anchorVerdict(dto.verification);
+  const propagating = newerVersionPropagating(dto.verification);
   const jsonLd = buildProductJsonLd({ url: siteUrl(`/asset/${tokenId}`), dto });
 
   const rows: [string, string][] = [
@@ -314,16 +317,30 @@ export default async function AssetVerifyPage({ params }: PageProps) {
 
       {/* Tri-state metadata-anchor verdict band (green / yellow / red). */}
       <div
-        className={`rounded-xl border px-4 py-2.5 mb-6 text-center animate-fadeUp ${bandClasses[anchor.tone]}`}
+        className={`rounded-xl border px-4 py-2.5 ${propagating ? "mb-2" : "mb-6"} text-center animate-fadeUp ${bandClasses[anchor.tone]}`}
         style={{ animationDelay: "0.3s" }}
       >
         <span className="text-sm font-bold tracking-wide">{anchor.label}</span>
         <span className="block text-[11px] opacity-80 mt-0.5">{anchor.detail}</span>
       </div>
 
+      {/* Subtle propagation hint (META-T37). Informational only, links
+          nothing, and never alters the tri-state verdict above — that band
+          stays the authoritative statement about metadata integrity. */}
+      {propagating && (
+        <p className="text-center text-[11px] text-amber-300/80 mb-6 animate-fadeUp">
+          A newer version of this product record exists and is still propagating to its on-chain
+          anchor.
+        </p>
+      )}
+
       {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} />}
 
       <DataCard rows={rows} />
+
+      {/* Server-rendered price incl. the "≈ €xx.xx" fx approximation. The buy
+          widget below re-fetches the live price before any purchase. */}
+      <PriceBlock price={dto.price} />
 
       {dto.description && (
         <div
@@ -339,6 +356,14 @@ export default async function AssetVerifyPage({ params }: PageProps) {
       {/* The buy flow lives in the client island; the widget fetches its own
           server price and hides itself when there is no live listing. */}
       <AssetClientIsland tokenId={tokenId} stateCode={stateCode} productName={displayName} />
+
+      {/* Below-the-fold provenance timeline, loaded CLIENT-SIDE after mount
+          (DASH-T37-SUSPENSE-ISR): this route is SSG/ISR and Next 14 does not
+          stream static renders, so a Suspense boundary here made a cold
+          cache-miss block first paint on the eth_getLogs history scan. The
+          static HTML carries only the skeleton; the island fetches
+          /api/asset/[tokenId]/provenance — zero timeline work in this render. */}
+      <ProvenanceTimeline tokenId={tokenId} />
 
       <Disclosure />
 

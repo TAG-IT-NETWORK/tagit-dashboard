@@ -117,5 +117,12 @@ export const MCP_PATH = "/mcp";
  */
 export function isRateLimitedPath(pathname: string): boolean {
   if (isCacheableReadPath(pathname)) return true;
+  // The provenance-timeline read (DASH-T37-SUSPENSE-ISR). Public token-id
+  // surface like the verdict read — and its origin cost on a cache miss is an
+  // eth_getLogs history scan (up to MAX_LOG_REQUESTS RPC calls, see
+  // @/lib/lifecycle), the most expensive read on this host — so it shares the
+  // per-IP "asset" budget. Already inside the middleware matcher via
+  // /api/asset/:path*; this predicate is what actually arms the limiter.
+  if (/^\/api\/asset\/[^/]+\/provenance\/?$/.test(pathname)) return true;
   return pathname === MCP_PATH || pathname === `${MCP_PATH}/`;
 }

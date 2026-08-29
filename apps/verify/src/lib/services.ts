@@ -51,12 +51,29 @@ export interface AssetVerificationBlock {
   status?: string;
 }
 
+/**
+ * FX approximation block, nested INSIDE the price block by the services detail
+ * DTO. `approx` is a PRE-FORMATTED decimal string with the currency's exponent
+ * already applied by the server (EUR -> "66.54", JPY -> "12366" with no
+ * decimals). It must be rendered AS-IS — never re-formatted with toFixed or
+ * Intl number formatting, which would silently assert a precision the server
+ * did not produce. See @/lib/fx for the one renderer.
+ *
+ * The block appears only when the request carries `?currency=` (see
+ * DISPLAY_CURRENCY below) or the listing has an msrp currency.
+ */
+export interface AssetPriceFx {
+  currency: string;
+  approx: string;
+}
+
 /** Canonical price object (tagit-services src/pricing/service.ts). */
 export interface AssetPrice {
   tokenId: string;
   priceUsdc6: string | null;
   display: string | null;
   msrp?: { amount: number; currency: string };
+  fx?: AssetPriceFx;
   saleState: "not_for_sale" | "listed" | "sold";
   version: number;
   purchase?: {
@@ -94,16 +111,40 @@ export type AssetLookup =
   | { kind: "unavailable" }; // services unreachable or 5xx
 
 /**
+ * Display currency requested from the services API for the fx approximation
+ * (META-T37).
+ *
+ * DELIBERATELY A FIXED CONSTANT, NOT Accept-Language. Reading request headers
+ * in this render path would mark the /asset/[tokenId] route dynamic and opt it
+ * out of Next's Full Route Cache — the primary cost control for this host (see
+ * the caching note in src/app/asset/[tokenId]/page.tsx). It would also cache
+ * one visitor's locale into the shared 60s ISR entry for every subsequent
+ * visitor, which is worse than a consistent default. EUR is the default
+ * because the verify host's fx line exists for the EU Digital Product
+ * Passport audience; the amount is explicitly approximate either way.
+ * Per-viewer currency selection, if it ever ships, belongs in a client island
+ * against the price proxy — not here.
+ */
+export const DISPLAY_CURRENCY = "EUR";
+
+/**
  * Server-side fetch of one asset DTO. Tagged + 60s ISR so a cache hit costs
  * nothing and the revalidate webhook can invalidate it precisely.
+ *
+ * `?currency=` asks the services API to include the price.fx approximation
+ * block in the requested display currency (fx also appears without the param
+ * when the listing carries an msrp currency).
  */
 export async function fetchAsset(tokenId: string): Promise<AssetLookup> {
   if (!/^\d+$/.test(tokenId)) return { kind: "none" };
   try {
-    const res = await fetch(`${SERVICES_URL}/api/v1/assets/${tokenId}`, {
-      headers: { accept: "application/json" },
-      next: { tags: [tokenTag(tokenId)], revalidate: 60 },
-    });
+    const res = await fetch(
+      `${SERVICES_URL}/api/v1/assets/${tokenId}?currency=${DISPLAY_CURRENCY}`,
+      {
+        headers: { accept: "application/json" },
+        next: { tags: [tokenTag(tokenId)], revalidate: 60 },
+      },
+    );
     if (res.status === 404) return { kind: "none" };
     if (!res.ok) return { kind: "unavailable" };
     const dto = (await res.json()) as AssetDto;
