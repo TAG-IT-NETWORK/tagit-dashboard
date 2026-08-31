@@ -15,6 +15,8 @@ import { useRef, useState } from "react";
 import { Button } from "@tagit/ui";
 import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 
+import { upstreamErrorMessage } from "@/lib/upstream-error";
+
 export interface UploadedMedia {
   sha256: string;
   mime: string;
@@ -51,7 +53,10 @@ export function parseMediaUploadResponse(
         : d
   ) as Record<string, unknown>;
   const sha256 = typeof entry.sha256 === "string" ? entry.sha256 : undefined;
-  const mime = typeof entry.mime === "string" ? entry.mime : fallbackMime || "image/webp";
+  const mime =
+    typeof entry.mime === "string" && entry.mime.length > 0
+      ? entry.mime
+      : fallbackMime || "image/webp";
   const urls = (entry.urls ?? {}) as Record<string, unknown>;
   const url =
     (typeof urls.lg === "string" ? urls.lg : undefined) ??
@@ -61,13 +66,17 @@ export function parseMediaUploadResponse(
   return { sha256, mime, url };
 }
 
-/** Human-readable error from a services ({ error: CODE, message }) or proxy ({ ok:false, error: text }) body. */
+/** Human-readable error for an upload response — see lib/upstream-error.ts. */
 export function mediaUploadErrorMessage(data: unknown, status: number): string {
-  const d = (data ?? {}) as Record<string, unknown>;
-  if (typeof d.message === "string" && d.message.length > 0) return d.message;
-  if (typeof d.error === "string" && d.error.length > 0) return d.error;
-  return `upload failed (${status})`;
+  return upstreamErrorMessage(data, status, "upload");
 }
+
+/**
+ * Vercel rejects request bodies over ~4.5 MB at the platform layer (a non-JSON
+ * 413 before our proxy runs), even though services itself allows 10 MB — so
+ * pre-flight the size for a readable error instead of a parse failure.
+ */
+export const MAX_UPLOAD_BYTES = 4.5 * 1024 * 1024;
 
 export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProps) {
   const [uploading, setUploading] = useState(false);
@@ -80,18 +89,36 @@ export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProp
     setUploadError(null);
     setUploading(true);
     try {
+      if (file.size > MAX_UPLOAD_BYTES) {
+        throw new Error(
+          `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)} MB — uploads are capped at 4.5 MB (platform limit). Resize or export a smaller copy.`,
+        );
+      }
       const formData = new FormData();
       // The services endpoint accepts multipart field "files" ONLY
       // (multer upload.array("files") — any other name is a 400).
       formData.append("files", file);
       const res = await fetch("/api/media-proxy", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok || data.ok === false) {
+      // Infra-level failures (413 body cap, gateway HTML pages) are not JSON.
+      const data: unknown = await res.json().catch(() => null);
+      if (data === null) {
+        throw new Error(`upload failed (${res.status}) — non-JSON response from the proxy`);
+      }
+      if (!res.ok || (data as { ok?: boolean }).ok === false) {
         throw new Error(mediaUploadErrorMessage(data, res.status));
       }
       const parsed = parseMediaUploadResponse(data, file.type);
       if (!parsed) {
         throw new Error("media pipeline returned no sha256/url");
+      }
+      // The pipeline is content-addressed — the same image dedupes to the same
+      // sha256, which would produce duplicate React keys and a confusing list.
+      // Rows loaded back from saved template attributes carry sha256: "" (only
+      // the URL round-trips), so match on URL as well.
+      if (
+        media.some((m) => (m.sha256 !== "" && m.sha256 === parsed.sha256) || m.url === parsed.url)
+      ) {
+        throw new Error(`${file.name} is already in the list (identical image content)`);
       }
       onChange([
         ...media,
@@ -131,7 +158,10 @@ export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProp
             variant="ghost"
             size="sm"
             onClick={() => removeMedia(m.sha256 || m.url)}
-            disabled={disabled}
+            // Also locked during an in-flight upload: handleUpload spreads the
+            // media array it closed over, so a concurrent removal would be
+            // resurrected when the upload lands.
+            disabled={disabled || uploading}
           >
             <Trash2 className="h-3 w-3" />
           </Button>

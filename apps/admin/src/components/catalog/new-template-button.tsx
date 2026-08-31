@@ -17,6 +17,8 @@ import { Loader2, Plus } from "lucide-react";
 
 import { canMutateCatalog, type CatalogRole } from "@/lib/catalog/template-logic";
 
+import { upstreamErrorMessage } from "@/lib/upstream-error";
+
 /**
  * "New template" → POST /api/catalog-proxy/templates { name } (draft) →
  * jump straight into the editor. Slug is server-generated from the name
@@ -47,7 +49,7 @@ export function NewTemplateButton({ role }: { role: CatalogRole | null }) {
       });
       const data = await res.json();
       if (!res.ok || !data.ok || !data.template?.id) {
-        throw new Error(data.error || `create failed (${res.status})`);
+        throw new Error(upstreamErrorMessage(data, res.status, "create"));
       }
       router.push(`/catalog/${data.template.id}`);
     } catch (err) {

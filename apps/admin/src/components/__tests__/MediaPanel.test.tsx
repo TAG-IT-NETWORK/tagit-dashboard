@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
+  MAX_UPLOAD_BYTES,
   MediaPanel,
   mediaUploadErrorMessage,
   parseMediaUploadResponse,
@@ -76,6 +77,14 @@ describe("parseMediaUploadResponse", () => {
 
   it("returns null when no sha256 is present (empty media array)", () => {
     expect(parseMediaUploadResponse({ ok: true, media: [] }, "image/png")).toBeNull();
+  });
+
+  it("treats an empty-string mime as missing and falls back", () => {
+    expect(parseMediaUploadResponse({ ok: true, media: [{ sha256: SHA, mime: "" }] }, "")).toEqual({
+      sha256: SHA,
+      mime: "image/webp",
+      url: `https://media.tagit.network/i/${SHA}/lg.webp`,
+    });
   });
 });
 
@@ -193,6 +202,59 @@ describe("MediaPanel upload", () => {
 
     await waitFor(() =>
       expect(screen.getByText("media pipeline returned no sha256/url")).toBeInTheDocument(),
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("rejects files over the platform body cap before uploading anything", async () => {
+    render(<MediaPanel media={[]} onChange={onChange} />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const big = new File([new Uint8Array(8)], "huge.png", { type: "image/png" });
+    Object.defineProperty(big, "size", { value: MAX_UPLOAD_BYTES + 1 });
+    fireEvent.change(input, { target: { files: [big] } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/uploads are capped at 4\.5 MB/)).toBeInTheDocument(),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("survives a non-JSON infra response (Vercel 413/gateway HTML) with a readable error", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("<html>Request Entity Too Large</html>", {
+        status: 413,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+    render(<MediaPanel media={[]} onChange={onChange} />);
+    pickFile();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("upload failed (413) — non-JSON response from the proxy"),
+      ).toBeInTheDocument(),
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("refuses to add the same image twice (content-addressed dedupe)", async () => {
+    const existing: UploadedMedia[] = [
+      {
+        sha256: SHA,
+        mime: "image/png",
+        url: `https://media.tagit.network/i/${SHA}/lg.webp`,
+        role: "hero",
+        fileName: "cream.png",
+      },
+    ];
+    render(<MediaPanel media={existing} onChange={onChange} />);
+    pickFile("cream-copy.png");
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("cream-copy.png is already in the list (identical image content)"),
+      ).toBeInTheDocument(),
     );
     expect(onChange).not.toHaveBeenCalled();
   });

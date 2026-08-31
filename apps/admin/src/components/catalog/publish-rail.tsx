@@ -9,20 +9,15 @@
  */
 
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@tagit/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@tagit/ui";
 import { Archive, GitCommitHorizontal, Loader2, Rocket } from "lucide-react";
 
 import { SnapshotDiff } from "@/components/catalog/snapshot-diff";
 import { StatusChip } from "@/components/catalog/status-chip";
 import { workingCopySnapshot, type PublishState } from "@/lib/catalog/template-logic";
 import type { TemplateDto, TemplateVersionDto } from "@/lib/catalog/template-types";
+
+import { upstreamErrorMessage } from "@/lib/upstream-error";
 
 interface PublishRailProps {
   template: TemplateDto;
@@ -55,7 +50,11 @@ export function PublishRail({
   const sorted = useMemo(() => [...versions].sort((a, b) => b.version - a.version), [versions]);
 
   const [fromKey, setFromKey] = useState<string>(() =>
-    sorted.length > 1 ? String(sorted[1].version) : sorted.length === 1 ? String(sorted[0].version) : WORKING,
+    sorted.length > 1
+      ? String(sorted[1].version)
+      : sorted.length === 1
+        ? String(sorted[0].version)
+        : WORKING,
   );
   const [toKey, setToKey] = useState<string>(() =>
     publishState.workingDirty || sorted.length === 0 ? WORKING : String(sorted[0].version),
@@ -78,7 +77,7 @@ export function PublishRail({
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || `${verb} failed (${res.status})`);
+        throw new Error(upstreamErrorMessage(data, res.status, verb));
       }
       onChanged();
     } catch (err) {
