@@ -29,6 +29,46 @@ interface MediaPanelProps {
   disabled?: boolean;
 }
 
+/**
+ * Parse the media pipeline response into { sha256, mime, url }.
+ *
+ * The services endpoint (POST /api/v1/media, passed through verbatim by the
+ * proxy) returns { ok: true, media: [{ sha256, mime, urls: { orig|lg|md|sm|t },
+ * … }] } — an ARRAY, one entry per uploaded file, with a `urls` variant map.
+ * Older shapes ({ media: {…} } or top-level fields) are kept as fallbacks.
+ * Exported for tests.
+ */
+export function parseMediaUploadResponse(
+  data: unknown,
+  fallbackMime: string,
+): { sha256: string; mime: string; url: string } | null {
+  const d = (data ?? {}) as Record<string, unknown>;
+  const entry = (
+    Array.isArray(d.media)
+      ? (d.media[0] ?? {})
+      : typeof d.media === "object" && d.media
+        ? d.media
+        : d
+  ) as Record<string, unknown>;
+  const sha256 = typeof entry.sha256 === "string" ? entry.sha256 : undefined;
+  const mime = typeof entry.mime === "string" ? entry.mime : fallbackMime || "image/webp";
+  const urls = (entry.urls ?? {}) as Record<string, unknown>;
+  const url =
+    (typeof urls.lg === "string" ? urls.lg : undefined) ??
+    (typeof entry.url === "string" ? entry.url : undefined) ??
+    (sha256 ? `https://media.tagit.network/i/${sha256}/lg.webp` : undefined);
+  if (!sha256 || !url) return null;
+  return { sha256, mime, url };
+}
+
+/** Human-readable error from a services ({ error: CODE, message }) or proxy ({ ok:false, error: text }) body. */
+export function mediaUploadErrorMessage(data: unknown, status: number): string {
+  const d = (data ?? {}) as Record<string, unknown>;
+  if (typeof d.message === "string" && d.message.length > 0) return d.message;
+  if (typeof d.error === "string" && d.error.length > 0) return d.error;
+  return `upload failed (${status})`;
+}
+
 export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -41,27 +81,22 @@ export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProp
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      // The services endpoint accepts multipart field "files" ONLY
+      // (multer upload.array("files") — any other name is a 400).
+      formData.append("files", file);
       const res = await fetch("/api/media-proxy", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `upload failed (${res.status})`);
+        throw new Error(mediaUploadErrorMessage(data, res.status));
       }
-      const sha256: string | undefined = data.sha256 ?? data.media?.sha256;
-      const mime: string = data.mime ?? data.media?.mime ?? file.type ?? "image/webp";
-      const url: string | undefined =
-        data.url ??
-        data.media?.url ??
-        (sha256 ? `https://media.tagit.network/i/${sha256}/lg.webp` : undefined);
-      if (!sha256 || !url) {
+      const parsed = parseMediaUploadResponse(data, file.type);
+      if (!parsed) {
         throw new Error("media pipeline returned no sha256/url");
       }
       onChange([
         ...media,
         {
-          sha256,
-          mime,
-          url,
+          ...parsed,
           role: media.length === 0 ? "hero" : "gallery",
           fileName: file.name,
         },
@@ -105,7 +140,8 @@ export function MediaPanel({ media, onChange, disabled = false }: MediaPanelProp
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        // Services hard-rejects SVG/HEIC by magic bytes — only offer what it accepts.
+        accept="image/jpeg,image/png,image/webp"
         className="hidden"
         onChange={handleUpload}
       />
