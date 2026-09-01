@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Button } from "@tagit/ui";
 import { AlertTriangle, ArrowLeft, GitFork, Layers, Loader2 } from "lucide-react";
 
+import { upstreamErrorMessage } from "@/lib/upstream-error";
 import { DetailsTab } from "@/components/catalog/details-tab";
 import { ItemsTab } from "@/components/catalog/items-tab";
 import { MediaTab } from "@/components/catalog/media-tab";
@@ -57,7 +58,7 @@ export function TemplateEditor({ id, role }: TemplateEditorProps) {
       const res = await fetch(`/api/catalog-proxy/templates/${id}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.ok || !data.template) {
-        throw new Error(data.error || `load failed (${res.status})`);
+        throw new Error(upstreamErrorMessage(data, res.status, "load"));
       }
       setTemplate(data.template as TemplateDto);
       setVersions((data.versions ?? []) as TemplateVersionDto[]);
@@ -88,7 +89,8 @@ export function TemplateEditor({ id, role }: TemplateEditorProps) {
         });
         const data = (await res.json()) as TemplateUpdateResponse;
         if (!res.ok || !data.ok || !data.template) {
-          return data.error || `save failed (${res.status})`;
+          // Services bodies are { error: CODE, message: human } — show the human line.
+          return upstreamErrorMessage(data, res.status, "save");
         }
         setTemplate(data.template);
         if (data.forked) setForkNotice(true);

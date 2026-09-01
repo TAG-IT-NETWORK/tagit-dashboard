@@ -25,6 +25,8 @@ import { CheckCircle2, ExternalLink, Loader2, Send, XCircle } from "lucide-react
 
 import type { PropagateJobDto, TemplateDto } from "@/lib/catalog/template-types";
 
+import { upstreamErrorMessage } from "@/lib/upstream-error";
+
 const VERIFY_URL = process.env.NEXT_PUBLIC_VERIFY_URL || "https://verify.tagit.network";
 const POLL_MS = 2500;
 
@@ -75,23 +77,20 @@ export function PropagateModal({
 
   useEffect(() => stopPolling, [stopPolling]);
 
-  const poll = useCallback(
-    async (id: string) => {
-      try {
-        const res = await fetch(`/api/catalog-proxy/propagate-jobs/${id}`, { cache: "no-store" });
-        const data = await res.json();
-        if (res.ok && data.ok && data.job) {
-          const next = data.job as PropagateJobDto;
-          setJob(next);
-          if (next.state !== "running") return; // terminal — stop polling
-        }
-      } catch {
-        // transient poll failure — keep trying
+  const poll = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/catalog-proxy/propagate-jobs/${id}`, { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && data.ok && data.job) {
+        const next = data.job as PropagateJobDto;
+        setJob(next);
+        if (next.state !== "running") return; // terminal — stop polling
       }
-      timerRef.current = setTimeout(() => void poll(id), POLL_MS);
-    },
-    [],
-  );
+    } catch {
+      // transient poll failure — keep trying
+    }
+    timerRef.current = setTimeout(() => void poll(id), POLL_MS);
+  }, []);
 
   const start = async () => {
     if (!acknowledged || starting) return;
@@ -107,7 +106,7 @@ export function PropagateModal({
       });
       const data = await res.json();
       if (!res.ok || !data.ok || !data.jobId) {
-        throw new Error(data.error || `propagate failed (${res.status})`);
+        throw new Error(upstreamErrorMessage(data, res.status, "propagate"));
       }
       setJobId(data.jobId as string);
       void poll(data.jobId as string);
@@ -172,7 +171,9 @@ export function PropagateModal({
                 • Every changed item gets a new metadata version and its anchor re-queues — one
                 relayer-funded transaction per item (grace 0).
               </p>
-              <p>• The job is chunked and resumable; unchanged items are skipped byte-identically.</p>
+              <p>
+                • The job is chunked and resumable; unchanged items are skipped byte-identically.
+              </p>
             </div>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -182,7 +183,11 @@ export function PropagateModal({
                 className="mt-0.5"
               />
               <span>
-                Re-render {scopeCount !== null ? `${scopeCount} item${scopeCount === 1 ? "" : "s"}` : "every adopted item"} onto v{targetVersion} and re-queue anchors.
+                Re-render{" "}
+                {scopeCount !== null
+                  ? `${scopeCount} item${scopeCount === 1 ? "" : "s"}`
+                  : "every adopted item"}{" "}
+                onto v{targetVersion} and re-queue anchors.
               </span>
             </label>
             {error && <p className="text-xs text-destructive">{error}</p>}

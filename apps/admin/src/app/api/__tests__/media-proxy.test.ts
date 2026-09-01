@@ -40,12 +40,27 @@ describe("POST /api/media-proxy", () => {
     actorRoleMock.role = "editor";
     process.env.SERVICES_API_KEY = TEST_KEY;
     process.env.SERVICES_URL = "https://services.test";
+    // Real services shape: { ok, media: [serialized] } — an ARRAY with a
+    // `urls` variant map (media/router.ts serializeMedia), NOT top-level
+    // sha256/mime fields.
     fetchMock = vi.fn(
       async () =>
-        new Response(JSON.stringify({ ok: true, sha256: "a".repeat(64), mime: "image/webp" }), {
-          status: 201,
-          headers: { "content-type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({
+            ok: true,
+            media: [
+              {
+                sha256: "a".repeat(64),
+                mime: "image/webp",
+                urls: { lg: `https://media.tagit.network/i/${"a".repeat(64)}/lg.webp` },
+              },
+            ],
+          }),
+          {
+            status: 201,
+            headers: { "content-type": "application/json" },
+          },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -92,8 +107,13 @@ describe("POST /api/media-proxy", () => {
     const res = await POST(multipartRequest());
     expect(await res.json()).toEqual({
       ok: true,
-      sha256: "a".repeat(64),
-      mime: "image/webp",
+      media: [
+        {
+          sha256: "a".repeat(64),
+          mime: "image/webp",
+          urls: { lg: `https://media.tagit.network/i/${"a".repeat(64)}/lg.webp` },
+        },
+      ],
     });
   });
 

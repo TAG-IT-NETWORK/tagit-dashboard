@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { E2E_ACTOR, isE2EAuthBypass } from "@/lib/e2e-auth";
 
 /**
  * Signed-in dashboard identity for server proxies (META-T32, REQ-S-16).
@@ -13,6 +14,8 @@ import { auth } from "@/auth";
 
 /** Lowercase session email, or null outside a signed-in request context. */
 export async function getActor(): Promise<string | null> {
+  // CI-only Playwright seam (dead in production builds) — see lib/e2e-auth.ts.
+  if (isE2EAuthBypass()) return E2E_ACTOR;
   try {
     const session = await auth();
     const email = session?.user?.email;
