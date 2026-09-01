@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { isE2EAuthBypass } from "@/lib/e2e-auth";
 import { evaluateAccess, isApiPath, parseRole } from "@/lib/rbac";
 
 /**
@@ -20,6 +21,9 @@ import { evaluateAccess, isApiPath, parseRole } from "@/lib/rbac";
  * the only one.
  */
 export default auth((req) => {
+  // CI-only Playwright seam (dead in production builds) — see lib/e2e-auth.ts.
+  if (isE2EAuthBypass()) return NextResponse.next();
+
   const { pathname, search } = req.nextUrl;
   const decision = evaluateAccess(
     pathname,

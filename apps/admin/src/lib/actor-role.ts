@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { isE2EAuthBypass } from "@/lib/e2e-auth";
 import { parseRole, type Role } from "@/lib/rbac";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 
@@ -25,6 +26,8 @@ const CATALOG_ROLE_BY_ROLE: Record<Role, CatalogRole> = {
 };
 
 export async function getActorRole(): Promise<CatalogRole | null> {
+  // CI-only Playwright seam (dead in production builds) — see lib/e2e-auth.ts.
+  if (isE2EAuthBypass()) return "admin";
   try {
     const session = await auth();
     const role = parseRole(session?.user?.role);

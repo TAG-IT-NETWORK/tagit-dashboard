@@ -36,7 +36,18 @@ export default defineConfig({
     url: "http://localhost:3001",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
-    // Render pages without a connected wallet so E2E can exercise them.
-    env: { NEXT_PUBLIC_E2E: "true" },
+    env: {
+      // Render pages without a connected wallet so E2E can exercise them.
+      NEXT_PUBLIC_E2E: "true",
+      // META-T32 auth: bypass the session gate as a signed-in admin — the
+      // seam is CI/dev-only (dead in production builds, see lib/e2e-auth.ts).
+      // Without it every page 307s to /api/auth/signin, which 500s with no
+      // real AUTH_SECRET, and the readiness probe (which follows redirects)
+      // times out after 120s — the post-T32 E2E failure mode.
+      E2E_AUTH_BYPASS: "true",
+      // Dummy secret so the NextAuth wrapper itself stops throwing
+      // MissingSecret on every request. Not a credential.
+      AUTH_SECRET: "e2e-only-dummy-secret-not-a-credential",
+    },
   },
 });
