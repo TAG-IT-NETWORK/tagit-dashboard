@@ -7,26 +7,17 @@
  * Persistence: product_templates has no media column (services schema), so
  * media is stored as reserved attribute rows — media:hero / media:gallery
  * with the variant URL as the value (see lib/catalog/template-logic.ts).
- * Attributes flow into rendered item docs, so adopted items inherit these
- * rows as doc attributes.
+ * The services renderer (templateSnapshotToDocFields) lifts these rows into
+ * the published item doc's image + tagit.media, which is what the verify
+ * page and mobile app display.
  */
 
 import { useMemo, useState } from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@tagit/ui";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@tagit/ui";
 import { Loader2, Save } from "lucide-react";
 
 import { MediaPanel, type UploadedMedia } from "@/components/media-panel";
-import {
-  mediaListFromAttributes,
-  mergeMediaIntoAttributes,
-} from "@/lib/catalog/template-logic";
+import { mediaListFromAttributes, mergeMediaIntoAttributes } from "@/lib/catalog/template-logic";
 import type { TemplateDto } from "@/lib/catalog/template-types";
 
 interface MediaTabProps {
@@ -98,9 +89,9 @@ export function MediaTab({ template, disabled, onSave }: MediaTabProps) {
         <CardTitle className="text-base">Media</CardTitle>
         <CardDescription>
           Uploads go through the server-side media proxy — the services API key never reaches this
-          browser. Stored on the template as media:hero / media:gallery attribute rows (the
-          services template schema has no media column); adopted items inherit them as doc
-          attributes on their next render. First upload is the hero.
+          browser. Stored on the template as media:hero / media:gallery attribute rows (the services
+          template schema has no media column); on publish they become the item image and gallery
+          shown on the verify page and in the apps. First upload is the hero.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
