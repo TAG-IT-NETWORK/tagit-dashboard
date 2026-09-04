@@ -16,9 +16,13 @@ jobs:
         with:
           fetch-depth: 0 # full history so committed secrets anywhere in the past are caught
       - name: Install gitleaks
+        # Pinned: resolving "latest" through api.github.com is unauthenticated
+        # and gets 403 rate-limited on busy runners, which failed the scan on
+        # push events with no relation to the code (same fix as the other repos).
+        env:
+          GITLEAKS_VERSION: "8.30.1"
         run: |
-          VER=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name | sed 's/^v//')
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" | tar -xz -C /tmp gitleaks
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz -C /tmp gitleaks
           sudo install /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
       - name: Scan history + working tree
