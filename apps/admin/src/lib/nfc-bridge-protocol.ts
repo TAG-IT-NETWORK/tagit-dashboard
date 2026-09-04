@@ -26,6 +26,32 @@ export interface NdefRecordDTO {
   data: string;
 }
 
+/**
+ * SUN (SDM) fields the bridge decoded from an encrypted-PICC URL record
+ * (`…/sun?picc=…&cmac=…`) with the master key it personalized the chip with.
+ */
+export interface SunDecodeDTO {
+  /** 7-byte UID, colon-separated uppercase hex — same format as CardInfo.uid. */
+  uid: string;
+  /** SDMReadCtr at this read (0 … 0xFFFFFF). */
+  counter: number;
+  /** 16-hex truncated SDMMAC exactly as mirrored in the URL. */
+  cmac: string;
+  /** 32-hex encrypted PICCData exactly as mirrored in the URL. */
+  picc: string;
+  /** true when the CMAC matched the per-chip key the bridge re-derived from its master. */
+  cmacVerified: boolean;
+}
+
+/** Result payload of a read-ndef request. */
+export interface ReadNdefResult {
+  records: NdefRecordDTO[];
+  /** null when no picc/cmac URL exists, the bridge has no master key, or the chip was keyed differently. */
+  sun: SunDecodeDTO | null;
+  /** Why `sun` is null although a picc/cmac URL record was present. */
+  sunError?: string;
+}
+
 // --- Client -> Bridge requests ---------------------------------------------
 
 interface BaseRequest {

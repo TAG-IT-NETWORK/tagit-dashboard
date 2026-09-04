@@ -8,12 +8,14 @@ import {
   graceRemainingMs,
   initialStationState,
   interpretNdefRead,
+  isEncryptedSunUrl,
   orderBySerial,
   parseBatchTokens,
   parseSunFromUrl,
   pendingQueue,
   stationReducer,
   sunCheckViaBridge,
+  sunFromBridgeDecode,
   sunMatchesCard,
   type StationState,
   type StationToken,
@@ -21,6 +23,9 @@ import {
 
 const UID = "04:A1:B2:C3:D4:E5:F6";
 const SUN_URL = "https://verify.tagit.network/sun?uid=04A1B2C3D4E5F6&ctr=00000A&cmac=0102030405060708";
+/** Encrypted-PICC layout (what the bridge personalizes) — opaque without the master key. */
+const ENC_SUN_URL = `https://verify.tagit.network/sun?picc=${"AB".repeat(16)}&cmac=0102030405060708`;
+const BRIDGE_SUN = { uid: UID, counter: 10, cmac: "0102030405060708", picc: "AB".repeat(16), cmacVerified: true };
 
 function token(tokenId: string, lifecycle = "minted", serial: string | null = null): StationToken {
   return { tokenId, lifecycle, tagUid: null, serial };
@@ -168,6 +173,62 @@ describe("interpretNdefRead / sunCheckViaBridge (mocked bridge)", () => {
 });
 
 // ── Station reducer: happy path ─────────────────────────────────────────────
+
+describe("bridge-decoded SUN (encrypted-PICC layout)", () => {
+  const encRecord = { recordType: "url", data: ENC_SUN_URL } as const;
+
+  it("uses the bridge's decoded sun and normalizes it to SunParams", () => {
+    expect(interpretNdefRead({ records: [encRecord], sun: BRIDGE_SUN }, UID)).toEqual({
+      ok: true,
+      sun: { uidHex: "0x04a1b2c3d4e5f6", counter: 10, cmacHex: "0x0102030405060708" },
+    });
+  });
+
+  it("fails tamper when the bridge reports a CMAC mismatch — even before the UID check", () => {
+    const result = interpretNdefRead(
+      { records: [encRecord], sun: { ...BRIDGE_SUN, cmacVerified: false } },
+      UID,
+    );
+    expect(result).toMatchObject({ ok: false, kind: "tamper" });
+    expect((result as { message: string }).message).toMatch(/SDMMAC mismatch/);
+  });
+
+  it("fails tamper when the decoded UID is not the tapped card", () => {
+    expect(
+      interpretNdefRead({ records: [encRecord], sun: BRIDGE_SUN }, "04:99:99:99:99:99:99"),
+    ).toMatchObject({ ok: false, kind: "tamper" });
+  });
+
+  it("is unreadable with the bridge's reason when the encrypted SUN was not decoded", () => {
+    const withReason = interpretNdefRead(
+      { records: [encRecord], sun: null, sunError: "chip was personalized with a different SDM master key" },
+      UID,
+    );
+    expect(withReason).toMatchObject({ ok: false, kind: "unreadable" });
+    expect((withReason as { message: string }).message).toMatch(/different SDM master key/);
+
+    const olderBridge = interpretNdefRead([encRecord], UID);
+    expect(olderBridge).toMatchObject({ ok: false, kind: "unreadable" });
+    expect((olderBridge as { message: string }).message).toMatch(/Encrypted SUN URL/);
+  });
+
+  it("ignores a malformed sun object and falls back to the URL path", () => {
+    expect(sunFromBridgeDecode({ uid: "04:A1", counter: 1, cmac: "0102030405060708" })).toBeNull();
+    expect(sunFromBridgeDecode({ uid: UID, counter: -1, cmac: "0102030405060708" })).toBeNull();
+    expect(sunFromBridgeDecode({ uid: UID, counter: 1, cmac: "01" })).toBeNull();
+    expect(sunFromBridgeDecode(null)).toBeNull();
+    // Plain-mirror URL still wins when the bridge attached garbage.
+    expect(
+      interpretNdefRead({ records: [{ recordType: "url", data: SUN_URL }], sun: { uid: 5 } }, UID),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("recognizes the encrypted layout only with well-formed picc + cmac", () => {
+    expect(isEncryptedSunUrl(ENC_SUN_URL)).toBe(true);
+    expect(isEncryptedSunUrl(SUN_URL)).toBe(false);
+    expect(isEncryptedSunUrl("nope")).toBe(false);
+  });
+});
 
 describe("stationReducer — bind loop", () => {
   it("LOAD → idle with a queue; empty queue → complete", () => {

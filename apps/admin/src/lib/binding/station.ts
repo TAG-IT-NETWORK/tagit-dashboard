@@ -159,17 +159,81 @@ export type TapEvaluation =
   | { ok: false; kind: SunFailKind; message: string };
 
 /**
+ * Bridge-decoded SUN (encrypted-PICC layout). This fleet's chips are
+ * personalized with `…/sun?picc=<enc PICCData>&cmac=…`, which no client can
+ * parse: only a holder of the SDM master key can decrypt PICCData to learn the
+ * UID and counter. The bridge holds that key (it programmed the chip), decodes
+ * on read-ndef and attaches `sun` (ReadNdefResult in nfc-bridge-protocol.ts).
+ * Returns null for anything malformed so the caller falls back / fails closed.
+ */
+export function sunFromBridgeDecode(value: unknown): SunParams | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as { uid?: unknown; counter?: unknown; cmac?: unknown };
+  if (typeof v.uid !== "string" || typeof v.cmac !== "string" || typeof v.counter !== "number") {
+    return null;
+  }
+  const uid = v.uid.replace(/[^0-9a-fA-F]/g, "");
+  if (!/^[0-9a-fA-F]{14}$/.test(uid)) return null;
+  if (!/^[0-9a-fA-F]{16}$/.test(v.cmac)) return null;
+  if (!Number.isInteger(v.counter) || v.counter < 0 || v.counter > 0xffffff) return null;
+  return {
+    uidHex: `0x${uid.toLowerCase()}` as `0x${string}`,
+    counter: v.counter,
+    cmacHex: `0x${v.cmac.toLowerCase()}` as `0x${string}`,
+  };
+}
+
+/** True when a URL carries the encrypted-PICC SUN layout (picc + cmac). */
+export function isEncryptedSunUrl(url: string): boolean {
+  let params: URLSearchParams;
+  try {
+    params = new URL(url).searchParams;
+  } catch {
+    return false;
+  }
+  return /^[0-9a-fA-F]{32}$/.test(params.get("picc") ?? "") && /^[0-9a-fA-F]{16}$/.test(params.get("cmac") ?? "");
+}
+
+/**
  * Interpret a bridge read-ndef result for the tapped card. Pure — the bridge
- * response rides in as plain data. Accepts both `NdefRecordDTO[]` and
- * `{records: NdefRecordDTO[]}` result shapes.
+ * response rides in as plain data. Accepts `NdefRecordDTO[]` and
+ * `{records, sun?, sunError?}` result shapes. Order of trust: a bridge-decoded
+ * `sun` (encrypted layout) first, then a plain uid/ctr/cmac URL; an encrypted
+ * URL the bridge could not decode is unverifiable (fail closed, REQ-S-21).
  */
 export function interpretNdefRead(result: unknown, cardUid: string): TapEvaluation {
-  const records: unknown = Array.isArray(result)
-    ? result
-    : (result as { records?: unknown } | null)?.records;
+  const container =
+    !Array.isArray(result) && result !== null && typeof result === "object"
+      ? (result as { records?: unknown; sun?: unknown; sunError?: unknown })
+      : null;
+  const records: unknown = Array.isArray(result) ? result : container?.records;
   if (!Array.isArray(records) || records.length === 0) {
     return { ok: false, kind: "unreadable", message: "Chip has no readable NDEF message" };
   }
+
+  if (container?.sun) {
+    // A bridge-side MAC failure means the chip's per-chip key is not the one
+    // our master derives — never bind it, whatever the server would say.
+    if ((container.sun as { cmacVerified?: unknown }).cmacVerified === false) {
+      return {
+        ok: false,
+        kind: "tamper",
+        message: "SDMMAC mismatch — the chip's MAC does not verify under the bridge's master key",
+      };
+    }
+    const sun = sunFromBridgeDecode(container.sun);
+    if (sun) {
+      if (!sunMatchesCard(sun, cardUid)) {
+        return {
+          ok: false,
+          kind: "tamper",
+          message: "SUN UID mismatch — the chip's mirrored UID does not match the tapped card",
+        };
+      }
+      return { ok: true, sun };
+    }
+  }
+
   const urls = (records as NdefRecordDTO[]).filter(
     (r) => r && r.recordType === "url" && typeof r.data === "string",
   );
@@ -188,6 +252,13 @@ export function interpretNdefRead(result: unknown, cardUid: string): TapEvaluati
       }
       return { ok: true, sun };
     }
+  }
+  if (urls.some((r) => isEncryptedSunUrl(r.data))) {
+    const why =
+      typeof container?.sunError === "string" && container.sunError.length > 0
+        ? container.sunError
+        : "the bridge did not decode it (older bridge build, or no SDM master key configured)";
+    return { ok: false, kind: "unreadable", message: `Encrypted SUN URL — ${why}` };
   }
   return {
     ok: false,
