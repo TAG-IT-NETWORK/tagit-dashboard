@@ -16,11 +16,11 @@ export const dynamic = "force-dynamic";
 const ACTIONS = new Set(["UPDATE", "DELIST", "RELIST"]);
 const PRICE_RE = /^\d{1,12}(\.\d{1,6})?$/;
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: { tokenId: string } }) {
   if (!canMutateCatalog(await getActorRole())) {
     return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
   }
-  if (!/^\d+$/.test(params.id)) {
+  if (!/^\d+$/.test(params.tokenId)) {
     return NextResponse.json({ ok: false, error: "token id must be numeric" }, { status: 400 });
   }
   let body: Record<string, unknown>;
@@ -39,6 +39,6 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const payload: Record<string, unknown> = { action };
   if (typeof priceUsdc === "string" && PRICE_RE.test(priceUsdc)) payload.priceUsdc = priceUsdc;
   if (typeof reason === "string" && reason.trim()) payload.reason = reason.trim();
-  const res = await templatesUpstream(`/api/v1/assets/${params.id}/price`, { method: "PUT", body: payload });
+  const res = await templatesUpstream(`/api/v1/assets/${params.tokenId}/price`, { method: "PUT", body: payload });
   return NextResponse.json(res.body, { status: res.status });
 }
