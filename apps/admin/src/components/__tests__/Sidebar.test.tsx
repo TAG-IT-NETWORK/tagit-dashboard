@@ -54,6 +54,7 @@ function renderDesktop(): {
 const NAV_ITEMS = [
   "Dashboard",
   "Binding Station",
+  "Verify",
   "Catalog",
   "Assets",
   "Assembly Line",
@@ -103,6 +104,7 @@ describe("Sidebar", () => {
     expect(ui.getByText("Dashboard").closest("a")).toHaveAttribute("href", "/dashboard");
     expect(ui.getByText("Assets").closest("a")).toHaveAttribute("href", "/assets");
     expect(ui.getByText("Assembly Line").closest("a")).toHaveAttribute("href", "/assembly-line");
+    expect(ui.getByText("Verify").closest("a")).toHaveAttribute("href", "/verify");
     expect(ui.getByText("Users").closest("a")).toHaveAttribute("href", "/users");
     expect(ui.getByText("Governance").closest("a")).toHaveAttribute("href", "/governance");
     expect(ui.getByText("AI Agents").closest("a")).toHaveAttribute("href", "/agents");
