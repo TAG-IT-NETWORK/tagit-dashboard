@@ -142,6 +142,38 @@ describe("interpretNdefRead / sunCheckViaBridge (mocked bridge)", () => {
     expect(interpretNdefRead({ records: [record] }, UID)).toMatchObject({ ok: true });
   });
 
+  it("flags an EMPTY NDEF file as a blank (programmable) chip, never as tamper", () => {
+    expect(interpretNdefRead({ records: [], sun: null }, UID)).toMatchObject({
+      ok: false,
+      kind: "unreadable",
+      blank: true,
+    });
+    expect(interpretNdefRead([], UID)).toMatchObject({ ok: false, blank: true });
+    // A chip WITH content that is not a SUN is not blank — do not offer to program it.
+    expect(
+      interpretNdefRead([{ recordType: "url", data: "https://x.test/plain" }], UID),
+    ).not.toHaveProperty("blank", true);
+  });
+
+  it("SUN_FAIL carries the blank flag into state so the station can offer Program SDM", () => {
+    const tapped = stationReducer(loadedState(), { type: "TAP", uid: UID });
+    const failed = stationReducer(tapped, {
+      type: "SUN_FAIL",
+      kind: "unreadable",
+      blank: true,
+      message: "blank",
+      at: 1,
+    });
+    expect(failed.sunFail).toEqual({ kind: "unreadable", message: "blank", blank: true });
+    const failedNoFlag = stationReducer(tapped, {
+      type: "SUN_FAIL",
+      kind: "tamper",
+      message: "bad",
+      at: 1,
+    });
+    expect(failedNoFlag.sunFail).toEqual({ kind: "tamper", message: "bad" });
+  });
+
   it("fails unreadable when there is no NDEF / no URL / no SUN params", () => {
     expect(interpretNdefRead(null, UID)).toMatchObject({ ok: false, kind: "unreadable" });
     expect(
