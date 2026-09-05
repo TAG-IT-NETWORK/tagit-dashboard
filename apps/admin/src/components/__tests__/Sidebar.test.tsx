@@ -53,6 +53,8 @@ function renderDesktop(): {
 // Full desktop navigation as currently defined in sidebar.tsx
 const NAV_ITEMS = [
   "Dashboard",
+  "Binding Station",
+  "Catalog",
   "Assets",
   "Assembly Line",
   "Users",
@@ -155,6 +157,23 @@ describe("Sidebar", () => {
     for (const item of NAV_ITEMS) {
       expect(ui.getByText(item)).toBeInTheDocument();
     }
+  });
+
+  it("groups the navigation by workflow with section headers", () => {
+    const { ui } = renderDesktop();
+    for (const group of ["Operations", "Identity & Access", "Token & Governance", "AI & Analytics", "Testing"]) {
+      expect(ui.getByText(group)).toBeInTheDocument();
+    }
+  });
+
+  it("exposes the Binding Station as a first-class entry and highlights it while binding", () => {
+    mockPathname.mockReturnValue("/catalog/tpl_1/batch/bind");
+    const { ui } = renderDesktop();
+    const station = ui.getByText("Binding Station").closest("a");
+    expect(station).toHaveAttribute("href", "/station");
+    expect(station).toHaveClass("bg-primary/10");
+    // The parent Catalog entry is also active on that path — both are true.
+    expect(ui.getByText("Catalog").closest("a")).toHaveClass("bg-primary/10");
   });
 
   it("applies correct styling to inactive items", () => {
