@@ -73,6 +73,8 @@ export interface RegistryRow {
   lifecycle: string | null;
   /** tag_hash present — the physical tag is bound. */
   bound: boolean;
+  /** Mirrored on-chain state name (MINTED … RECYCLED) — null until first mirrored. */
+  chainState: string | null;
   priceDisplay: string | null;
   saleState: PriceBlock["saleState"] | null;
   verification: VerificationBlock | null;
@@ -89,4 +91,10 @@ export interface RegistryFilters {
   needsInfo: boolean;
   /** Only items whose anchor verdict is drift. */
   drift: boolean;
+  /** On-chain state filter (catalog_items.chain_state), or null = all. */
+  state: ChainStateFilter | null;
 }
+
+/** On-chain state names the registry can filter on. */
+export const CHAIN_STATE_FILTERS = ["MINTED", "BOUND", "ACTIVATED", "CLAIMED", "FLAGGED", "RECYCLED"] as const;
+export type ChainStateFilter = (typeof CHAIN_STATE_FILTERS)[number];

@@ -13,7 +13,7 @@ import type {
   RegistryRow,
   VerificationBlock,
 } from "./types";
-import { CATALOG_LIFECYCLES } from "./types";
+import { CATALOG_LIFECYCLES, CHAIN_STATE_FILTERS, type ChainStateFilter } from "./types";
 
 // ──────────────────────────────────────────────
 // Anchor verdict (REQ-S-12 tri-state) + drift dot
@@ -203,6 +203,7 @@ export function registryRowFromAdminItem(item: unknown): RegistryRow {
     templateVersion: num(raw.templateVersion),
     serial: readString(raw.serial),
     lifecycle: readString(raw.lifecycle),
+    chainState: readString(raw.chainState),
     bound: raw.bound === true,
     priceDisplay: readString(raw.priceDisplay),
     saleState:
@@ -240,10 +241,15 @@ export function parseRegistryFilters(searchParams: SearchParams): RegistryFilter
   const lifecycle = (CATALOG_LIFECYCLES as readonly string[]).includes(rawLifecycle ?? "")
     ? (rawLifecycle as CatalogLifecycle)
     : null;
+  const rawState = firstParam(searchParams.state);
+  const state = (CHAIN_STATE_FILTERS as readonly string[]).includes(rawState ?? "")
+    ? (rawState as ChainStateFilter)
+    : null;
   return {
     lifecycle,
     needsInfo: firstParam(searchParams.needsInfo) === "1",
     drift: firstParam(searchParams.drift) === "1",
+    state,
   };
 }
 
@@ -258,6 +264,7 @@ export function applyRegistryFilters(rows: RegistryRow[], filters: RegistryFilte
     if (filters.lifecycle !== null && row.lifecycle !== filters.lifecycle) return false;
     if (filters.needsInfo && !needsProductInfo(row)) return false;
     if (filters.drift && row.verdict !== "drift") return false;
+    if (filters.state !== null && row.chainState !== filters.state) return false;
     return true;
   });
 }
@@ -272,6 +279,7 @@ export function registryHref(filters: RegistryFilters, cursor?: string | null): 
   if (filters.lifecycle !== null) params.set("lifecycle", filters.lifecycle);
   if (filters.needsInfo) params.set("needsInfo", "1");
   if (filters.drift) params.set("drift", "1");
+  if (filters.state !== null) params.set("state", filters.state);
   if (cursor !== undefined && cursor !== null && /^\d+$/.test(cursor)) {
     params.set("cursor", cursor);
   }

@@ -198,6 +198,7 @@ describe("registryRowFromAdminItem", () => {
       priceDisplay: "$19.99",
       saleState: "listed",
       verdict: "confirmed",
+      chainState: null,
       hasProductInfo: true,
     });
     expect(row.verification).toMatchObject({
@@ -208,12 +209,12 @@ describe("registryRowFromAdminItem", () => {
   });
 
   it("recomputes a newer-version item as pending client-side, even if the server said drift", () => {
-    const row = registryRowFromAdminItem({ ...fullItem, latestVersion: 3, drift: true });
+    const row = registryRowFromAdminItem({ ...fullItem, latestVersion: 3, drift: true, state: null });
     expect(row.verdict).toBe("pending");
   });
 
   it("recomputes drift from anchorStatus='drift' too", () => {
-    const row = registryRowFromAdminItem({ ...fullItem, anchorStatus: "drift", drift: true });
+    const row = registryRowFromAdminItem({ ...fullItem, anchorStatus: "drift", drift: true, state: null });
     expect(row.verdict).toBe("drift");
   });
 
@@ -277,6 +278,7 @@ function rowWith(patch: Partial<RegistryRow>): RegistryRow {
     saleState: null,
     verification: null,
     verdict: "confirmed",
+    chainState: null,
     hasProductInfo: true,
     ...patch,
   };
@@ -287,7 +289,7 @@ describe("parseRegistryFilters", () => {
     expect(parseRegistryFilters({ lifecycle: "minted", needsInfo: "1", drift: "1" })).toEqual({
       lifecycle: "minted",
       needsInfo: true,
-      drift: true,
+      drift: true, state: null,
     });
   });
 
@@ -295,7 +297,7 @@ describe("parseRegistryFilters", () => {
     expect(parseRegistryFilters({})).toEqual({
       lifecycle: null,
       needsInfo: false,
-      drift: false,
+      drift: false, state: null,
     });
   });
 
@@ -320,7 +322,7 @@ describe("applyRegistryFilters", () => {
 
   it("passes everything through with no filters", () => {
     expect(
-      applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: false }),
+      applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: false, state: null }),
     ).toHaveLength(4);
   });
 
@@ -328,47 +330,47 @@ describe("applyRegistryFilters", () => {
     const out = applyRegistryFilters(rows, {
       lifecycle: "anchored",
       needsInfo: false,
-      drift: false,
+      drift: false, state: null,
     });
     expect(out.map((r) => r.tokenId)).toEqual(["2", "3"]);
   });
 
   it("filters by needs-product-info", () => {
-    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: true, drift: false });
+    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: true, drift: false, state: null });
     expect(out.map((r) => r.tokenId)).toEqual(["3"]);
   });
 
   it("filters by drift verdict", () => {
-    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: true });
+    const out = applyRegistryFilters(rows, { lifecycle: null, needsInfo: false, drift: true, state: null });
     expect(out.map((r) => r.tokenId)).toEqual(["2"]);
   });
 
   it("ANDs filters together", () => {
-    const out = applyRegistryFilters(rows, { lifecycle: "anchored", needsInfo: true, drift: true });
+    const out = applyRegistryFilters(rows, { lifecycle: "anchored", needsInfo: true, drift: true, state: null });
     expect(out).toHaveLength(0);
   });
 });
 
 describe("registryHref", () => {
   it("omits defaults entirely", () => {
-    expect(registryHref({ lifecycle: null, needsInfo: false, drift: false })).toBe("/assets");
+    expect(registryHref({ lifecycle: null, needsInfo: false, drift: false, state: null })).toBe("/assets");
   });
 
   it("encodes active filters", () => {
-    expect(registryHref({ lifecycle: "minted", needsInfo: true, drift: true })).toBe(
+    expect(registryHref({ lifecycle: "minted", needsInfo: true, drift: true, state: null })).toBe(
       "/assets?lifecycle=minted&needsInfo=1&drift=1",
     );
   });
 
   it("appends a valid keyset cursor and rejects a malformed one", () => {
-    const filters = { lifecycle: null, needsInfo: false, drift: false } as const;
+    const filters = { lifecycle: null, needsInfo: false, drift: false, state: null } as const;
     expect(registryHref(filters, "42")).toBe("/assets?cursor=42");
     expect(registryHref(filters, null)).toBe("/assets");
     expect(registryHref(filters, "abc")).toBe("/assets");
   });
 
   it("round-trips through parseRegistryFilters", () => {
-    const filters = { lifecycle: "bound" as const, needsInfo: true, drift: false };
+    const filters = { lifecycle: "bound" as const, needsInfo: true, drift: false, state: null };
     const href = registryHref(filters);
     const qs = Object.fromEntries(new URL(`http://x${href}`).searchParams.entries());
     expect(parseRegistryFilters(qs)).toEqual(filters);

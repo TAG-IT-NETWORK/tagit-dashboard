@@ -99,6 +99,8 @@ export const PATH_ROLES: ReadonlyArray<
   ["/api/catalog-proxy/binding/reassign", "operator"],
   ["/api/catalog-proxy/binding/skip-defective", "operator"],
   ["/api/catalog-proxy/binding/activate", "operator"],
+  ["/api/catalog-proxy/lifecycle/flag", "operator"],
+  ["/api/catalog-proxy/assets/*/price", "operator", ["PUT"]],
   // admin — publish + prices + recovery + team
   ["/publish", "admin"],
   ["/prices", "admin"],
@@ -116,6 +118,9 @@ export const PATH_ROLES: ReadonlyArray<
   // (irreversible on-chain recycle)
   ["/api/catalog-proxy/batches/*/unstick", "admin"],
   ["/api/catalog-proxy/binding/void-remint", "admin"],
+  ["/api/catalog-proxy/lifecycle/recycle", "admin"],
+  ["/api/catalog-proxy/lifecycle/resolve", "admin"],
+  ["/api/catalog-proxy/sale/settle", "admin"],
 ];
 
 /**

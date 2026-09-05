@@ -33,6 +33,10 @@ export interface CatalogStats {
   driftCount: number;
   reanchorPendingCount: number;
   needsProductInfoCount: number;
+  /** Mirrored on-chain FLAGGED rows (chain_state). */
+  flaggedCount: number;
+  /** Mirrored on-chain CLAIMED rows (chain_state). */
+  claimedCount: number;
   /** Items whose catalog row changed in the last 24 h (mint, bind, anchor, listing…). */
   changedLast24h: number;
   /** Newest changes first. */
@@ -88,6 +92,8 @@ export function aggregateCatalog(
     driftCount: 0,
     reanchorPendingCount: 0,
     needsProductInfoCount: 0,
+    flaggedCount: 0,
+    claimedCount: 0,
     changedLast24h: 0,
     recent: [],
     truncated: options.truncated === true,
@@ -112,6 +118,9 @@ export function aggregateCatalog(
     if (it.drift === true) stats.driftCount++;
     if (it.reanchorPending === true) stats.reanchorPendingCount++;
     if (it.needsProductInfo === true) stats.needsProductInfoCount++;
+    const chainState = str(it.chainState);
+    if (chainState === "FLAGGED") stats.flaggedCount++;
+    if (chainState === "CLAIMED") stats.claimedCount++;
     const updatedAt = str(it.updatedAt);
     const updatedMs = updatedAt ? Date.parse(updatedAt) : Number.NaN;
     if (Number.isFinite(updatedMs) && updatedMs >= cutoff) stats.changedLast24h++;
@@ -131,9 +140,9 @@ export function aggregateCatalog(
   return stats;
 }
 
-/** Items that need an operator's eyes: drift, stuck re-anchors, missing product info. */
+/** Items that need an operator's eyes: flagged, drift, stuck re-anchors, missing product info. */
 export function needsAttention(stats: CatalogStats): number {
-  return stats.driftCount + stats.reanchorPendingCount + stats.needsProductInfoCount;
+  return stats.driftCount + stats.reanchorPendingCount + stats.needsProductInfoCount + stats.flaggedCount;
 }
 
 export interface DistributionSlice {
