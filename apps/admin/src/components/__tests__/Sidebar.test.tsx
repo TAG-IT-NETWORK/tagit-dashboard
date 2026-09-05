@@ -55,6 +55,7 @@ const NAV_ITEMS = [
   "Dashboard",
   "Binding Station",
   "Verify",
+  "Chip Tools",
   "Catalog",
   "Assets",
   "Assembly Line",

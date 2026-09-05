@@ -27,6 +27,7 @@ import {
   BookOpen,
   Nfc,
   ScanLine,
+  Cpu,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -70,6 +71,7 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
         match: (pathname) => pathname.includes("/batch/bind"),
       },
       { name: "Verify", href: "/verify", icon: ScanLine },
+      { name: "Chip Tools", href: "/chip-tools", icon: Cpu },
       { name: "Catalog", href: "/catalog", icon: BookOpen },
       { name: "Assets", href: "/assets", icon: Package },
       { name: "Assembly Line", href: "/assembly-line", icon: Factory },

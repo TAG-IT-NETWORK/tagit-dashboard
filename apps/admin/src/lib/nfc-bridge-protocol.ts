@@ -81,12 +81,25 @@ export interface PersonalizeSdmResult {
   sdmMacOffset: number;
   notes: string[];
 }
+/** Reset SDM keys 1 + 2 to factory under the bridge's master key (key 0 untouched). */
+export interface ResetSdmRequest extends BaseRequest {
+  type: "reset-sdm";
+}
+export interface WriteNdefResult {
+  bytesWritten: number;
+  notes: string[];
+}
+export interface ResetSdmResult {
+  notes: string[];
+}
+
 export type BridgeRequest =
   | GetStatusRequest
   | ReadUidRequest
   | ReadNdefRequest
   | WriteNdefRequest
-  | PersonalizeSdmRequest;
+  | PersonalizeSdmRequest
+  | ResetSdmRequest;
 
 // --- Bridge -> Client messages ---------------------------------------------
 
