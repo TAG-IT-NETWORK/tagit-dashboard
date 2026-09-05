@@ -98,6 +98,7 @@ export const PATH_ROLES: ReadonlyArray<
   ["/api/catalog-proxy/binding/verify", "operator"],
   ["/api/catalog-proxy/binding/reassign", "operator"],
   ["/api/catalog-proxy/binding/skip-defective", "operator"],
+  ["/api/catalog-proxy/binding/activate", "operator"],
   // admin — publish + prices + recovery + team
   ["/publish", "admin"],
   ["/prices", "admin"],

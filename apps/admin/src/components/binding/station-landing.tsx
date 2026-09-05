@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Loader2, Nfc, RefreshCw, Usb, Wifi, WifiOff } from "lucide-react";
+import { ArrowRight, Loader2, Nfc, RefreshCw, Usb, Wifi, WifiOff, Zap } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@tagit/ui";
 import { useNfcBridge } from "@/lib/nfc-bridge";
 import {
@@ -205,7 +205,15 @@ function BatchCard({ batch, primary = false }: { batch: BatchStationSummary; pri
             <>
               <Button size="sm" asChild>
                 <Link href={stationHref(batch.templateId!, batch.id)}>
-                  Open station <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  {!batch.unknown && batch.unbound === 0 && batch.bound > 0 ? (
+                    <>
+                      <Zap className="mr-1 h-3.5 w-3.5" /> Activate &amp; list
+                    </>
+                  ) : (
+                    <>
+                      Open station <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </>
+                  )}
                 </Link>
               </Button>
               <Button size="sm" variant="ghost" asChild>

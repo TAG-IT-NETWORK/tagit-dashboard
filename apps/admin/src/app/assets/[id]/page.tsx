@@ -7,7 +7,6 @@ import {
   useAssetState,
   useTagByToken,
   useAssetHistory,
-  useActivate,
   useFlag,
   useRecycle,
   AssetState,
@@ -22,6 +21,7 @@ import { useMetadataHash } from "@/lib/hooks/use-metadata-hash";
 import { BindTagModal } from "@/components/bind-tag-modal";
 import { TransferModal } from "@/components/transfer-modal";
 import { TransactionStatus } from "@/components/transaction-status";
+import { describeOutcome, parseActivateOutcome, validatePriceInput } from "@/lib/binding/activate";
 import {
   Card,
   CardContent,
@@ -30,6 +30,7 @@ import {
   CardDescription,
   Button,
   Badge,
+  Input,
   StateBadge,
   AddressBadge,
 } from "@tagit/ui";
@@ -108,8 +109,7 @@ function AssetDetailContent({ id }: { id: string }) {
     refetch: refetchHistory,
   } = useAssetHistory(chainId, tokenId);
 
-  // Write hooks
-  const activateHook = useActivate();
+  // Write hooks (flag/recycle still sign with the connected wallet)
   const flagHook = useFlag();
   const recycleHook = useRecycle();
 
@@ -132,12 +132,43 @@ function AssetDetailContent({ id }: { id: string }) {
     refetchHistory();
   };
 
-  // Refetch on successful activate/flag/recycle
+  // Activate + list go through the services relayer (ACTIVATOR key) — the
+  // operator wallet lost its capabilities in the key ceremony, so a MetaMask
+  // activate() would only ever revert with MissingCapability.
+  const [relay, setRelay] = useState<{ busy: boolean; lines: string[]; error: string | null; explorerUrl: string | null }>({
+    busy: false,
+    lines: [],
+    error: null,
+    explorerUrl: null,
+  });
+  const [listPrice, setListPrice] = useState("");
+  const priceCheck = validatePriceInput(listPrice);
+  const runRelayer = async (priceUsdc?: string | null) => {
+    setRelay({ busy: true, lines: [], error: null, explorerUrl: null });
+    try {
+      const res = await fetch("/api/catalog-proxy/binding/activate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tokenIds: [id], ...(priceUsdc ? { priceUsdc } : {}) }),
+      });
+      const outcome = parseActivateOutcome(await res.json().catch(() => null));
+      if (!res.ok && !outcome.ok) {
+        setRelay({ busy: false, lines: [], error: outcome.error ?? `Relayer call failed (HTTP ${res.status})`, explorerUrl: null });
+        return;
+      }
+      setRelay({ busy: false, lines: describeOutcome(outcome, priceUsdc), error: null, explorerUrl: outcome.explorerUrl });
+      handleTxSuccess();
+    } catch (err) {
+      setRelay({ busy: false, lines: [], error: err instanceof Error ? err.message : String(err), explorerUrl: null });
+    }
+  };
+
+  // Refetch on successful flag/recycle
   useEffect(() => {
-    if (activateHook.isSuccess || flagHook.isSuccess || recycleHook.isSuccess) {
+    if (flagHook.isSuccess || recycleHook.isSuccess) {
       handleTxSuccess();
     }
-  }, [activateHook.isSuccess, flagHook.isSuccess, recycleHook.isSuccess]);
+  }, [flagHook.isSuccess, recycleHook.isSuccess]);
 
   // Determine which action buttons to show, with handlers
   const renderActions = () => {
@@ -160,8 +191,8 @@ function AssetDetailContent({ id }: { id: string }) {
         break;
       case AssetState.BOUND:
         buttons.push(
-          <Button key="activate" onClick={() => activateHook.activate(tokenId)}>
-            <Zap className="h-4 w-4 mr-2" />
+          <Button key="activate" onClick={() => void runRelayer()} disabled={relay.busy}>
+            {relay.busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
             Activate
           </Button>,
           <Button key="flag" variant="destructive" onClick={() => flagHook.flag(tokenId)}>
@@ -172,6 +203,24 @@ function AssetDetailContent({ id }: { id: string }) {
         break;
       case AssetState.ACTIVATED:
         buttons.push(
+          <div key="list" className="flex items-center gap-1" title="List for sale at this USDC price (via the relayer)">
+            <Input
+              value={listPrice}
+              onChange={(e) => setListPrice(e.target.value)}
+              placeholder="23.33"
+              className="h-9 w-24 font-mono"
+              disabled={relay.busy}
+              aria-label="List price in USDC"
+            />
+            <Button
+              variant="outline"
+              onClick={() => void runRelayer(priceCheck.priceUsdc)}
+              disabled={relay.busy || !priceCheck.priceUsdc}
+            >
+              {relay.busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+              List
+            </Button>
+          </div>,
           <Button key="transfer" onClick={() => setTransferModalOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" />
             Transfer
@@ -302,17 +351,33 @@ function AssetDetailContent({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Transaction Status for inline actions (activate/flag/recycle) */}
-      <TransactionStatus
-        isPending={activateHook.isPending}
-        isConfirming={activateHook.isConfirming}
-        isSuccess={activateHook.isSuccess}
-        error={activateHook.error}
-        hash={activateHook.hash}
-        chainId={chainId}
-        action="Activate"
-        successMessage="Asset activated successfully!"
-      />
+      {/* Relayer outcome (activate / list) */}
+      {(relay.busy || relay.error || relay.lines.length > 0) && (
+        <Card className={relay.error ? "border-destructive/50" : "border-green-500/40"}>
+          <CardContent className="flex items-start gap-2 pt-4 pb-4 text-sm">
+            {relay.busy ? (
+              <Loader2 className="mt-0.5 h-4 w-4 animate-spin" />
+            ) : relay.error ? (
+              <Flag className="mt-0.5 h-4 w-4 text-destructive" />
+            ) : (
+              <CheckCircle className="mt-0.5 h-4 w-4 text-green-500" />
+            )}
+            <div className="space-y-0.5">
+              {relay.busy && <p>Relayer transaction in progress…</p>}
+              {relay.error && <p className="text-destructive">{relay.error}</p>}
+              {relay.lines.map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+            {relay.explorerUrl && (
+              <a href={relay.explorerUrl} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-xs underline">
+                tx <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {/* Transaction Status for wallet-signed actions (flag/recycle) */}
       <TransactionStatus
         isPending={flagHook.isPending}
         isConfirming={flagHook.isConfirming}

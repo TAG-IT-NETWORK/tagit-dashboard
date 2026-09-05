@@ -51,6 +51,7 @@ import {
 import { useNfcBridge } from "@/lib/nfc-bridge";
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
+import { ActivateListPanel } from "@/components/binding/activate-list-panel";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import { canMutateCatalog, canPublishCatalog } from "@/lib/catalog/template-logic";
 import {
@@ -76,6 +77,8 @@ type Tab = "station" | "exceptions";
 interface BindingStationProps {
   batchId: string;
   role: CatalogRole | null;
+  /** Template of this batch (tpl_…) — seeds the Activate & list price. */
+  templateId?: string | null;
   /** Exception-log tab content injected by the page (keeps this file focused). */
   exceptionsTab: React.ReactNode;
 }
@@ -97,7 +100,7 @@ function upstreamError(body: Record<string, unknown> | null, fallback: string): 
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
-export function BindingStation({ batchId, role, exceptionsTab }: BindingStationProps) {
+export function BindingStation({ batchId, role, exceptionsTab, templateId = null }: BindingStationProps) {
   const writable = canMutateCatalog(role);
   // Void + remint recycles on-chain (irreversible) — admin-only, same posture
   // as batch unstick; the proxy + middleware enforce it server-side too.
@@ -438,6 +441,15 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
       ) : (
         <>
           <BridgeStatus bridge={bridge} />
+
+          {state.phase !== "loading" && queue.length === 0 && (
+            <ActivateListPanel
+              templateId={templateId}
+              tokens={state.tokens}
+              writable={writable}
+              onDone={() => void refreshStatus()}
+            />
+          )}
 
           <NextUpCard
             state={state}
