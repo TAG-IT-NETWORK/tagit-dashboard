@@ -68,6 +68,7 @@ export default async function BatchBindPage({
       <BindingStation
         batchId={batchId}
         role={role}
+        templateId={isTemplate ? params.id : null}
         exceptionsTab={<ExceptionLog batchId={batchId} />}
       />
     </div>
