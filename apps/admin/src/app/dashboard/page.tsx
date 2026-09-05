@@ -50,8 +50,7 @@ import {
   Play,
   RefreshCw,
   Loader2,
-  Database,
-} from "lucide-react";
+  Database, Flag } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 const stateColors: Record<number, string> = {
@@ -214,12 +213,20 @@ function DashboardContent() {
               </Link>
             </Button>
           ) : (
-            <Button variant="outline" asChild>
+            <>
+              <Button variant="outline" asChild>
+              <Link href="/assets?state=FLAGGED">
+                <Flag className="mr-2 h-4 w-4" />
+                Flagged ({stats ? stats.flaggedCount : 0})
+              </Link>
+            </Button>
+              <Button variant="outline" asChild>
               <Link href={attention > 0 ? "/assets?drift=true" : "/assets"}>
                 <ShieldAlert className="h-4 w-4 mr-2" />
                 Needs attention ({attention})
               </Link>
             </Button>
+            </>
           )}
           <Button variant="outline" asChild>
             <Link href="/catalog">

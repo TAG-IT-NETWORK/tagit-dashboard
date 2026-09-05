@@ -78,6 +78,7 @@ export async function fetchRegistry(
   if (filters.lifecycle !== null) params.set("lifecycle", filters.lifecycle);
   if (filters.drift) params.set("drift", "true");
   if (filters.needsInfo) params.set("needsProductInfo", "true");
+  if (filters.state !== null) params.set("chainState", filters.state);
 
   const res = await fetchJson(`/api/v1/admin/catalog?${params.toString()}`);
   if (!res) {

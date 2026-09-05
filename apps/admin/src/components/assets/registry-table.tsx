@@ -14,6 +14,15 @@ import { AssetSlideOver } from "./asset-slide-over";
  * present (marked, not hidden). Clicking a row opens the detail slide-over.
  */
 
+const CHAIN_STATE_CLASSES: Record<string, string> = {
+  MINTED: "bg-zinc-500/10 text-zinc-400",
+  BOUND: "bg-blue-500/10 text-blue-500",
+  ACTIVATED: "bg-green-500/10 text-green-500",
+  CLAIMED: "bg-violet-500/10 text-violet-400",
+  FLAGGED: "bg-red-500/10 text-red-500",
+  RECYCLED: "bg-zinc-500/10 text-zinc-500",
+};
+
 const LIFECYCLE_CLASSES: Record<string, string> = {
   draft: "bg-secondary text-secondary-foreground",
   minted: "bg-blue-500/10 text-blue-500",
@@ -60,6 +69,7 @@ export function RegistryTable({ rows }: { rows: RegistryRow[] }) {
                   <th className="hidden px-4 py-3 lg:table-cell">Template</th>
                   <th className="hidden px-4 py-3 lg:table-cell">Serial</th>
                   <th className="px-4 py-3">Lifecycle</th>
+                  <th className="hidden px-4 py-3 md:table-cell">On-chain</th>
                   <th className="hidden px-4 py-3 md:table-cell">Bound</th>
                   <th className="hidden px-4 py-3 md:table-cell">Price</th>
                   <th className="px-4 py-3">Anchor</th>
@@ -124,6 +134,15 @@ export function RegistryTable({ rows }: { rows: RegistryRow[] }) {
                             className={LIFECYCLE_CLASSES[row.lifecycle] ?? ""}
                           >
                             {row.lifecycle}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="hidden px-4 py-3 md:table-cell">
+                        {row.chainState ? (
+                          <Badge variant="secondary" className={CHAIN_STATE_CLASSES[row.chainState] ?? ""}>
+                            {row.chainState}
                           </Badge>
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>

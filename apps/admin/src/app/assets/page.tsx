@@ -7,7 +7,7 @@ import {
   registryHref,
 } from "@/lib/catalog/logic";
 import type { RegistryFilters } from "@/lib/catalog/types";
-import { CATALOG_LIFECYCLES } from "@/lib/catalog/types";
+import { CATALOG_LIFECYCLES, CHAIN_STATE_FILTERS } from "@/lib/catalog/types";
 import { fetchRegistry, REGISTRY_PAGE_LIMIT } from "@/lib/catalog/server";
 import { RegistryTable } from "@/components/assets/registry-table";
 
@@ -25,6 +25,15 @@ import { RegistryTable } from "@/components/assets/registry-table";
  */
 
 export const dynamic = "force-dynamic";
+
+const CHAIN_STATE_LABELS: Record<string, string> = {
+  MINTED: "Minted",
+  BOUND: "Bound",
+  ACTIVATED: "Activated",
+  CLAIMED: "Claimed",
+  FLAGGED: "Flagged",
+  RECYCLED: "Recycled",
+};
 
 const LIFECYCLE_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -67,7 +76,7 @@ export default async function AssetsPage({
 
   const toggle = (patch: Partial<RegistryFilters>): string =>
     registryHref({ ...filters, ...patch });
-  const anyFilter = filters.lifecycle !== null || filters.needsInfo || filters.drift;
+  const anyFilter = filters.lifecycle !== null || filters.needsInfo || filters.drift || filters.state !== null;
 
   return (
     <div className="space-y-6">
@@ -124,6 +133,17 @@ export default async function AssetsPage({
             <FilterChip active={filters.drift} href={toggle({ drift: !filters.drift })}>
               Drift
             </FilterChip>
+            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+            <span className="text-xs text-muted-foreground">On-chain:</span>
+            {CHAIN_STATE_FILTERS.map((st) => (
+              <FilterChip
+                key={st}
+                active={filters.state === st}
+                href={toggle({ state: filters.state === st ? null : st })}
+              >
+                {CHAIN_STATE_LABELS[st]}
+              </FilterChip>
+            ))}
             {anyFilter && (
               <Button variant="ghost" size="sm" asChild className="text-xs">
                 <Link href="/assets">Clear</Link>
