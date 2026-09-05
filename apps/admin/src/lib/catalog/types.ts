@@ -28,7 +28,10 @@ export interface VerificationBlock {
   anchoredVersion: number | null;
   latestVersion: number | null;
   anchorStatus: string | null;
+  /** jcs_hash of the SERVED (last-anchored) doc — the public trust rule. */
   metadataHash: string | null;
+  /** jcs_hash of the newest version; differs from metadataHash while a re-anchor is pending. */
+  latestHash?: string | null;
   verified: boolean;
 }
 
@@ -53,7 +56,7 @@ export interface ProductBlock {
 export type AnchorVerdict = "confirmed" | "pending" | "drift";
 
 /** Result of comparing the on-chain metadataHash against the served jcs_hash. */
-export type IntegrityResult = "match" | "mismatch" | "unknown";
+export type IntegrityResult = "match" | "confirming" | "mismatch" | "unknown";
 
 /** One row of the org-wide registry table (admin catalog list item). */
 export interface RegistryRow {

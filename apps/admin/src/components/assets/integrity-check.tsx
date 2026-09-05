@@ -13,9 +13,12 @@ import { useMetadataHash } from "@/lib/hooks/use-metadata-hash";
 export function IntegrityCheck({
   tokenId,
   servedHash,
+  latestHash = null,
 }: {
   tokenId: string;
   servedHash: string | null;
+  /** Newest version's jcs_hash — lets an in-flight re-anchor read as "confirming", not mismatch. */
+  latestHash?: string | null;
 }) {
   const { metadataHash, isLoading, error } = useMetadataHash(BigInt(tokenId));
 
@@ -28,7 +31,7 @@ export function IntegrityCheck({
     );
   }
 
-  const result = error ? "unknown" : compareIntegrity(metadataHash, servedHash);
+  const result = error ? "unknown" : compareIntegrity(metadataHash, servedHash, latestHash);
 
   return (
     <div className="space-y-2">
@@ -36,6 +39,13 @@ export function IntegrityCheck({
         <div className="flex items-center gap-2 text-sm text-green-500">
           <ShieldCheck className="h-4 w-4" />
           On-chain hash matches the served canonical doc
+        </div>
+      )}
+      {result === "confirming" && (
+        <div className="flex items-center gap-2 text-sm text-yellow-500">
+          <ShieldQuestion className="h-4 w-4" />
+          On-chain already carries the newest version — confirmation pending, the served doc
+          catches up on the next sweep
         </div>
       )}
       {result === "mismatch" && (

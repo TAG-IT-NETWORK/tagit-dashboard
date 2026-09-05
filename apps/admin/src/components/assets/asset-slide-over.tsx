@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, StateBadge } from "@tagit/ui";
 import { ExternalLink, ImageIcon, Loader2, ShieldOff, X } from "lucide-react";
-import { anchorVerdict, readProduct } from "@/lib/catalog/logic";
+import { anchorVerdict, isReanchorPending, readProduct } from "@/lib/catalog/logic";
 import type { VerificationBlock } from "@/lib/catalog/types";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { AnchorDot } from "./anchor-dot";
@@ -208,11 +208,18 @@ export function AssetSlideOver({ tokenId, onClose }: { tokenId: string; onClose:
                   <Field label="Anchor status" value={verification?.anchorStatus ?? "—"} />
                   {verdict === "drift" && (
                     <p className="text-xs text-red-500">
-                      The latest metadata version is not the anchored one — the public trust rule
-                      keeps serving the last-anchored doc until the new anchor confirms.
+                      The reconciler found the on-chain hash disagreeing with the anchored doc on
+                      two independent RPCs — investigate before trusting this item.
                     </p>
                   )}
-                  {verdict === "pending" && (
+                  {verdict === "pending" && isReanchorPending(verification) && (
+                    <p className="text-xs text-yellow-500">
+                      Version {verification?.latestVersion} published — re-anchor pending. The
+                      public trust rule keeps serving the last-anchored doc (v
+                      {verification?.anchoredVersion}) until the new anchor confirms.
+                    </p>
+                  )}
+                  {verdict === "pending" && !isReanchorPending(verification) && (
                     <p className="text-xs text-yellow-500">
                       Anchor pending — the canonical doc is published but not yet confirmed
                       on-chain.
@@ -234,6 +241,7 @@ export function AssetSlideOver({ tokenId, onClose }: { tokenId: string; onClose:
                     <IntegrityCheck
                       tokenId={tokenId}
                       servedHash={verification?.metadataHash ?? null}
+                      latestHash={verification?.latestHash ?? null}
                     />
                   </WagmiGuard>
                 </Section>
