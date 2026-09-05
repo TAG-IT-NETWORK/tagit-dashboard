@@ -113,3 +113,41 @@ export async function fetchRegistry(
     error: null,
   };
 }
+
+// ── Dashboard (real numbers from the catalog, no indexer needed) ─────────────
+
+export interface AdminCatalogRawPage {
+  /** Raw services CatalogListItem JSON rows — aggregated by lib/dashboard/stats. */
+  items: unknown[];
+  nextCursor: string | null;
+  error: string | null;
+}
+
+/** One RAW page of GET /api/v1/admin/catalog (no row mapping; keyset cursor). */
+export async function fetchAdminCatalogRaw(limit: number, cursor?: string): Promise<AdminCatalogRawPage> {
+  const params = new URLSearchParams();
+  params.set("limit", String(Math.min(Math.max(limit, 1), 100)));
+  if (cursor !== undefined && /^\d+$/.test(cursor)) params.set("cursor", cursor);
+  const res = await fetchJson(`/api/v1/admin/catalog?${params.toString()}`);
+  if (!res) return { items: [], nextCursor: null, error: "Could not reach the services catalog" };
+  const body = res.body as { ok?: unknown; items?: unknown; nextCursor?: unknown; error?: unknown } | null;
+  if (res.status !== 200 || body?.ok !== true || !Array.isArray(body.items)) {
+    return {
+      items: [],
+      nextCursor: null,
+      error: typeof body?.error === "string" ? body.error : `services admin catalog returned ${res.status}`,
+    };
+  }
+  return {
+    items: body.items,
+    nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
+    error: null,
+  };
+}
+
+/** Raw GET /api/v1/admin/batches?limit= envelope (null on failure). */
+export async function fetchRecentBatchesRaw(limit: number): Promise<unknown | null> {
+  const res = await fetchJson(`/api/v1/admin/batches?limit=${Math.min(Math.max(limit, 1), 50)}`);
+  if (!res || res.status !== 200) return null;
+  return res.body;
+}

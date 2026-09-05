@@ -25,34 +25,102 @@ import {
   Factory,
   UsersRound,
   BookOpen,
+  Nfc,
 } from "lucide-react";
 import { useState } from "react";
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Assets", href: "/assets", icon: Package },
-  { name: "Catalog", href: "/catalog", icon: BookOpen },
-  { name: "Assembly Line", href: "/assembly-line", icon: Factory },
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Badges", href: "/badges", icon: BadgeCheck },
-  { name: "Capabilities", href: "/capabilities", icon: Shield },
-  { name: "Resolve", href: "/resolve", icon: AlertTriangle },
-  { name: "Governance", href: "/governance", icon: Vote },
-  { name: "Treasury", href: "/treasury", icon: Wallet },
-  { name: "Tokenomics", href: "/tokenomics", icon: Coins },
-  { name: "AI Agents", href: "/agents", icon: BrainCircuit },
-  { name: "BD Agent", href: "/adagent", icon: Bot },
-  { name: "Influencer", href: "/influencer", icon: Megaphone },
-  { name: "Demo", href: "/demo", icon: Play },
-  // META-T32: admin_users roster CRUD. Visible to everyone; the role
-  // middleware sends non-admins to /403.
-  { name: "Team", href: "/team", icon: UsersRound },
+import type { LucideIcon } from "lucide-react";
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  /** Extra "active" rule beyond the href prefix (e.g. the station lives under /catalog). */
+  match?: (pathname: string) => boolean;
+}
+
+interface NavGroup {
+  name: string;
+  /** Tailwind bg-* class for the section dot. */
+  dot: string;
+  /** Tailwind border-* class for the active-item accent bar. */
+  accent: string;
+  items: NavItem[];
+  /** Testing / scratch tools — rendered dimmed. */
+  muted?: boolean;
+}
+
+/**
+ * Sidebar groups. The physical/hardware workflow comes first because it is
+ * what an operator does every day (catalog → batch → binding station);
+ * governance, AI and testing tools are separated so they stop hiding it.
+ */
+export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
+  {
+    name: "Operations",
+    dot: "bg-emerald-500",
+    accent: "border-emerald-500",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      {
+        name: "Binding Station",
+        href: "/station",
+        icon: Nfc,
+        match: (pathname) => pathname.includes("/batch/bind"),
+      },
+      { name: "Catalog", href: "/catalog", icon: BookOpen },
+      { name: "Assets", href: "/assets", icon: Package },
+      { name: "Assembly Line", href: "/assembly-line", icon: Factory },
+    ],
+  },
+  {
+    name: "Identity & Access",
+    dot: "bg-sky-500",
+    accent: "border-sky-500",
+    items: [
+      { name: "Users", href: "/users", icon: Users },
+      { name: "Badges", href: "/badges", icon: BadgeCheck },
+      { name: "Capabilities", href: "/capabilities", icon: Shield },
+      // META-T32: admin_users roster CRUD. Visible to everyone; the role
+      // middleware sends non-admins to /403.
+      { name: "Team", href: "/team", icon: UsersRound },
+    ],
+  },
+  {
+    name: "Token & Governance",
+    dot: "bg-violet-500",
+    accent: "border-violet-500",
+    items: [
+      { name: "Governance", href: "/governance", icon: Vote },
+      { name: "Treasury", href: "/treasury", icon: Wallet },
+      { name: "Tokenomics", href: "/tokenomics", icon: Coins },
+      { name: "Resolve", href: "/resolve", icon: AlertTriangle },
+    ],
+  },
+  {
+    name: "AI & Analytics",
+    dot: "bg-amber-500",
+    accent: "border-amber-500",
+    items: [
+      { name: "AI Agents", href: "/agents", icon: BrainCircuit },
+      { name: "BD Agent", href: "/adagent", icon: Bot },
+      { name: "Influencer", href: "/influencer", icon: Megaphone },
+      { name: "Demo", href: "/demo", icon: Play },
+    ],
+  },
+  {
+    name: "Testing",
+    dot: "bg-zinc-500",
+    accent: "border-zinc-500",
+    muted: true,
+    items: [{ name: "Lifecycle Console", href: "/test/console", icon: FlaskConical }],
+  },
 ];
 
-// Testing section
-const testingNavigation = [
-  { name: "Lifecycle Console", href: "/test/console", icon: FlaskConical },
-];
+function isItemActive(item: NavItem, pathname: string): boolean {
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
+  return item.match ? item.match(pathname) : false;
+}
 
 interface SidebarProps {
   /** Controls whether the drawer is open on mobile (below md breakpoint). */
@@ -99,58 +167,54 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {/* Navigation — grouped by workflow, color-coded per group */}
+        <nav className="flex-1 px-2 py-3 overflow-y-auto">
+          {NAV_GROUPS.map((group, gi) => {
+            const groupActive = group.items.some((item) => isItemActive(item, pathname));
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={isDrawer ? onMobileClose : undefined}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  collapsed && !isDrawer && "justify-center",
+              <div key={group.name} className={cn(gi > 0 && "mt-4", group.muted && "opacity-70")}>
+                {!collapsed || isDrawer ? (
+                  <div className="flex items-center gap-2 px-3 pb-1.5">
+                    <span className={cn("h-1.5 w-1.5 rounded-full", group.dot)} aria-hidden="true" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {group.name}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mx-3 mb-2 flex items-center justify-center" title={group.name}>
+                    <span
+                      className={cn(
+                        "h-1.5 w-6 rounded-full",
+                        groupActive ? group.dot : "bg-border",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </div>
                 )}
-                title={collapsed && !isDrawer ? item.name : undefined}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {(!collapsed || isDrawer) && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
-
-          {/* Testing Section */}
-          <div className="pt-4 pb-2">
-            {(!collapsed || isDrawer) && (
-              <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Testing
-              </span>
-            )}
-            {collapsed && !isDrawer && <div className="border-t border-border mx-3" />}
-          </div>
-          {testingNavigation.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={isDrawer ? onMobileClose : undefined}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  collapsed && !isDrawer && "justify-center",
-                )}
-                title={collapsed && !isDrawer ? item.name : undefined}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {(!collapsed || isDrawer) && <span>{item.name}</span>}
-              </Link>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const isActive = isItemActive(item, pathname);
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        onClick={isDrawer ? onMobileClose : undefined}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg border-l-2 px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? cn("bg-primary/10 text-primary", group.accent)
+                            : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+                          collapsed && !isDrawer && "justify-center",
+                        )}
+                        title={collapsed && !isDrawer ? item.name : undefined}
+                      >
+                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                        {(!collapsed || isDrawer) && <span>{item.name}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>

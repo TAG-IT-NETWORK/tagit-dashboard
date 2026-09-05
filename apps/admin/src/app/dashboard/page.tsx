@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   useTotalSupply,
@@ -20,6 +20,12 @@ import { StatsBar } from "@/components/stats-bar";
 import { AgentActivityMonitor } from "@/components/agent-activity-monitor";
 import { WTagDistributionTracker } from "@/components/wtag-distribution-tracker";
 import {
+  lifecycleDistribution,
+  needsAttention,
+  parseDashboardStats,
+  type DashboardStatsDto,
+} from "@/lib/dashboard/stats";
+import {
   Card,
   CardHeader,
   CardTitle,
@@ -32,10 +38,11 @@ import {
 } from "@tagit/ui";
 import {
   Package,
-  Users,
   AlertTriangle,
-  TrendingUp,
   Plus,
+  Layers,
+  ShoppingBag,
+  ShieldAlert,
   ArrowRight,
   ExternalLink,
   FlaskConical,
@@ -47,16 +54,6 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
-// Fallback mock data - used when subgraph is not available
-const mockStateDistribution: StateDistribution[] = [
-  { name: "Minted", value: 45, state: 0 },
-  { name: "Bound", value: 120, state: 1 },
-  { name: "Activated", value: 280, state: 2 },
-  { name: "Claimed", value: 95, state: 3 },
-  { name: "Flagged", value: 12, state: 4 },
-  { name: "Recycled", value: 8, state: 5 },
-];
-
 const stateColors: Record<number, string> = {
   0: "#6b7280",
   1: "#3b82f6",
@@ -65,50 +62,6 @@ const stateColors: Record<number, string> = {
   4: "#ef4444",
   5: "#f97316",
 };
-
-const mockRecentActivity: ActivityItem[] = [
-  {
-    tokenId: "1234",
-    oldState: 2,
-    newState: 3,
-    timestamp: Date.now() - 1000 * 60 * 5,
-    txHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-  },
-  {
-    tokenId: "1235",
-    oldState: 1,
-    newState: 2,
-    timestamp: Date.now() - 1000 * 60 * 15,
-    txHash: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-  },
-  {
-    tokenId: "1236",
-    oldState: 0,
-    newState: 1,
-    timestamp: Date.now() - 1000 * 60 * 30,
-    txHash: "0x567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234",
-  },
-  {
-    tokenId: "1237",
-    oldState: 2,
-    newState: 4,
-    timestamp: Date.now() - 1000 * 60 * 45,
-    txHash: "0x890abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456",
-  },
-  {
-    tokenId: "1238",
-    oldState: 1,
-    newState: 2,
-    timestamp: Date.now() - 1000 * 60 * 60,
-    txHash: "0xcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
-  },
-];
-
-const mockTopUsers: TopUser[] = [
-  { address: "0x1234567890abcdef1234567890abcdef12345678", assetCount: 234 },
-  { address: "0xabcdef1234567890abcdef1234567890abcdef01", assetCount: 189 },
-  { address: "0x9876543210fedcba9876543210fedcba98765432", assetCount: 145 },
-];
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -148,32 +101,65 @@ function DashboardContent() {
     refetch,
   } = useDashboardData(30000);
 
-  // Use subgraph data or fallback to mock/contract data
+  // Catalog stats — the real operational numbers (services admin list),
+  // computed server-side by /api/dashboard-stats. No indexer needed.
+  const [catalog, setCatalog] = useState<DashboardStatsDto | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const loadCatalog = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard-stats", { cache: "no-store" });
+      const body: unknown = await res.json().catch(() => null);
+      const parsed = res.ok ? parseDashboardStats(body) : null;
+      if (!parsed) {
+        const err = (body as { error?: unknown } | null)?.error;
+        setCatalogError(
+          typeof err === "string" ? err : `catalog stats unavailable (${res.status || "network"})`,
+        );
+        return;
+      }
+      setCatalog(parsed);
+      setCatalogError(null);
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : "catalog stats unavailable");
+    }
+  }, []);
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  // Subgraph (when NEXT_PUBLIC_SUBGRAPH_URL is configured) wins for chain-wide
+  // figures; otherwise every number below comes from the catalog or the
+  // contract itself — never a placeholder.
   const useSubgraphData = !subgraphError && globalStats;
+  const stats = catalog?.catalog ?? null;
+  const catalogLoading = catalog === null && catalogError === null;
 
   const totalAssets = useSubgraphData
     ? globalStats.totalAssets
     : totalSupply
       ? Number(totalSupply)
-      : 560;
+      : (stats?.totalItems ?? 0);
 
-  const displayDailyMints = useSubgraphData && dailyMints !== null ? dailyMints : 23;
-  const displayActiveUsers = useSubgraphData && activeUsers !== null ? activeUsers : 145;
-  const displayStateDistribution = useSubgraphData && stateDistribution
-    ? stateDistribution
-    : mockStateDistribution;
-  const displayRecentActivity = useSubgraphData && recentActivity
-    ? recentActivity
-    : mockRecentActivity;
-  const displayTopUsers = useSubgraphData && topUsers
-    ? topUsers
-    : mockTopUsers;
+  const displayStateDistribution: StateDistribution[] =
+    useSubgraphData && stateDistribution
+      ? stateDistribution
+      : stats
+        ? (lifecycleDistribution(stats) as StateDistribution[])
+        : [];
+  const displayRecentActivity: ActivityItem[] =
+    useSubgraphData && recentActivity ? recentActivity : [];
+  const displayTopUsers: TopUser[] = useSubgraphData && topUsers ? topUsers : [];
 
-  const flaggedAssets = displayStateDistribution.find((s) => s.state === 4)?.value ?? 0;
+  const flaggedAssets = useSubgraphData
+    ? (displayStateDistribution.find((s) => s.state === 4)?.value ?? 0)
+    : 0;
+  const attention = stats ? needsAttention(stats) : 0;
+  const dailyMintsLabel = useSubgraphData && dailyMints !== null ? String(dailyMints) : null;
+  const activeUsersLabel = useSubgraphData && activeUsers !== null ? String(activeUsers) : null;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), loadCatalog()]);
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -188,11 +174,20 @@ function DashboardContent() {
             {useSubgraphData ? (
               <Badge variant="outline" className="text-xs gap-1">
                 <Database className="h-3 w-3" />
-                Live
+                Live · indexer
+              </Badge>
+            ) : stats ? (
+              <Badge variant="outline" className="text-xs gap-1">
+                <Database className="h-3 w-3" />
+                Live · catalog{stats.truncated ? " (partial)" : ""}
+              </Badge>
+            ) : catalogError ? (
+              <Badge variant="secondary" className="text-xs text-destructive" title={catalogError}>
+                Catalog unavailable
               </Badge>
             ) : (
               <Badge variant="secondary" className="text-xs">
-                Mock Data
+                Loading…
               </Badge>
             )}
           </div>
@@ -211,55 +206,75 @@ function DashboardContent() {
               <RefreshCw className="h-4 w-4" />
             )}
           </Button>
+          {useSubgraphData ? (
+            <Button variant="outline" asChild>
+              <Link href="/resolve">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                View Flagged ({flaggedAssets})
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" asChild>
+              <Link href={attention > 0 ? "/assets?drift=true" : "/assets"}>
+                <ShieldAlert className="h-4 w-4 mr-2" />
+                Needs attention ({attention})
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" asChild>
-            <Link href="/resolve">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              View Flagged ({flaggedAssets})
+            <Link href="/catalog">
+              <Plus className="h-4 w-4 mr-2" />
+              New batch
             </Link>
           </Button>
           <Button asChild>
-            <Link href="/assets?action=mint">
-              <Plus className="h-4 w-4 mr-2" />
-              Mint Asset
+            <Link href="/station">
+              <Nfc className="h-4 w-4 mr-2" />
+              Binding Station
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Metrics Row — chain + catalog truth; indexer-only figures show as "not indexed" */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Total Assets"
+          title="Total Assets (on-chain)"
           value={totalAssets.toLocaleString()}
-          change={useSubgraphData ? undefined : 12}
           icon={<Package className="h-5 w-5" />}
           loading={supplyLoading || subgraphLoading}
         />
         <MetricCard
-          title="Daily Mints"
-          value={displayDailyMints}
-          change={useSubgraphData ? undefined : 8}
-          icon={<TrendingUp className="h-5 w-5" />}
-          loading={subgraphLoading}
+          title={dailyMintsLabel !== null ? "Daily Mints" : "Catalog items"}
+          value={dailyMintsLabel ?? (stats ? stats.totalItems.toLocaleString() : "—")}
+          icon={<Layers className="h-5 w-5" />}
+          loading={subgraphLoading || catalogLoading}
         />
         <MetricCard
-          title="Active Users (7d)"
-          value={displayActiveUsers}
-          change={useSubgraphData ? undefined : -3}
-          icon={<Users className="h-5 w-5" />}
-          loading={subgraphLoading}
+          title={activeUsersLabel !== null ? "Active Users (7d)" : "Listed for sale"}
+          value={activeUsersLabel ?? (stats ? stats.listedCount.toLocaleString() : "—")}
+          icon={<ShoppingBag className="h-5 w-5" />}
+          loading={subgraphLoading || catalogLoading}
         />
         <MetricCard
-          title="Flagged Assets"
-          value={flaggedAssets}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          className={flaggedAssets > 0 ? "border-red-500/50" : ""}
-          loading={subgraphLoading}
+          title={useSubgraphData ? "Flagged Assets" : "Needs attention"}
+          value={useSubgraphData ? flaggedAssets : stats ? attention : "—"}
+          icon={useSubgraphData ? <AlertTriangle className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
+          className={(useSubgraphData ? flaggedAssets : attention) > 0 ? "border-red-500/50" : ""}
+          loading={subgraphLoading || catalogLoading}
         />
       </div>
+      {stats && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          {stats.boundCount} of {stats.totalItems} catalog items carry a chip · {stats.changedLast24h} changed in the last 24 h
+          {stats.driftCount > 0 ? ` · ${stats.driftCount} drift` : ""}
+          {stats.reanchorPendingCount > 0 ? ` · ${stats.reanchorPendingCount} re-anchor pending` : ""}
+          {stats.needsProductInfoCount > 0 ? ` · ${stats.needsProductInfoCount} need product info` : ""}
+        </p>
+      )}
 
       {/* Lifecycle Distribution Bar */}
-      <StatsBar distribution={displayStateDistribution} loading={subgraphLoading} />
+      <StatsBar distribution={displayStateDistribution} loading={subgraphLoading || catalogLoading} />
 
       {/* NFC Lifecycle Test Card */}
       {process.env.NODE_ENV === "development" && (
@@ -394,9 +409,42 @@ function DashboardContent() {
                     </div>
                   </div>
                 ))
+              ) : stats && stats.recent.length > 0 ? (
+                stats.recent.map((item) => (
+                  <div
+                    key={item.tokenId}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Link
+                        href={`/assets/${item.tokenId}`}
+                        className="font-mono text-sm font-medium hover:text-primary transition-colors"
+                      >
+                        #{item.tokenId}
+                      </Link>
+                      <span className="truncate text-sm text-muted-foreground">{item.name ?? "Untitled"}</span>
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {item.lifecycle || "unknown"}
+                      </Badge>
+                      {item.saleState === "listed" && (
+                        <Badge variant="outline" className="text-xs">
+                          listed
+                        </Badge>
+                      )}
+                      {item.saleState === "sold" && (
+                        <Badge variant="outline" className="text-xs">
+                          sold
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {item.updatedAt ? formatRelativeTime(Date.parse(item.updatedAt)) : ""}
+                    </span>
+                  </div>
+                ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No recent activity
+                  {catalogLoading ? "Loading catalog…" : "No recent activity"}
                 </p>
               )}
             </div>
@@ -420,21 +468,52 @@ function DashboardContent() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Top Asset Owners</CardTitle>
+            <CardTitle className="text-base">
+              {displayTopUsers.length > 0 ? "Top Asset Owners" : "Recent batches"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {displayTopUsers.map((user, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <Link
-                    href={`/users/${user.address}`}
-                    className="text-sm font-mono text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {shortenAddress(user.address)}
-                  </Link>
-                  <span className="text-sm font-medium">{user.assetCount} assets</span>
-                </div>
-              ))}
+              {displayTopUsers.length > 0 ? (
+                displayTopUsers.map((user, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <Link
+                      href={`/users/${user.address}`}
+                      className="text-sm font-mono text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {shortenAddress(user.address)}
+                    </Link>
+                    <span className="text-sm font-medium">{user.assetCount} assets</span>
+                  </div>
+                ))
+              ) : catalog && catalog.batches.length > 0 ? (
+                catalog.batches.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-3">
+                    <Link
+                      href={
+                        b.templateId
+                          ? `/catalog/${encodeURIComponent(b.templateId)}/batch?batch=${encodeURIComponent(b.id)}`
+                          : "/catalog"
+                      }
+                      className="truncate text-sm font-mono text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {b.id}
+                    </Link>
+                    <span className="whitespace-nowrap text-sm">
+                      {b.size} · <span className="capitalize">{b.state}</span>
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {catalogLoading ? "Loading…" : "No batches yet"}
+                </p>
+              )}
+              {displayTopUsers.length === 0 && (
+                <Link href="/station" className="block text-xs text-primary hover:underline">
+                  Open the binding station →
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -497,10 +576,17 @@ function DashboardContent() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Subgraph</span>
-                <span className={`flex items-center gap-1.5 text-sm ${useSubgraphData ? "text-green-500" : "text-yellow-500"}`}>
-                  <span className={`w-2 h-2 rounded-full ${useSubgraphData ? "bg-green-500" : "bg-yellow-500"}`} />
-                  {useSubgraphData ? "Synced" : "Pending"}
+                <span className="text-sm text-muted-foreground">Catalog API</span>
+                <span className={`flex items-center gap-1.5 text-sm ${stats ? "text-green-500" : catalogError ? "text-red-500" : "text-muted-foreground"}`}>
+                  <span className={`w-2 h-2 rounded-full ${stats ? "bg-green-500" : catalogError ? "bg-red-500" : "bg-muted-foreground"}`} />
+                  {stats ? "Live" : catalogError ? "Unavailable" : "Loading"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Indexer (subgraph)</span>
+                <span className={`flex items-center gap-1.5 text-sm ${useSubgraphData ? "text-green-500" : "text-muted-foreground"}`}>
+                  <span className={`w-2 h-2 rounded-full ${useSubgraphData ? "bg-green-500" : "bg-muted-foreground"}`} />
+                  {useSubgraphData ? "Synced" : "Not configured"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
