@@ -24,29 +24,37 @@ const ZERO_HASH = `0x${"0".repeat(64)}`;
 /**
  * Tri-state anchor verdict for an item's verification block:
  *
- *   drift     — anchor_status='drift' (reconciler detected the on-chain hash
- *               no longer matches), OR a newer metadata version supersedes the
- *               anchored one (latestVersion > anchoredVersion).
+ *   drift     — anchor_status='drift': the reconciler found the on-chain
+ *               metadataHash disagreeing with the anchored doc (primary AND
+ *               witness RPC). The only red.
  *   confirmed — the anchored version IS the latest version.
  *   pending   — everything else: first publish awaiting its anchor
- *               (anchoredVersion null), anchor_status pending/submitted, or an
- *               item with no verification data at all (yellow, never green).
+ *               (anchoredVersion null), anchor_status pending/submitted, a
+ *               NEWER version above the anchored one (re-anchor in flight —
+ *               see isReanchorPending; this used to be reported as drift and
+ *               painted every routine republish red until the next sweep),
+ *               or an item with no verification data at all (yellow, never
+ *               green).
  */
 export function anchorVerdict(v: Partial<VerificationBlock> | null | undefined): AnchorVerdict {
   if (!v) return "pending";
   if (v.anchorStatus === "drift") return "drift";
-  if (
-    typeof v.latestVersion === "number" &&
-    typeof v.anchoredVersion === "number" &&
-    v.latestVersion > v.anchoredVersion
-  ) {
-    return "drift";
-  }
+  if (isReanchorPending(v)) return "pending";
   if (v.anchorStatus === "confirmed") return "confirmed";
   return "pending";
 }
 
-/** Drift dot predicate (acceptance: latestVersion>anchoredVersion or anchor_status='drift'). */
+/** A newer metadata version exists above the last anchored one (anchor in flight). */
+export function isReanchorPending(v: Partial<VerificationBlock> | null | undefined): boolean {
+  return (
+    !!v &&
+    typeof v.latestVersion === "number" &&
+    typeof v.anchoredVersion === "number" &&
+    v.latestVersion > v.anchoredVersion
+  );
+}
+
+/** Drift dot predicate — the reconciler's verdict only. */
 export function hasDrift(v: Partial<VerificationBlock> | null | undefined): boolean {
   return anchorVerdict(v) === "drift";
 }
@@ -66,13 +74,21 @@ const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
 export function compareIntegrity(
   onChainHash: string | null | undefined,
   servedHash: string | null | undefined,
+  latestHash?: string | null,
 ): IntegrityResult {
   if (!onChainHash || !servedHash) return "unknown";
   const chain = onChainHash.toLowerCase();
   const served = servedHash.toLowerCase();
   if (!HASH_RE.test(chain) || !HASH_RE.test(served)) return "unknown";
   if (chain === ZERO_HASH || served === ZERO_HASH) return "unknown";
-  return chain === served ? "match" : "mismatch";
+  if (chain === served) return "match";
+  // The chain already carries the NEWEST version while the DB still serves
+  // the last confirmed one: a re-anchor whose confirmation is pending, not a
+  // mismatch (live 2026-09-05: token 55 v3 landed seconds before its row
+  // was confirmed).
+  const latest = latestHash?.toLowerCase();
+  if (latest && HASH_RE.test(latest) && chain === latest) return "confirming";
+  return "mismatch";
 }
 
 // ──────────────────────────────────────────────

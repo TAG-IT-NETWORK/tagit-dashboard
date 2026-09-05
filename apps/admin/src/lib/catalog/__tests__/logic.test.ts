@@ -27,10 +27,13 @@ describe("anchorVerdict", () => {
     ).toBe("drift");
   });
 
-  it("is drift when latestVersion > anchoredVersion (superseded anchor)", () => {
+  it("is PENDING (not drift) when latestVersion > anchoredVersion — a re-anchor in flight", () => {
     expect(
       anchorVerdict({ anchorStatus: "confirmed", anchoredVersion: 1, latestVersion: 2 }),
-    ).toBe("drift");
+    ).toBe("pending");
+    expect(
+      anchorVerdict({ anchorStatus: "pending", anchoredVersion: 1, latestVersion: 2 }),
+    ).toBe("pending");
   });
 
   it("is confirmed when the anchored version IS the latest", () => {
@@ -61,8 +64,8 @@ describe("anchorVerdict", () => {
 });
 
 describe("hasDrift (acceptance rule)", () => {
-  it("true for latestVersion>anchoredVersion", () => {
-    expect(hasDrift({ anchoredVersion: 1, latestVersion: 2, anchorStatus: "pending" })).toBe(true);
+  it("false for latestVersion>anchoredVersion (re-anchor pending is amber, not red)", () => {
+    expect(hasDrift({ anchoredVersion: 1, latestVersion: 2, anchorStatus: "pending" })).toBe(false);
   });
   it("true for anchor_status='drift'", () => {
     expect(hasDrift({ anchoredVersion: 2, latestVersion: 2, anchorStatus: "drift" })).toBe(true);
@@ -79,6 +82,15 @@ describe("hasDrift (acceptance rule)", () => {
 // ──────────────────────────────────────────────
 
 describe("compareIntegrity", () => {
+  it("reads as 'confirming' when the chain already carries the newest version", () => {
+    const served = `0x${"a".repeat(64)}`;
+    const latest = `0x${"b".repeat(64)}`;
+    expect(compareIntegrity(latest, served, latest)).toBe("confirming");
+    expect(compareIntegrity(latest, served)).toBe("mismatch"); // no latestHash known
+    expect(compareIntegrity(served, served, latest)).toBe("match");
+    expect(compareIntegrity(`0x${"c".repeat(64)}`, served, latest)).toBe("mismatch");
+  });
+
   it("matches identical hashes case-insensitively", () => {
     expect(compareIntegrity(HASH_A, HASH_A)).toBe("match");
     expect(compareIntegrity(HASH_A.toUpperCase().replace("0X", "0x"), HASH_A)).toBe("match");
@@ -195,9 +207,9 @@ describe("registryRowFromAdminItem", () => {
     });
   });
 
-  it("recomputes the drift verdict client-side (latestVersion > anchoredVersion)", () => {
+  it("recomputes a newer-version item as pending client-side, even if the server said drift", () => {
     const row = registryRowFromAdminItem({ ...fullItem, latestVersion: 3, drift: true });
-    expect(row.verdict).toBe("drift");
+    expect(row.verdict).toBe("pending");
   });
 
   it("recomputes drift from anchorStatus='drift' too", () => {
