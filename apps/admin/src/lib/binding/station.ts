@@ -156,7 +156,16 @@ export type SunFailKind =
 
 export type TapEvaluation =
   | { ok: true; sun: SunParams }
-  | { ok: false; kind: SunFailKind; message: string };
+  | {
+      ok: false;
+      kind: SunFailKind;
+      message: string;
+      /** True for a factory-fresh chip (empty NDEF file): programmable on the spot. */
+      blank?: boolean;
+    };
+
+/** SUN URL base the station programs onto blank chips (same as the Bind Tag modal). */
+export const SUN_BASE_URL = "https://verify.tagit.network/sun";
 
 /**
  * Bridge-decoded SUN (encrypted-PICC layout). This fleet's chips are
@@ -208,7 +217,15 @@ export function interpretNdefRead(result: unknown, cardUid: string): TapEvaluati
       : null;
   const records: unknown = Array.isArray(result) ? result : container?.records;
   if (!Array.isArray(records) || records.length === 0) {
-    return { ok: false, kind: "unreadable", message: "Chip has no readable NDEF message" };
+    // An empty NDEF file is what a chip looks like straight off the roll —
+    // not tamper, just not programmed yet. Flag it so the station can offer
+    // Program SDM right here instead of sending the operator to another page.
+    return {
+      ok: false,
+      kind: "unreadable",
+      blank: true,
+      message: "Chip has no readable NDEF message — blank chip, not SDM-programmed yet",
+    };
   }
 
   if (container?.sun) {
@@ -334,7 +351,7 @@ export interface StationState {
    * provisioned upstream), null = no server verify yet for this tap.
    */
   cmacVerified: boolean | null;
-  sunFail: { kind: SunFailKind; message: string } | null;
+  sunFail: { kind: SunFailKind; message: string; blank?: boolean } | null;
   bindError: string | null;
   lastBind: LastBind | null;
   sessionLog: LogEntry[];
@@ -360,7 +377,7 @@ export type StationAction =
   | { type: "TAP"; uid: string }
   /** cmacVerified omitted = false (counter-only check, WB-01). */
   | { type: "SUN_OK"; cmacVerified?: boolean }
-  | { type: "SUN_FAIL"; kind: SunFailKind; message: string; at: number }
+  | { type: "SUN_FAIL"; kind: SunFailKind; message: string; at: number; blank?: boolean }
   | { type: "BIND_OK"; txHash: string | null; at: number }
   | { type: "BIND_FAIL"; error: string; at: number }
   | { type: "ADVANCE" }
@@ -436,7 +453,11 @@ export function stationReducer(state: StationState, action: StationAction): Stat
       return {
         ...state,
         phase: "idle",
-        sunFail: { kind: action.kind, message: action.message },
+        sunFail: {
+          kind: action.kind,
+          message: action.message,
+          ...(action.blank === true ? { blank: true } : {}),
+        },
         sessionLog: token
           ? log(state, {
               at: action.at,

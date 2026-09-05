@@ -45,6 +45,7 @@ import {
   Usb,
   Wifi,
   WifiOff,
+  Wand2,
 } from "lucide-react";
 
 import { useNfcBridge } from "@/lib/nfc-bridge";
@@ -64,6 +65,7 @@ import {
   type LogEntry,
   type StationState,
   type StationToken,
+  SUN_BASE_URL,
 } from "@/lib/binding/station";
 
 const AUTO_ADVANCE_MS = 1500;
@@ -214,7 +216,13 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
           uid,
         );
         if (!evaluation.ok) {
-          dispatch({ type: "SUN_FAIL", kind: evaluation.kind, message: evaluation.message, at: Date.now() });
+          dispatch({
+            type: "SUN_FAIL",
+            kind: evaluation.kind,
+            message: evaluation.message,
+            blank: evaluation.blank === true,
+            at: Date.now(),
+          });
           return;
         }
         const verifyRes = await proxyJson("/api/catalog-proxy/binding/verify", {
@@ -290,6 +298,44 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
     },
     [bridge, refreshStatus, scheduleAdvance],
   );
+
+  // ── Blank chip: program SDM on the spot, then re-run the tap pipeline ────
+  // A factory-fresh NTAG 424 DNA has an empty NDEF file, so the SUN check
+  // fails "unreadable" before anything else. Personalization is the same
+  // bridge RPC the Bind Tag modal and the Assembly Line use; doing it here
+  // keeps the operator on the station page for a whole roll of new chips.
+  const [programming, setProgramming] = useState(false);
+  const programAndRetry = useCallback(async () => {
+    const card = bridge.card;
+    const tapUid = stateRef.current.tapUid;
+    if (!card || card.uid !== tapUid || card.chip !== "NTAG424DNA" || pipelineBusyRef.current) return;
+    setProgramming(true);
+    try {
+      await bridge.request({ type: "personalize-sdm", baseUrl: SUN_BASE_URL });
+    } catch (err) {
+      dispatch({
+        type: "SUN_FAIL",
+        kind: "unreadable",
+        blank: true,
+        message: `Program SDM failed: ${err instanceof Error ? err.message : String(err)}`,
+        at: Date.now(),
+      });
+      setProgramming(false);
+      return;
+    }
+    setProgramming(false);
+    dispatch({ type: "DISMISS_WARNING" });
+    // Same physical card, fresh pipeline run — the tap guard keys on the UID.
+    lastUidRef.current = card.uid;
+    void runTapPipeline(card.uid, card.chip);
+  }, [bridge, runTapPipeline]);
+  const canProgram =
+    writable &&
+    !programming &&
+    state.sunFail?.blank === true &&
+    bridge.card !== null &&
+    bridge.card.uid === state.tapUid &&
+    bridge.card.chip === "NTAG424DNA";
 
   // Tap detection — one pipeline run per physical card-present event.
   useEffect(() => {
@@ -401,6 +447,9 @@ export function BindingStation({ batchId, role, exceptionsTab }: BindingStationP
             onAdvance={advance}
             onSkip={() => setSkipOpen(true)}
             onDismiss={() => dispatch({ type: "DISMISS_WARNING" })}
+            onProgram={() => void programAndRetry()}
+            programming={programming}
+            canProgram={canProgram}
           />
 
           <LastBindCard
@@ -489,6 +538,9 @@ function NextUpCard({
   onAdvance,
   onSkip,
   onDismiss,
+  onProgram,
+  programming,
+  canProgram,
 }: {
   state: StationState;
   next: StationToken | null;
@@ -497,6 +549,10 @@ function NextUpCard({
   onAdvance: () => void;
   onSkip: () => void;
   onDismiss: () => void;
+  /** Program SDM on the blank chip still on the antenna, then retry the tap. */
+  onProgram: () => void;
+  programming: boolean;
+  canProgram: boolean;
 }) {
   if (state.phase === "loading") {
     return (
@@ -586,7 +642,23 @@ function NextUpCard({
             </p>
             {/* Bridge/server detail — rendered inert. */}
             <p className="mt-1 text-muted-foreground">{state.sunFail.message}</p>
+            {state.sunFail.blank && (
+              <p className="mt-1 text-muted-foreground">
+                Blank chip from the roll. Program it here, keep it on the reader, and the bind
+                retries automatically.
+              </p>
+            )}
             <div className="mt-2 flex gap-2">
+              {state.sunFail.blank && (
+                <Button size="sm" onClick={onProgram} disabled={!canProgram}>
+                  {programming ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  )}
+                  {programming ? "Programming SDM…" : "Program SDM and retry"}
+                </Button>
+              )}
               <Button size="sm" variant="outline" onClick={onSkip} disabled={!writable}>
                 <SkipForward className="mr-1 h-3.5 w-3.5" /> Skip defective chip
               </Button>
