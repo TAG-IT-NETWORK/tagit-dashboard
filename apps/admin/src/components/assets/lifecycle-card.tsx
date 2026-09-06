@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, Flag, Loader2, RefreshCw, Shield, Zap } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@tagit/ui";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
@@ -50,6 +50,10 @@ export function LifecycleCard({
   const [busy, setBusy] = useState<ActionKind | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [voidOpen, setVoidOpen] = useState(false);
+  const [nudge, setNudge] = useState<string | null>(null);
+  const reasonRef = useRef<HTMLInputElement>(null);
+  const priceRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -94,7 +98,17 @@ export function LifecycleCard({
       setVoidOpen(true);
       return;
     }
-    if (!ready(a).ok || busy) return;
+    if (!canRun(a, role) || busy) return;
+    const gate = ready(a);
+    if (!gate.ok) {
+      // Don't silently ignore the click: say what is missing and put the cursor there.
+      setNudge(`${a.label}: ${gate.why}`);
+      const target =
+        a.needsReason && reason.trim() === "" ? reasonRef : a.needsPrice && !priceCheck.priceUsdc ? priceRef : addressRef;
+      target.current?.focus();
+      return;
+    }
+    setNudge(null);
     if (a.irreversible && armed !== a.kind) {
       setArmed(a.kind);
       return;
@@ -251,25 +265,30 @@ export function LifecycleCard({
         )}
 
         {/* Inputs */}
+        {nudge && (
+          <p className="flex items-center gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-500">
+            <AlertTriangle className="h-4 w-4" /> {nudge}
+          </p>
+        )}
         {(needsReason || needsPrice || needsAddress) && (
           <div className="grid gap-3 sm:grid-cols-3">
             {needsReason && (
               <div className="space-y-1 sm:col-span-1">
-                <Label htmlFor="lc-reason" className="text-xs">Reason (audit)</Label>
-                <Input id="lc-reason" value={reason} onChange={(e) => { setReason(e.target.value); setArmed(null); }} placeholder="e.g. customer reported stolen" />
+                <Label htmlFor="lc-reason" className="text-xs">Reason — required for Flag, Delist, Resolve, Recycle (audit log)</Label>
+                <Input ref={reasonRef} id="lc-reason" value={reason} onChange={(e) => { setReason(e.target.value); setArmed(null); setNudge(null); }} placeholder="e.g. customer reported stolen" />
               </div>
             )}
             {needsPrice && (
               <div className="space-y-1">
                 <Label htmlFor="lc-price" className="text-xs">Price (USDC)</Label>
-                <Input id="lc-price" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="23.33" className="font-mono" />
+                <Input ref={priceRef} id="lc-price" value={price} onChange={(e) => { setPrice(e.target.value); setNudge(null); }} placeholder="23.33" className="font-mono" />
                 {price && priceCheck.error && <p className="text-xs text-destructive">{priceCheck.error}</p>}
               </div>
             )}
             {needsAddress && (
               <div className="space-y-1">
                 <Label htmlFor="lc-address" className="text-xs">{state === ST.FLAGGED ? "Recipient (optional, CLAIMED only)" : "Customer wallet"}</Label>
-                <Input id="lc-address" value={address} onChange={(e) => { setAddress(e.target.value); setArmed(null); }} placeholder="0x…" className="font-mono text-xs" />
+                <Input ref={addressRef} id="lc-address" value={address} onChange={(e) => { setAddress(e.target.value); setArmed(null); setNudge(null); }} placeholder="0x…" className="font-mono text-xs" />
                 {address && addressCheck.error && <p className="text-xs text-destructive">{addressCheck.error}</p>}
               </div>
             )}
@@ -293,7 +312,7 @@ export function LifecycleCard({
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {items.map((a) => {
-                      const r = ready(a);
+                      const allowed = canRun(a, role);
                       const isBusy = busy === a.kind;
                       const isArmed = armed === a.kind;
                       const destructive = a.kind === "recycle" || a.kind === "flag" || a.kind === "void-remint";
@@ -302,14 +321,15 @@ export function LifecycleCard({
                           <Button
                             size="sm"
                             variant={g === "forward" ? "default" : destructive ? "destructive" : "outline"}
-                            disabled={(!r.ok && a.kind !== "bind" && a.kind !== "void-remint") || busy !== null}
+                            disabled={!allowed || busy !== null}
                             onClick={() => void run(a)}
                             title={a.hint}
                           >
                             {isBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : g === "forward" ? <Zap className="mr-1 h-3.5 w-3.5" /> : null}
                             {isBusy ? "Working…" : isArmed ? `Confirm ${a.label.toLowerCase()} #${tokenId}` : a.label}
                           </Button>
-                          {!r.ok && a.kind !== "bind" && a.kind !== "void-remint" && <span className="text-[11px] text-muted-foreground">{r.why}</span>}
+                          {isArmed && <span className="text-[11px] text-yellow-500">click again to run — this cannot be undone</span>}
+                          {!allowed && <span className="text-[11px] text-muted-foreground">{a.tier === "admin" ? "admin role required" : "editor role required"}</span>}
                         </div>
                       );
                     })}
