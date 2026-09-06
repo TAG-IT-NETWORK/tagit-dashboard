@@ -109,10 +109,14 @@ export function RegistryTable({ rows }: { rows: RegistryRow[] }) {
                             )}
                           </div>
                           <div className="font-mono text-xs text-muted-foreground">
-                            <Link href={`/assets/${row.tokenId}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-primary hover:underline" title="Open the asset page (lifecycle controls)">
-                              #{row.tokenId}
-                              <ArrowUpRight className="h-3 w-3" />
-                            </Link>
+                            {/^\d+$/.test(row.tokenId) ? (
+                              <Link href={`/assets/${row.tokenId}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-primary hover:underline" title="Open the asset page (lifecycle controls)">
+                                #{row.tokenId}
+                                <ArrowUpRight className="h-3 w-3" />
+                              </Link>
+                            ) : (
+                              <span title="pre-mint placeholder id — not on-chain yet">#{row.tokenId}</span>
+                            )}
                           </div>
                         </div>
                       </td>
