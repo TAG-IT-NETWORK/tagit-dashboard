@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, StateBadge } from "@tagit/ui";
-import { ExternalLink, ImageIcon, Loader2, ShieldOff, X } from "lucide-react";
+import { ExternalLink, ImageIcon, Loader2, ShieldOff, X, Shield } from "lucide-react";
 import { anchorVerdict, isReanchorPending, readProduct } from "@/lib/catalog/logic";
 import type { VerificationBlock } from "@/lib/catalog/types";
 import { WagmiGuard } from "@/components/wagmi-guard";
@@ -258,6 +258,12 @@ export function AssetSlideOver({ tokenId, onClose }: { tokenId: string; onClose:
               )}
 
               <section className="flex flex-wrap items-center gap-3 pt-1">
+                <Button size="sm" asChild>
+                  <Link href={`/assets/${tokenId}`}>
+                    <Shield className="mr-2 h-3.5 w-3.5" />
+                    Manage lifecycle (activate, list, flag, recycle…)
+                  </Link>
+                </Button>
                 <Button variant="outline" size="sm" asChild>
                   <a
                     href={`${VERIFY_URL}/asset/${tokenId}`}
@@ -267,9 +273,6 @@ export function AssetSlideOver({ tokenId, onClose }: { tokenId: string; onClose:
                     <ExternalLink className="mr-2 h-3.5 w-3.5" />
                     Public provenance
                   </a>
-                </Button>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={`/assets/${tokenId}`}>Lifecycle console</Link>
                 </Button>
               </section>
             </>

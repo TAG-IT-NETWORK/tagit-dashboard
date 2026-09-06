@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge, Card, CardContent, Input } from "@tagit/ui";
-import { Search, ShieldOff } from "lucide-react";
+import { Search, ShieldOff, ArrowUpRight } from "lucide-react";
 import type { RegistryRow } from "@/lib/catalog/types";
 import { AnchorDot } from "./anchor-dot";
 import { AssetSlideOver } from "./asset-slide-over";
@@ -108,7 +109,10 @@ export function RegistryTable({ rows }: { rows: RegistryRow[] }) {
                             )}
                           </div>
                           <div className="font-mono text-xs text-muted-foreground">
-                            #{row.tokenId}
+                            <Link href={`/assets/${row.tokenId}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-primary hover:underline" title="Open the asset page (lifecycle controls)">
+                              #{row.tokenId}
+                              <ArrowUpRight className="h-3 w-3" />
+                            </Link>
                           </div>
                         </div>
                       </td>
