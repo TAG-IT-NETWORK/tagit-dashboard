@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge, Card, CardContent, Input } from "@tagit/ui";
-import { Search, ShieldOff } from "lucide-react";
+import { Search, ShieldOff, ArrowUpRight } from "lucide-react";
 import type { RegistryRow } from "@/lib/catalog/types";
 import { AnchorDot } from "./anchor-dot";
 import { AssetSlideOver } from "./asset-slide-over";
