@@ -163,7 +163,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
         </div>
       </div>
 
-      {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} />}
+      {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} priority />}
       <DataCard
         rows={[
           ["Product", brand ? `${brand} · ${displayName}` : displayName],

@@ -1,9 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
-import { baseSepolia } from "viem/chains";
-import { BuyButton } from "./buy-button";
 import { fetchPriceFromProxy, isPurchasable, type CanonicalPrice } from "@/lib/price";
 
 /**
@@ -18,7 +16,32 @@ import { fetchPriceFromProxy, isPurchasable, type CanonicalPrice } from "@/lib/p
  * re-fetches the same endpoint immediately before payment.
  *
  * Renders nothing until NEXT_PUBLIC_PRIVY_APP_ID is set.
+ *
+ * PERF: the wallet stack (Privy + wagmi/viem, ~600 KB gzipped) is a lazy
+ * chunk (./buy-checkout) loaded after the page has painted — a phone tap shows
+ * the verdict and the product image without waiting for it. Until it arrives
+ * the same button is drawn in a disabled state with the live price.
  */
+
+const BuyCheckout = dynamic(() => import("./buy-checkout"), {
+  ssr: false,
+  loading: () => <BuyPlaceholder />,
+});
+
+let placeholderDisplay = "";
+function BuyPlaceholder() {
+  return (
+    <button
+      type="button"
+      disabled
+      aria-busy="true"
+      className="w-full rounded-2xl bg-[#00D68F]/70 px-5 py-4 text-center text-base font-bold text-black opacity-80"
+    >
+      Buy now{placeholderDisplay ? ` · ${placeholderDisplay}` : ""}
+    </button>
+  );
+}
+
 export function BuyWidget(props: { tokenId: string; productName: string }) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const [price, setPrice] = useState<CanonicalPrice | null>(null);
@@ -36,29 +59,15 @@ export function BuyWidget(props: { tokenId: string; productName: string }) {
   if (!appId) return null;
   // Hidden entirely when there is no live purchase block.
   if (!isPurchasable(price)) return null;
+  placeholderDisplay = price.display ?? "";
 
   return (
-    <PrivyProvider
+    <BuyCheckout
       appId={appId}
-      config={{
-        loginMethods: ["email"],
-        embeddedWallets: {
-          ethereum: { createOnLogin: "users-without-wallets" },
-        },
-        defaultChain: baseSepolia,
-        supportedChains: [baseSepolia],
-        appearance: {
-          theme: "dark",
-          accentColor: "#00D68F",
-        },
-      }}
-    >
-      <BuyButton
-        tokenId={props.tokenId}
-        productName={props.productName}
-        price={price}
-        refetchPrice={refetchPrice}
-      />
-    </PrivyProvider>
+      tokenId={props.tokenId}
+      productName={props.productName}
+      price={price}
+      refetchPrice={refetchPrice}
+    />
   );
 }

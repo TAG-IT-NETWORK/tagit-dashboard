@@ -55,6 +55,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" style={{ background: "#000000" }}>
+      <head>
+        <link rel="preconnect" href="https://media.tagit.network" crossOrigin="anonymous" />
+      </head>
       <body
         className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable} font-sans`}
         style={{ background: "#000000", color: "#ffffff" }}
