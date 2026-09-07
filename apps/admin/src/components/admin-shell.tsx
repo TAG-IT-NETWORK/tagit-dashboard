@@ -10,9 +10,11 @@ import { Wallet, Loader2 } from "lucide-react";
 
 interface AdminShellProps {
   children: ReactNode;
+  /** Tenant id of a business-scoped session (trims the menu); null for platform users. */
+  tenant?: string | null;
 }
 
-export function AdminShell({ children }: AdminShellProps) {
+export function AdminShell({ children, tenant = null }: AdminShellProps) {
   const { isConnected, isConnecting } = useAccount();
   const { openConnectModal } = useConnectModal();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -24,7 +26,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <Sidebar tenant={tenant} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">

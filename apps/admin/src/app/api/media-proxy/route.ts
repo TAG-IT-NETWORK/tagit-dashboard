@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { actorHeader, getActor } from "@/lib/actor";
+import { actorHeader, getActor, getTenant, tenantHeader } from "@/lib/actor";
 import { getActorRole } from "@/lib/actor-role";
 import { canMutateCatalog } from "@/lib/catalog/template-logic";
 
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
   }
 
   const actor = await getActor();
+  const tenant = await getTenant();
 
   try {
     const upstream = await fetch(`${SERVICES_URL}/api/v1/media`, {
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
         // browser's cookies or other headers.
         "content-type": contentType,
         authorization: `Bearer ${apiKey}`,
+        ...tenantHeader(tenant),
         ...actorHeader(actor),
       },
       body: req.body,

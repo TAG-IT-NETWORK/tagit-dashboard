@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getActor } from "@/lib/actor";
+import { getActor, getTenant, tenantHeader } from "@/lib/actor";
 import { getActorRole } from "@/lib/actor-role";
 import { canMutateCatalog } from "@/lib/catalog/template-logic";
 import { validateOverridesDoc } from "@/lib/catalog/logic";
@@ -71,6 +71,7 @@ export async function PUT(req: Request, { params }: { params: { tokenId: string 
   const backfill = body.backfill === true;
 
   const actor = await getActor();
+  const tenant = await getTenant();
 
   try {
     const upstream = await fetch(`${SERVICES_URL}/api/v1/assets/${tokenId}/metadata`, {
@@ -78,6 +79,7 @@ export async function PUT(req: Request, { params }: { params: { tokenId: string 
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${apiKey}`,
+        ...tenantHeader(tenant),
         ...(relayerKey ? { "x-relayer-key": relayerKey } : {}),
         ...(actor ? { "x-actor": actor } : {}),
       },

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTenant } from "@/lib/actor";
 import { Inter } from "next/font/google";
 import { ClientShell } from "./client-shell";
 import "./globals.css";
@@ -10,15 +11,17 @@ export const metadata: Metadata = {
   description: "Internal dashboard for TAG IT Network",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Tenant-scoped (brand) sessions get the operations menu only; see Sidebar.
+  const tenant = await getTenant();
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <ClientShell>{children}</ClientShell>
+        <ClientShell tenant={tenant}>{children}</ClientShell>
       </body>
     </html>
   );

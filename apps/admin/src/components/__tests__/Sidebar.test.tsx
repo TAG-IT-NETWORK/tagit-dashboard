@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, within, type BoundFunctions, type queries } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Sidebar } from "../sidebar";
+import { Sidebar, visibleNavGroups, NAV_GROUPS } from "../sidebar";
 
 // Mock next/navigation
 const mockPathname = vi.fn().mockReturnValue("/dashboard");
@@ -185,5 +185,19 @@ describe("Sidebar", () => {
     const assetsLink = ui.getByText("Assets").closest("a");
     expect(assetsLink).toHaveClass("text-muted-foreground");
     expect(assetsLink).not.toHaveClass("bg-primary/10");
+  });
+});
+
+describe("visibleNavGroups (tenant menu)", () => {
+  it("keeps the full menu for platform users and trims platform-only items for a tenant", () => {
+    const all = visibleNavGroups(NAV_GROUPS, null);
+    expect(all.map((g) => g.name)).toEqual(NAV_GROUPS.map((g) => g.name));
+    const tenant = visibleNavGroups(NAV_GROUPS, "biz-acme");
+    const names = tenant.flatMap((g) => g.items.map((i) => i.name));
+    expect(names).toEqual(expect.arrayContaining(["Dashboard", "Binding Station", "Verify", "Chip Tools", "Catalog", "Assets", "Team"]));
+    for (const hidden of ["Assembly Line", "Users", "Capabilities", "Governance", "Treasury", "AI Agents", "Lifecycle Console"]) {
+      expect(names).not.toContain(hidden);
+    }
+    expect(tenant.map((g) => g.name)).not.toContain("Token & Governance");
   });
 });

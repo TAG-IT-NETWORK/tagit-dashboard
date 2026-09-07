@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getTenant, tenantHeader } from "@/lib/actor";
 
 import { auth } from "@/auth";
 import { hasRole, parseRole } from "@/lib/rbac";
@@ -49,6 +50,7 @@ export async function proxyTeamRequest({ method, path, body }: TeamProxyRequest)
       headers: {
         authorization: `Bearer ${apiKey}`,
         "x-actor": email.toLowerCase(),
+        ...tenantHeader(await getTenant()),
         ...(body !== undefined ? { "content-type": "application/json" } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),

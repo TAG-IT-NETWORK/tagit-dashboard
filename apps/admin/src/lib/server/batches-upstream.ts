@@ -13,7 +13,7 @@
  * hence this sibling module.
  */
 
-import { getActor } from "@/lib/actor";
+import { getActor, getTenant, tenantHeader } from "@/lib/actor";
 
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 const FETCH_TIMEOUT_MS = 15_000;
@@ -45,6 +45,7 @@ async function upstreamHeaders(
   if (!apiKey) return { error: "SERVICES_API_KEY not configured on the server" };
   const relayerKey = process.env.RELAYER_API_KEY;
   const actor = await getActor();
+  const tenant = await getTenant();
   return {
     authorization: `Bearer ${apiKey}`,
     ...(init.json !== undefined ? { "content-type": "application/json" } : {}),
@@ -52,6 +53,7 @@ async function upstreamHeaders(
     ...(init.relayer && relayerKey ? { "x-relayer-key": relayerKey } : {}),
     // REQ-S-16: forward identity on writes; omit entirely when unknown.
     ...(actor && method !== "GET" ? { "x-actor": actor } : {}),
+    ...tenantHeader(tenant),
   };
 }
 
