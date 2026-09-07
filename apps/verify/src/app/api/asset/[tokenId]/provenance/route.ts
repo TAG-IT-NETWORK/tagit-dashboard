@@ -39,7 +39,9 @@
 import { CHAIN_READ_TTL_SECONDS, neverCacheControl } from "@/lib/cache";
 import { getPublicClient } from "@/lib/contract.server";
 import { getLifecycleHistory } from "@/lib/lifecycle";
-import { toProvenanceWire } from "@/lib/provenance-wire";
+import { servicesProvenanceToWire, toProvenanceWire } from "@/lib/provenance-wire";
+import { fetchAsset } from "@/lib/services";
+import { STATES } from "@/lib/states";
 import { parseTokenId } from "@/lib/verdict";
 
 export const runtime = "nodejs";
@@ -71,25 +73,44 @@ export async function GET(
     );
   }
 
+  // Fallback when this host cannot scan the chain (every reachable RPC caps
+  // eth_getLogs far below TAGITCore's history span): the per-token provenance
+  // list tagit-services keeps from its relayer receipts + reconciler reads.
+  // Stamped `scan.source = "tagit-services"` so the timeline names the source.
+  const fallback = async (): Promise<Response | null> => {
+    try {
+      const lookup = await fetchAsset(tokenId.toString());
+      if (lookup.kind !== "record" && lookup.kind !== "restricted") return null;
+      const wire = servicesProvenanceToWire(lookup.dto.provenance, (code) => STATES[code]?.label ?? "UNKNOWN");
+      return wire.available ? jsonResponse(wire, 200, TIMELINE_CACHE_CONTROL) : null;
+    } catch {
+      return null;
+    }
+  };
+
   try {
     // Pin the head first so the scan range is a single node's view — the same
     // pin-then-read ordering the verdict builder uses (@/lib/verdict readAt).
     const head = await getPublicClient().getBlock({ blockTag: "latest" });
     if (head.number === null) throw new Error("unpinnable head");
     const wire = toProvenanceWire(await getLifecycleHistory(tokenId, head.number));
+    if (wire.available) return jsonResponse(wire, 200, TIMELINE_CACHE_CONTROL);
 
     // `available: false` is a real answer, not an error (see @/lib/lifecycle),
     // but it must not be pinned at the edge: the next call may find a warmer
-    // cache or a recovered provider. Only a real timeline is storable.
-    return jsonResponse(wire, 200, wire.available ? TIMELINE_CACHE_CONTROL : neverCacheControl());
+    // cache or a recovered provider. Try the services-backed records first.
+    return (await fallback()) ?? jsonResponse(wire, 200, neverCacheControl());
   } catch {
     // No provider text on the wire — same rule and same reason as
     // @/lib/lifecycle's providerDetail note: this is attacker-reachable output
     // on a keyless endpoint and viem errors can embed the transport URL.
-    return jsonResponse(
-      { error: { code: "CHAIN_UNAVAILABLE", message: "could not read the chain right now" } },
-      502,
-      neverCacheControl(),
+    return (
+      (await fallback()) ??
+      jsonResponse(
+        { error: { code: "CHAIN_UNAVAILABLE", message: "could not read the chain right now" } },
+        502,
+        neverCacheControl(),
+      )
     );
   }
 }
