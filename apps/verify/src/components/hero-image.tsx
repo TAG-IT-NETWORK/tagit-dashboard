@@ -15,7 +15,7 @@ import { isAllowedImageUrl, mediaImageLoader } from "@/lib/media";
  * is attacker-writable, and this host must not hotlink arbitrary origins into
  * a page that renders next to an authenticity verdict.
  */
-export function HeroImage({ src, alt, lqip }: { src: string; alt: string; lqip?: string }) {
+export function HeroImage({ src, alt, lqip, priority = false }: { src: string; alt: string; lqip?: string; priority?: boolean }) {
   if (!isAllowedImageUrl(src)) return null;
 
   return (
@@ -29,6 +29,7 @@ export function HeroImage({ src, alt, lqip }: { src: string; alt: string; lqip?:
         alt={alt}
         fill
         sizes="(max-width: 640px) 100vw, 640px"
+        priority={priority}
         className="object-contain"
         {...(lqip ? { placeholder: "blur" as const, blurDataURL: lqip } : {})}
       />
