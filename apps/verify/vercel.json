@@ -4,6 +4,7 @@
   "installCommand": "cd ../.. && pnpm install",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "crons": [{ "path": "/api/warm", "schedule": "* * * * *" }],
   "headers": [
     {
       "source": "/(.*)",

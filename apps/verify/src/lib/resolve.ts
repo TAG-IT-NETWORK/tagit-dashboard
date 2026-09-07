@@ -49,7 +49,16 @@ export function getMasterKey(): Buffer | null {
  * Verify a SUN tap and resolve its on-chain digital twin. Pure data (no JSX) so
  * every surface (HTML page, JSON-LD VC endpoint) renders from one source.
  */
-export async function resolveTap(picc?: string, cmac?: string): Promise<TapResolution> {
+/**
+ * `onTokenId` fires as soon as the tag resolves to a token — before the asset
+ * and anchor reads — so callers can start their own lookups (product DTO from
+ * tagit-services) in parallel instead of after the chain round-trips.
+ */
+export async function resolveTap(
+  picc?: string,
+  cmac?: string,
+  onTokenId?: (tokenId: bigint) => void,
+): Promise<TapResolution> {
   if (!picc || !cmac) return { kind: "bad-params" };
 
   const masterKey = getMasterKey();
@@ -69,20 +78,16 @@ export async function resolveTap(picc?: string, cmac?: string): Promise<TapResol
   }
 
   if (tokenId === 0n) return { kind: "authentic-unbound", uid, counter };
+  onTokenId?.(tokenId);
 
-  let asset: AssetState;
-  try {
-    asset = await getAsset(tokenId);
-  } catch {
+  // Asset + anchor are independent reads — one round-trip instead of two.
+  const [assetRead, hashRead] = await Promise.allSettled([getAsset(tokenId), getMetadataHash(tokenId)]);
+  if (assetRead.status === "rejected") {
     return { kind: "lookup-failed", uid, counter, reason: "Asset read failed." };
   }
-
-  let metadataHash: `0x${string}` | null = null;
-  try {
-    metadataHash = await getMetadataHash(tokenId);
-  } catch {
-    // Non-fatal: the contract may predate the metadataHash getter. Anchor stays null.
-  }
+  const asset: AssetState = assetRead.value;
+  // Non-fatal: the contract may predate the metadataHash getter. Anchor stays null.
+  const metadataHash: `0x${string}` | null = hashRead.status === "fulfilled" ? hashRead.value : null;
 
   return { kind: "resolved", uid, counter, tokenId, asset, metadataHash };
 }
