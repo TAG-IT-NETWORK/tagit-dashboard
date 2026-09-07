@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { actorHeader, getActor } from "@/lib/actor";
+import { actorHeader, getActor, getTenant, tenantHeader } from "@/lib/actor";
 import { getActorRole } from "@/lib/actor-role";
 import { canMutateCatalog } from "@/lib/catalog/template-logic";
 
@@ -82,9 +82,11 @@ export async function POST(req: Request) {
 
   // REQ-S-16 (META-T32): name the signed-in human on every mutating call.
   const actor = await getActor();
+  const tenant = await getTenant();
   const authHeaders = {
     "content-type": "application/json",
     authorization: `Bearer ${apiKey}`,
+    ...tenantHeader(tenant),
     ...(relayerKey ? { "x-relayer-key": relayerKey } : {}),
     ...actorHeader(actor),
   };

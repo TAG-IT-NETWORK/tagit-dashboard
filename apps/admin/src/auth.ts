@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-import { fetchAdminRole } from "@/lib/admin-role";
+import { fetchAdminRoster } from "@/lib/admin-role";
 import { parseRole } from "@/lib/rbac";
 import { SESSION_MAX_AGE_SECONDS, shouldRefreshRole } from "@/lib/role-refresh";
 
@@ -50,13 +50,17 @@ export const { handlers, auth } = NextAuth({
         now: Date.now(),
       });
       if (email && refresh) {
-        token.role = await fetchAdminRole(email);
+        const roster = await fetchAdminRoster(email);
+        token.role = roster.role;
+        token.businessId = roster.businessId;
         token.roleFetchedAt = Date.now();
       }
       return token;
     },
     session({ session, token }) {
       session.user.role = parseRole(token.role);
+      session.user.businessId =
+        typeof token.businessId === "string" && token.businessId.length > 0 ? token.businessId : null;
       return session;
     },
   },

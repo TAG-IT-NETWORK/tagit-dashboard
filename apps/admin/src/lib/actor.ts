@@ -30,3 +30,25 @@ export async function getActor(): Promise<string | null> {
 export function actorHeader(actor: string | null): Record<string, string> {
   return actor ? { "x-actor": actor } : {};
 }
+
+/**
+ * Tenant half of the actor seam: the business id bound to the signed-in
+ * roster user, or null for platform (unscoped) users and outside a request.
+ * Every services call made on a brand user's behalf must carry it as
+ * X-Business-Id — services then scopes catalog, batches, binding, listings
+ * and the roster to that business (tagit-services src/lib/tenant.ts).
+ */
+export async function getTenant(): Promise<string | null> {
+  if (isE2EAuthBypass()) return null;
+  try {
+    const session = await auth();
+    const id = session?.user?.businessId;
+    return typeof id === "string" && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+export function tenantHeader(tenant: string | null): Record<string, string> {
+  return tenant ? { "x-business-id": tenant } : {};
+}

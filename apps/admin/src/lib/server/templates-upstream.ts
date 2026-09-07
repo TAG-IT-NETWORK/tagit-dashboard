@@ -9,7 +9,7 @@
  * forward the signed-in identity as X-Actor via lib/actor.ts.
  */
 
-import { getActor } from "@/lib/actor";
+import { getActor, getTenant, tenantHeader } from "@/lib/actor";
 import type { TemplateDto } from "@/lib/catalog/template-types";
 
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
@@ -42,6 +42,7 @@ export async function templatesUpstream(
   }
   const relayerKey = process.env.RELAYER_API_KEY;
   const actor = await getActor();
+  const tenant = await getTenant();
   const method = init.method ?? "GET";
 
   const ctrl = new AbortController();
@@ -55,6 +56,8 @@ export async function templatesUpstream(
         ...(init.relayer && relayerKey ? { "x-relayer-key": relayerKey } : {}),
         // REQ-S-16: forward identity on writes; omit entirely when unknown.
         ...(actor && method !== "GET" ? { "x-actor": actor } : {}),
+        // Tenant isolation: brand users only ever see/mutate their own business.
+        ...tenantHeader(tenant),
       },
       ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
       cache: "no-store",

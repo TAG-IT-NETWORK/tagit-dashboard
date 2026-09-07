@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchAdminRole, parseRoleResponse } from "../admin-role";
+import { fetchAdminRole, parseRoleResponse, parseRosterResponse } from "../admin-role";
 
 /**
  * META-T32: role resolution against the services admin_users by-email
@@ -94,5 +94,14 @@ describe("fetchAdminRole", () => {
   it("resolves null on a non-JSON upstream body", async () => {
     fetchMock.mockResolvedValueOnce(new Response("<html>gateway error</html>", { status: 200 }));
     await expect(fetchAdminRole("ops@tagit.network")).resolves.toBeNull();
+  });
+});
+
+describe("parseRosterResponse", () => {
+  it("carries the tenant scope next to the role, null for platform users", () => {
+    expect(parseRosterResponse(200, { ok: true, user: { role: "operator", businessId: "biz-acme" } })).toEqual({ role: "operator", businessId: "biz-acme" });
+    expect(parseRosterResponse(200, { ok: true, user: { role: "admin", businessId: null } })).toEqual({ role: "admin", businessId: null });
+    expect(parseRosterResponse(200, { ok: true, user: { role: "viewer" } })).toEqual({ role: "viewer", businessId: null });
+    expect(parseRosterResponse(404, { ok: false })).toEqual({ role: null, businessId: null });
   });
 });

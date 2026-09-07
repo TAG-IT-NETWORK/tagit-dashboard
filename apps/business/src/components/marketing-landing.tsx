@@ -273,6 +273,9 @@ export function MarketingLanding() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="ghost" className="hidden sm:inline-flex">
+            <a href="https://admin.tagit.network" rel="noopener">Customer sign-in</a>
+          </Button>
           <Button asChild size="sm">
             <a href="#get-started">Request a demo</a>
           </Button>

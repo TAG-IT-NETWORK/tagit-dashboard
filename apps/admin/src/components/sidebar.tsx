@@ -39,6 +39,8 @@ interface NavItem {
   icon: LucideIcon;
   /** Extra "active" rule beyond the href prefix (e.g. the station lives under /catalog). */
   match?: (pathname: string) => boolean;
+  /** Hidden for business-scoped (tenant) users — platform operations only. */
+  platformOnly?: boolean;
 }
 
 interface NavGroup {
@@ -57,6 +59,19 @@ interface NavGroup {
  * what an operator does every day (catalog → batch → binding station);
  * governance, AI and testing tools are separated so they stop hiding it.
  */
+/**
+ * Brand (tenant-scoped) users get the operations surface only: their catalog,
+ * batches, binding, registry, desktop verify/chip tools and their own team.
+ * Platform-only items (on-chain governance, capabilities, AI agents, test
+ * consoles) are hidden for them — the proxies enforce tenant scope server-side.
+ */
+export function visibleNavGroups<T extends { items: ReadonlyArray<{ platformOnly?: boolean }> }>(groups: readonly T[], tenant: string | null): T[] {
+  if (!tenant) return [...groups];
+  return groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.platformOnly) }))
+    .filter((g) => g.items.length > 0);
+}
+
 export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
   {
     name: "Operations",
@@ -74,7 +89,7 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
       { name: "Chip Tools", href: "/chip-tools", icon: Cpu },
       { name: "Catalog", href: "/catalog", icon: BookOpen },
       { name: "Assets", href: "/assets", icon: Package },
-      { name: "Assembly Line", href: "/assembly-line", icon: Factory },
+      { name: "Assembly Line", href: "/assembly-line", icon: Factory, platformOnly: true },
     ],
   },
   {
@@ -82,9 +97,9 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     dot: "bg-sky-500",
     accent: "border-sky-500",
     items: [
-      { name: "Users", href: "/users", icon: Users },
-      { name: "Badges", href: "/badges", icon: BadgeCheck },
-      { name: "Capabilities", href: "/capabilities", icon: Shield },
+      { name: "Users", href: "/users", icon: Users, platformOnly: true },
+      { name: "Badges", href: "/badges", icon: BadgeCheck, platformOnly: true },
+      { name: "Capabilities", href: "/capabilities", icon: Shield, platformOnly: true },
       // META-T32: admin_users roster CRUD. Visible to everyone; the role
       // middleware sends non-admins to /403.
       { name: "Team", href: "/team", icon: UsersRound },
@@ -95,10 +110,10 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     dot: "bg-violet-500",
     accent: "border-violet-500",
     items: [
-      { name: "Governance", href: "/governance", icon: Vote },
-      { name: "Treasury", href: "/treasury", icon: Wallet },
-      { name: "Tokenomics", href: "/tokenomics", icon: Coins },
-      { name: "Resolve", href: "/resolve", icon: AlertTriangle },
+      { name: "Governance", href: "/governance", icon: Vote, platformOnly: true },
+      { name: "Treasury", href: "/treasury", icon: Wallet, platformOnly: true },
+      { name: "Tokenomics", href: "/tokenomics", icon: Coins, platformOnly: true },
+      { name: "Resolve", href: "/resolve", icon: AlertTriangle, platformOnly: true },
     ],
   },
   {
@@ -106,10 +121,10 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     dot: "bg-amber-500",
     accent: "border-amber-500",
     items: [
-      { name: "AI Agents", href: "/agents", icon: BrainCircuit },
-      { name: "BD Agent", href: "/adagent", icon: Bot },
-      { name: "Influencer", href: "/influencer", icon: Megaphone },
-      { name: "Demo", href: "/demo", icon: Play },
+      { name: "AI Agents", href: "/agents", icon: BrainCircuit, platformOnly: true },
+      { name: "BD Agent", href: "/adagent", icon: Bot, platformOnly: true },
+      { name: "Influencer", href: "/influencer", icon: Megaphone, platformOnly: true },
+      { name: "Demo", href: "/demo", icon: Play, platformOnly: true },
     ],
   },
   {
@@ -117,7 +132,7 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     dot: "bg-zinc-500",
     accent: "border-zinc-500",
     muted: true,
-    items: [{ name: "Lifecycle Console", href: "/test/console", icon: FlaskConical }],
+    items: [{ name: "Lifecycle Console", href: "/test/console", icon: FlaskConical, platformOnly: true }],
   },
 ];
 
@@ -127,13 +142,16 @@ function isItemActive(item: NavItem, pathname: string): boolean {
 }
 
 interface SidebarProps {
+  /** Business id of a tenant-scoped session; null/undefined = platform user (full menu). */
+  tenant?: string | null;
   /** Controls whether the drawer is open on mobile (below md breakpoint). */
   mobileOpen?: boolean;
   /** Called when the mobile drawer should close (backdrop click or close button). */
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+export function Sidebar({ tenant = null, mobileOpen = false, onMobileClose }: SidebarProps) {
+  const groups = visibleNavGroups(NAV_GROUPS, tenant);
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -173,7 +191,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
 
         {/* Navigation — grouped by workflow, color-coded per group */}
         <nav className="flex-1 px-2 py-3 overflow-y-auto">
-          {NAV_GROUPS.map((group, gi) => {
+          {groups.map((group, gi) => {
             const groupActive = group.items.some((item) => isItemActive(item, pathname));
             return (
               <div key={group.name} className={cn(gi > 0 && "mt-4", group.muted && "opacity-70")}>

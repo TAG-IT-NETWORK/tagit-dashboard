@@ -57,7 +57,7 @@ const ClientShellContent = dynamic(
   }
 );
 
-export function ClientShell({ children }: { children: ReactNode }) {
+export function ClientShell({ children, tenant = null }: { children: ReactNode; tenant?: string | null }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -69,5 +69,5 @@ export function ClientShell({ children }: { children: ReactNode }) {
     return <LoadingScreen />;
   }
 
-  return <ClientShellContent>{children}</ClientShellContent>;
+  return <ClientShellContent tenant={tenant}>{children}</ClientShellContent>;
 }

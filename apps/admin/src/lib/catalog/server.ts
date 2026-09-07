@@ -14,6 +14,7 @@
  */
 
 import { registryRowFromAdminItem } from "./logic";
+import { getTenant, tenantHeader } from "@/lib/actor";
 import type { RegistryFilters, RegistryRow } from "./types";
 
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
@@ -22,10 +23,11 @@ const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 export const REGISTRY_PAGE_LIMIT = 50;
 const FETCH_TIMEOUT_MS = 10_000;
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   // The admin catalog list sits behind apiKeyAuth — the key is required.
   const apiKey = process.env.SERVICES_API_KEY;
-  return apiKey ? { authorization: `Bearer ${apiKey}` } : {};
+  // Tenant isolation: a brand user's registry/dashboard only covers their business.
+  return { ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}), ...tenantHeader(await getTenant()) };
 }
 
 async function fetchJson(path: string): Promise<{ status: number; body: unknown } | null> {
@@ -33,7 +35,7 @@ async function fetchJson(path: string): Promise<{ status: number; body: unknown 
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${SERVICES_URL}${path}`, {
-      headers: authHeaders(),
+      headers: await authHeaders(),
       cache: "no-store",
       signal: ctrl.signal,
     });
