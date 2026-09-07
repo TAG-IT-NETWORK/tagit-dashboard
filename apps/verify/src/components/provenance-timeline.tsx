@@ -168,7 +168,9 @@ export function ProvenanceTimeline({ tokenId }: { tokenId: string }) {
         ))}
       </ol>
       <p className="text-[10px] text-gray-700 mt-2 font-mono">
-        scanned blocks {scan.from_block}–{scan.to_block} via eth_getLogs
+        {scan.source === "tagit-services"
+          ? `blocks ${scan.from_block}–${scan.to_block} · from TAG IT services records (relayer receipts)`
+          : `scanned blocks ${scan.from_block}–${scan.to_block} via eth_getLogs`}
       </p>
     </TimelineFrame>
   );
