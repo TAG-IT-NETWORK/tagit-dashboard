@@ -11,7 +11,8 @@
 import Link from "next/link";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
-import { loadProduct } from "@/lib/dpp";
+import { fetchAsset, heroMedia, type AssetLookup } from "@/lib/services";
+import { HeroImage } from "@/components/hero-image";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
@@ -28,7 +29,13 @@ function truncateAddress(a: string): string {
 
 export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   const { picc, cmac } = searchParams;
-  const res = await resolveTap(picc, cmac);
+  // The product DTO (tagit-services) only needs the token id, so it is fetched
+  // WHILE the asset/anchor chain reads run — not after them. On a cold
+  // services function that overlap is worth several seconds on a phone tap.
+  let productLookup: Promise<AssetLookup> | null = null;
+  const res = await resolveTap(picc, cmac, (tokenId) => {
+    productLookup = fetchAsset(tokenId.toString());
+  });
 
   if (res.kind === "bad-params") {
     return (
@@ -116,10 +123,15 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   // ── Resolved ───────────────────────────────────────────────────────────────
   // Product identity from the tagit-services assets API (META-T17 — the old
   // hardcoded metadata map is gone).
-  const product = await loadProduct(res.tokenId.toString());
+  const lookup = await (productLookup ?? fetchAsset(res.tokenId.toString()));
+  // Restricted items resolve to an EMPTY product — the verdict never resurrects
+  // copy the services API chose to redact (same rule as loadProduct in @/lib/dpp).
+  const dto = lookup.kind === "record" ? lookup.dto : null;
+  const hero = dto ? heroMedia(dto) : undefined;
   const state = STATES[res.asset.state] ?? STATES[0];
   const authentic = isAuthenticState(res.asset.state);
-  const displayName = product.name || `Token #${res.tokenId}`;
+  const displayName = dto?.product?.name || dto?.name || `Token #${res.tokenId}`;
+  const brand = dto?.product?.brand;
 
   return (
     <Shell>
@@ -151,9 +163,10 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
         </div>
       </div>
 
+      {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} />}
       <DataCard
         rows={[
-          ["Product", displayName],
+          ["Product", brand ? `${brand} · ${displayName}` : displayName],
           ["Owner", truncateAddress(res.asset.owner)],
           ["UID", formatUid(res.uid)],
           ["Tap counter", String(res.counter)],
@@ -168,7 +181,15 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
         </div>
       )}
 
-      <div className="text-center mt-5 text-xs text-gray-600 font-mono">
+      <div className="text-center mt-5 text-sm">
+        <Link
+          href={`/asset/${res.tokenId.toString()}`}
+          className="inline-block rounded-full border border-[#00D68F]/40 px-5 py-2 text-[#00D68F] hover:bg-[#00D68F]/10"
+        >
+          Open full product passport →
+        </Link>
+      </div>
+      <div className="text-center mt-4 text-xs text-gray-600 font-mono">
         <Link
           href={`https://sepolia.basescan.org/address/${CONTRACT_ADDRESS}`}
           target="_blank"
