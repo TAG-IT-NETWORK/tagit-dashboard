@@ -84,6 +84,16 @@ export interface AssetPrice {
   };
 }
 
+/** One lifecycle event as tagit-services records it (relayer receipts + reconciler chain reads). */
+export interface AssetProvenanceEntry {
+  type: string;
+  label?: string;
+  blockNumber: number;
+  txHash: string;
+  timestamp?: number;
+  data?: Record<string, unknown>;
+}
+
 export interface AssetDto {
   tokenId: string;
   owner?: string; // truncated by the API (shortAddr)
@@ -102,6 +112,7 @@ export interface AssetDto {
   media?: AssetMediaEntry[];
   price?: AssetPrice;
   verification?: AssetVerificationBlock;
+  provenance?: AssetProvenanceEntry[];
 }
 
 export type AssetLookup =

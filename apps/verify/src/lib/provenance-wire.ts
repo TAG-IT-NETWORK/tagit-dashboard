@@ -32,13 +32,53 @@ export interface ProvenanceWireEvent {
   to_state?: string;
 }
 
+export type ProvenanceWireSource = "eth_getLogs" | "tagit-services";
+
 export type ProvenanceWire =
   | {
       available: true;
       events: ProvenanceWireEvent[];
-      scan: { from_block: number; to_block: number };
+      scan: { from_block: number; to_block: number; source?: ProvenanceWireSource };
     }
   | { available: false };
+
+const WIRE_TYPES = new Set(["AssetMinted", "TagBound", "StateChanged", "AssetResold"]);
+
+/**
+ * Fallback source: the provenance list tagit-services keeps for each token
+ * (its relayer transaction receipts + reconciler chain reads). Used when this
+ * host cannot scan the chain itself — every RPC available to it caps
+ * eth_getLogs at 10k–50k blocks and TAGITCore's history spans millions. The
+ * footer names the source so the reader knows which records they are seeing.
+ * Returns `available: false` when the list is missing or empty.
+ */
+export function servicesProvenanceToWire(
+  entries: ReadonlyArray<{ type: string; blockNumber: number; txHash: string; data?: Record<string, unknown> }> | undefined,
+  stateLabel: (code: number) => string,
+): ProvenanceWire {
+  if (!entries || entries.length === 0) return { available: false };
+  const events: ProvenanceWireEvent[] = [];
+  entries.forEach((e, i) => {
+    if (!WIRE_TYPES.has(e.type) || !Number.isFinite(e.blockNumber) || typeof e.txHash !== "string") return;
+    const from = typeof e.data?.from === "number" ? (e.data.from as number) : undefined;
+    const to = typeof e.data?.to === "number" ? (e.data.to as number) : undefined;
+    events.push({
+      type: e.type as ProvenanceWireEvent["type"],
+      block_number: e.blockNumber,
+      log_index: i,
+      transaction_hash: e.txHash as ProvenanceWireEvent["transaction_hash"],
+      ...(e.type === "StateChanged" && from !== undefined ? { from_state: stateLabel(from) } : {}),
+      ...(e.type === "StateChanged" && to !== undefined ? { to_state: stateLabel(to) } : {}),
+    });
+  });
+  if (events.length === 0) return { available: false };
+  events.sort((a, b) => a.block_number - b.block_number || a.log_index - b.log_index);
+  return {
+    available: true,
+    events,
+    scan: { from_block: events[0]!.block_number, to_block: events[events.length - 1]!.block_number, source: "tagit-services" },
+  };
+}
 
 /** Project a LifecycleResult down to exactly what the timeline renders. */
 export function toProvenanceWire(result: LifecycleResult): ProvenanceWire {
@@ -53,6 +93,6 @@ export function toProvenanceWire(result: LifecycleResult): ProvenanceWire {
       ...(event.from_state !== undefined ? { from_state: event.from_state } : {}),
       ...(event.to_state !== undefined ? { to_state: event.to_state } : {}),
     })),
-    scan: { from_block: result.scan.from_block, to_block: result.scan.to_block },
+    scan: { from_block: result.scan.from_block, to_block: result.scan.to_block, source: "eth_getLogs" },
   };
 }
