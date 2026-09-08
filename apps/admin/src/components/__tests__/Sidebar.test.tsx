@@ -67,6 +67,7 @@ const NAV_ITEMS = [
   "Treasury",
   "Tokenomics",
   "AI Agents",
+  "Agent Catalog",
   "BD Agent",
   "Influencer",
   "Demo",

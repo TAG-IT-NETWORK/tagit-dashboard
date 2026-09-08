@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const GATEWAY_URL = process.env.A2A_GATEWAY_URL || "https://api.tagit.network";
-const API_KEY = process.env.API_KEY || process.env.A2A_API_KEY || "dev-api-key-change-me";
+const API_KEY = process.env.API_KEY || process.env.A2A_API_KEY || process.env.SERVICES_API_KEY || "dev-api-key-change-me";
 
 export async function POST(req: NextRequest) {
   try {
