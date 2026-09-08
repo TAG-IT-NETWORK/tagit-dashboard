@@ -310,6 +310,9 @@ export default function AgentsPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/agents/catalog">Agent Catalog</Link>
+          </Button>
           <Button size="sm" asChild>
             <Link href="/agents/register">
               <Bot className="h-4 w-4 mr-2" />

@@ -27,8 +27,7 @@ import {
   BookOpen,
   Nfc,
   ScanLine,
-  Cpu,
-} from "lucide-react";
+  Cpu, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import type { LucideIcon } from "lucide-react";
@@ -122,6 +121,7 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     accent: "border-amber-500",
     items: [
       { name: "AI Agents", href: "/agents", icon: BrainCircuit, platformOnly: true },
+      { name: "Agent Catalog", href: "/agents/catalog", icon: Sparkles, match: (p) => p.startsWith("/agents/catalog") },
       { name: "BD Agent", href: "/adagent", icon: Bot, platformOnly: true },
       { name: "Influencer", href: "/influencer", icon: Megaphone, platformOnly: true },
       { name: "Demo", href: "/demo", icon: Play, platformOnly: true },
