@@ -13,6 +13,9 @@ import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
 import { fetchAsset, heroMedia, type AssetLookup } from "@/lib/services";
 import { HeroImage } from "@/components/hero-image";
+import { RatingSummary } from "@/components/rating-summary";
+import { RateWidget } from "@/components/rate-widget";
+import { fetchRatings } from "@/lib/ratings";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
@@ -128,6 +131,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   // copy the services API chose to redact (same rule as loadProduct in @/lib/dpp).
   const dto = lookup.kind === "record" ? lookup.dto : null;
   const hero = dto ? heroMedia(dto) : undefined;
+  const ratings = await fetchRatings(res.tokenId.toString());
   const state = STATES[res.asset.state] ?? STATES[0];
   const authentic = isAuthenticState(res.asset.state);
   const displayName = dto?.product?.name || dto?.name || `Token #${res.tokenId}`;
@@ -172,6 +176,10 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
           ["Tap counter", String(res.counter)],
         ]}
       />
+
+      <RatingSummary view={ratings} productName={displayName} />
+
+      <RateWidget tokenId={res.tokenId.toString()} productName={displayName} />
 
       {res.asset.state === 3 && (
         <div className="mt-5">
