@@ -1,4 +1,4 @@
-import type { RatingsView } from "@/lib/ratings";
+import type { RatingsView } from "@/lib/ratings-shared";
 
 /** Server-rendered stars + counts + recent verified-owner reviews. */
 export function Stars({ value, size = "text-base" }: { value: number | null; size?: string }) {

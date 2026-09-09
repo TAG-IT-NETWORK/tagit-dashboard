@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PrivyProvider, usePrivy, useSignMessage, useWallets } from "@privy-io/react-auth";
 import { baseSepolia } from "viem/chains";
-import { ratingMessage, reviewDigestBrowser } from "@/lib/ratings";
+import { ratingMessage, reviewDigestBrowser } from "@/lib/ratings-shared";
 
 /** Privy context + the rating form (lazy chunk, see rate-widget.tsx). */
 export default function RateCheckout({ tokenId, productName, onClose }: { tokenId: string; productName: string; onClose: () => void }) {

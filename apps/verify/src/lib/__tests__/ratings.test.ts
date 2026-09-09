@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseRatingsView, ratingMessage, starsLabel } from "../ratings";
+import { parseRatingsView, ratingMessage, starsLabel } from "../ratings-shared";
 
 describe("ratings helpers", () => {
   it("builds the exact canonical message the services verify", () => {
