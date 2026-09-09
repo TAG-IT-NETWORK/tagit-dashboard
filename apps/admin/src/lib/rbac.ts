@@ -121,6 +121,7 @@ export const PATH_ROLES: ReadonlyArray<
   ["/api/catalog-proxy/lifecycle/recycle", "admin"],
   ["/api/catalog-proxy/lifecycle/resolve", "admin"],
   ["/api/catalog-proxy/sale/settle", "admin"],
+  ["/api/catalog-proxy/ratings/*", "admin", ["PUT"]],
 ];
 
 /**

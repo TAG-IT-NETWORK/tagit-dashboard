@@ -18,6 +18,7 @@ import { WagmiGuard } from "@/components/wagmi-guard";
 import { useMetadataHash } from "@/lib/hooks/use-metadata-hash";
 import { BindTagModal } from "@/components/bind-tag-modal";
 import { LifecycleCard } from "@/components/assets/lifecycle-card";
+import { RatingsCard } from "@/components/assets/ratings-card";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import {
   Card,
@@ -217,6 +218,8 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
             onBind={() => setBindModalOpen(true)}
             onChanged={handleTxSuccess}
           />
+
+          <RatingsCard tokenId={id} role={role} />
 
           {/* Metadata Card */}
           <Card>

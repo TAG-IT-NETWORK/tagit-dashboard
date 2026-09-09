@@ -41,6 +41,9 @@ import { siteUrl } from "@/lib/site";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { HeroImage } from "@/components/hero-image";
+import { RatingSummary } from "@/components/rating-summary";
+import { RateWidget } from "@/components/rate-widget";
+import { fetchRatings } from "@/lib/ratings";
 import { PriceBlock } from "@/components/price-block";
 import { ProvenanceTimeline } from "@/components/provenance-timeline";
 import { CHAIN_READ_TTL_SECONDS } from "@/lib/cache";
@@ -252,6 +255,7 @@ export default async function AssetVerifyPage({ params }: PageProps) {
   const authentic = stateCode >= 1 && stateCode <= 4;
   const state = STATES[stateCode] ?? STATES[0];
   const hero = heroMedia(dto);
+  const ratings = await fetchRatings(tokenId);
   const anchor = anchorVerdict(dto.verification);
   const propagating = newerVersionPropagating(dto.verification);
   const jsonLd = buildProductJsonLd({ url: siteUrl(`/asset/${tokenId}`), dto });
@@ -337,6 +341,10 @@ export default async function AssetVerifyPage({ params }: PageProps) {
       {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} />}
 
       <DataCard rows={rows} />
+
+      <RatingSummary view={ratings} productName={displayName} />
+
+      <RateWidget tokenId={tokenId} productName={displayName} />
 
       {/* Server-rendered price incl. the "≈ €xx.xx" fx approximation. The buy
           widget below re-fetches the live price before any purchase. */}
