@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Flag, Loader2, RefreshCw, Sh
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@tagit/ui";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
 import { validatePriceInput } from "@/lib/binding/activate";
+import { basescanTxUrl } from "@/lib/catalog/batch-logic";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import {
   FORWARD_STATES,
@@ -21,6 +22,76 @@ import {
   type LifecycleStatus,
   type Outcome,
 } from "@/lib/lifecycle/logic";
+
+/** One row from GET /api/catalog-proxy/assets/:tokenId/owner-actions (mobile-app-triggered moves). */
+interface OwnerAction {
+  id: string;
+  action: string;
+  status: string;
+  reason: string | null;
+  priceUsdc: string | null;
+  method: string | null;
+  executeAt: string | null;
+  executedAt: string | null;
+  txHash: string | null;
+  error: string | null;
+  createdAt: string;
+}
+
+const OWNER_ACTION_LABELS: Record<string, string> = {
+  flag: "Report lost/stolen",
+  list: "List for sale",
+  delist: "Remove from sale",
+  recycle: "Recycle",
+  "cancel-recycle": "Cancel recycling",
+};
+
+function ownerActionLabel(action: string): string {
+  return OWNER_ACTION_LABELS[action] ?? action;
+}
+
+const OWNER_ACTION_STATUS_BADGE: Record<
+  string,
+  { label: string; variant: "success" | "warning" | "secondary" | "destructive" }
+> = {
+  executed: { label: "Executed", variant: "success" },
+  scheduled: { label: "Scheduled", variant: "warning" },
+  cancelled: { label: "Cancelled", variant: "secondary" },
+  failed: { label: "Failed", variant: "destructive" },
+};
+
+const ownerStr = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
+/** Parses the { ok, tokenId, actions: [...] } envelope; null on a malformed body. */
+function parseOwnerActions(body: unknown): OwnerAction[] | null {
+  const b = (body ?? {}) as Record<string, unknown>;
+  if (b.ok !== true || !Array.isArray(b.actions)) return null;
+  const out: OwnerAction[] = [];
+  for (const raw of b.actions) {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const idRaw = r.id;
+    const id = typeof idRaw === "string" ? idRaw : typeof idRaw === "number" ? String(idRaw) : null;
+    const action = ownerStr(r.action);
+    const status = ownerStr(r.status);
+    const createdAt = ownerStr(r.createdAt);
+    if (id === null || action === null || status === null || createdAt === null) continue;
+    const params = (r.params ?? {}) as Record<string, unknown>;
+    out.push({
+      id,
+      action,
+      status,
+      reason: ownerStr(params.reason),
+      priceUsdc: ownerStr(params.priceUsdc),
+      method: ownerStr(params.method),
+      executeAt: ownerStr(r.executeAt),
+      executedAt: ownerStr(r.executedAt),
+      txHash: ownerStr(r.txHash),
+      error: ownerStr(r.error),
+      createdAt,
+    });
+  }
+  return out;
+}
 
 /**
  * Lifecycle card — every state transition an operator/admin can make on one
@@ -43,6 +114,8 @@ export function LifecycleCard({
 }) {
   const [status, setStatus] = useState<LifecycleStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [ownerActions, setOwnerActions] = useState<OwnerAction[] | null>(null);
+  const [ownerActionsError, setOwnerActionsError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [price, setPrice] = useState("");
   const [address, setAddress] = useState("");
@@ -74,6 +147,30 @@ export function LifecycleCard({
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
+
+  const loadOwnerActions = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/catalog-proxy/assets/${tokenId}/owner-actions`, { cache: "no-store" });
+      const body = (await res.json().catch(() => null)) as unknown;
+      const parsed = parseOwnerActions(body);
+      if (!res.ok || parsed === null) {
+        setOwnerActionsError(
+          typeof (body as { error?: unknown })?.error === "string"
+            ? (body as { error: string }).error
+            : `owner actions unavailable (HTTP ${res.status})`,
+        );
+        return;
+      }
+      setOwnerActions(parsed);
+      setOwnerActionsError(null);
+    } catch (err) {
+      setOwnerActionsError(err instanceof Error ? err.message : String(err));
+    }
+  }, [tokenId]);
+
+  useEffect(() => {
+    void loadOwnerActions();
+  }, [loadOwnerActions]);
 
   const state = status?.state ?? stateCode;
   const saleState = status?.saleState ?? null;
@@ -358,6 +455,55 @@ export function LifecycleCard({
             </ul>
           </div>
         )}
+
+        {/* Owner actions — triggered from the TAG IT mobile app (flag, list/delist, recycle) */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner actions</p>
+          {ownerActionsError && (
+            <p className="text-xs text-yellow-500">Owner actions unavailable: {ownerActionsError}.</p>
+          )}
+          {!ownerActionsError && ownerActions !== null && ownerActions.length === 0 && (
+            <p className="text-sm text-muted-foreground">No owner actions yet</p>
+          )}
+          {ownerActions && ownerActions.length > 0 && (
+            <ul className="divide-y divide-border rounded-md border">
+              {ownerActions.map((a) => {
+                const badge = OWNER_ACTION_STATUS_BADGE[a.status] ?? { label: a.status, variant: "secondary" as const };
+                return (
+                  <li key={a.id} className="space-y-1 px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{ownerActionLabel(a.action)}</span>
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    </div>
+                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                      {a.status === "scheduled" && a.executeAt && <p>Executes {new Date(a.executeAt).toLocaleString()}</p>}
+                      {a.status === "failed" && a.error && <p className="text-destructive">{a.error}</p>}
+                      {a.reason && <p>Reason: {a.reason}</p>}
+                      {a.priceUsdc && (
+                        <p>
+                          Price: {a.priceUsdc} USDC{a.method ? ` · ${a.method}` : ""}
+                        </p>
+                      )}
+                      <p className="flex flex-wrap items-center gap-1.5">
+                        {new Date(a.createdAt).toLocaleString()}
+                        {a.txHash && (
+                          <a
+                            href={basescanTxUrl(a.txHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 underline"
+                          >
+                            {a.txHash.slice(0, 10)}…{a.txHash.slice(-8)} <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </CardContent>
 
       <VoidRemintWizard
