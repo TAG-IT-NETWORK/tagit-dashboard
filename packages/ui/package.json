@@ -40,7 +40,7 @@
     "postcss": "^8.5.18",
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",
-    "vitest": "^4.0.16"
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.90.12",
