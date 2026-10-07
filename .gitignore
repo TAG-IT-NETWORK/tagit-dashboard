@@ -37,3 +37,7 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 .vercel
+
+# Playwright output
+apps/*/playwright-report/
+apps/*/test-results/

@@ -24,9 +24,13 @@ export const dynamic = "force-dynamic";
 
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!BATCH_ID_RE.test(params.id)) {
-    return NextResponse.json({ ok: false, error: "id must be a batch id (bat_…)" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "id must be a batch id (bat_…)" },
+      { status: 400 },
+    );
   }
   if (!canMutateCatalog(await getActorRole())) {
     return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
@@ -48,7 +52,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   let chainId: number | undefined;
   if (body.chainId !== undefined) {
     if (typeof body.chainId !== "number" || !Number.isInteger(body.chainId) || body.chainId <= 0) {
-      return NextResponse.json({ ok: false, error: "chainId must be a positive integer" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "chainId must be a positive integer" },
+        { status: 400 },
+      );
     }
     chainId = body.chainId;
   }

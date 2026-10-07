@@ -117,7 +117,7 @@ function MobileNav({
 }: {
   open: boolean;
   onClose: () => void;
-  triggerRef: RefObject<HTMLButtonElement>;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);

@@ -67,8 +67,9 @@ function formatUid(uid: string): string {
   return clean.match(/.{1,2}/g)?.join(":") || clean;
 }
 
-export default function TagVerifyPage({ params }: { params: { uid: string } }) {
-  const tokenId = parseTokenId(params.uid);
+export default async function TagVerifyPage({ params }: { params: Promise<{ uid: string }> }) {
+  const { uid } = await params;
+  const tokenId = parseTokenId(uid);
   if (tokenId !== null) redirect(`/asset/${tokenId}`);
 
   return (
@@ -79,10 +80,8 @@ export default function TagVerifyPage({ params }: { params: { uid: string } }) {
       <div className="text-center max-w-sm">
         <div className="text-5xl mb-4 text-gray-600">?</div>
         <h1 className="text-2xl font-syne font-bold text-white mb-2">Tag Not Found</h1>
-        <p className="text-gray-400 text-sm mb-2">
-          This NFC tag is not registered on-chain.
-        </p>
-        <p className="text-gray-600 text-xs font-mono mb-6">{formatUid(params.uid)}</p>
+        <p className="text-gray-400 text-sm mb-2">This NFC tag is not registered on-chain.</p>
+        <p className="text-gray-600 text-xs font-mono mb-6">{formatUid(uid)}</p>
         <a href="/" className="text-[#00D68F] hover:underline text-sm">
           Back to TAG IT Verify
         </a>

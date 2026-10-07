@@ -18,13 +18,12 @@ import { TEMPLATE_ID_RE } from "@/lib/catalog/template-logic";
 
 export const dynamic = "force-dynamic";
 
-export default async function CatalogBatchPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { batch?: string };
+export default async function CatalogBatchPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ batch?: string }>;
 }) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return (
       <div className="space-y-4">

@@ -23,7 +23,7 @@ import { BuyWidget } from "@/components/buy-widget";
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
 interface SunPageProps {
-  searchParams: { picc?: string; cmac?: string };
+  searchParams: Promise<{ picc?: string; cmac?: string }>;
 }
 
 function truncateAddress(a: string): string {
@@ -31,7 +31,7 @@ function truncateAddress(a: string): string {
 }
 
 export default async function SunVerifyPage({ searchParams }: SunPageProps) {
-  const { picc, cmac } = searchParams;
+  const { picc, cmac } = await searchParams;
   // The product DTO (tagit-services) only needs the token id, so it is fetched
   // WHILE the asset/anchor chain reads run — not after them. On a cold
   // services function that overlap is worth several seconds on a phone tap.

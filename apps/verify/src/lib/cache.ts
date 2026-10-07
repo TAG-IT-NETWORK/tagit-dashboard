@@ -51,8 +51,9 @@
  *
  * WHERE THE WIRE HEADER COMES FROM — AND WHY NOT FROM MIDDLEWARE
  * ─────────────────────────────────────────────────────────────
- * `CHAIN_READ_TTL_SECONDS` feeds `export const revalidate` in
- * src/app/asset/[tokenId]/page.tsx. Next turns that into
+ * `CHAIN_READ_TTL_SECONDS` is mirrored by `export const revalidate = 60` in
+ * src/app/asset/[tokenId]/page.tsx (Next 15 requires a literal there, so the
+ * two must be kept in sync by hand). Next turns that into
  * `Cache-Control: s-maxage=60, stale-while-revalidate` on the wire, and it does
  * so ONLY for a cacheable 200 render.
  *
@@ -67,7 +68,8 @@
 
 /** Lifecycle state changes are human-paced; 60s of staleness is invisible to a
  *  reader and collapses a crawl burst into a single origin render per token.
- *  Consumed by `export const revalidate` in src/app/asset/[tokenId]/page.tsx. */
+ *  Mirrored (as a literal) by `export const revalidate` in
+ *  src/app/asset/[tokenId]/page.tsx — change both together. */
 export const CHAIN_READ_TTL_SECONDS = 60;
 
 /**

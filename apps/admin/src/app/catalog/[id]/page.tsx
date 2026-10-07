@@ -12,7 +12,8 @@ import { TEMPLATE_ID_RE } from "@/lib/catalog/template-logic";
 
 export const dynamic = "force-dynamic";
 
-export default async function CatalogTemplatePage({ params }: { params: { id: string } }) {
+export default async function CatalogTemplatePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return (
       <div className="space-y-4">

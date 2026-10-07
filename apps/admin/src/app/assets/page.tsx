@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { Badge, Button, Card, CardContent } from "@tagit/ui";
 import { ChevronRight, Filter, Plus } from "lucide-react";
-import {
-  applyRegistryFilters,
-  parseRegistryFilters,
-  registryHref,
-} from "@/lib/catalog/logic";
+import { applyRegistryFilters, parseRegistryFilters, registryHref } from "@/lib/catalog/logic";
 import type { RegistryFilters } from "@/lib/catalog/types";
 import { CATALOG_LIFECYCLES, CHAIN_STATE_FILTERS } from "@/lib/catalog/types";
 import { fetchRegistry, REGISTRY_PAGE_LIMIT } from "@/lib/catalog/server";
@@ -61,22 +57,21 @@ function FilterChip({
   );
 }
 
-export default async function AssetsPage({
-  searchParams,
-}: {
-  searchParams?: Record<string, string | string[] | undefined>;
+export default async function AssetsPage(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const searchParams = await props.searchParams;
   const filters = parseRegistryFilters(searchParams ?? {});
   const rawCursor = searchParams?.cursor;
-  const cursor =
-    typeof rawCursor === "string" && /^\d+$/.test(rawCursor) ? rawCursor : undefined;
+  const cursor = typeof rawCursor === "string" && /^\d+$/.test(rawCursor) ? rawCursor : undefined;
 
   const registry = await fetchRegistry(filters, cursor);
   const rows = applyRegistryFilters(registry.rows, filters);
 
   const toggle = (patch: Partial<RegistryFilters>): string =>
     registryHref({ ...filters, ...patch });
-  const anyFilter = filters.lifecycle !== null || filters.needsInfo || filters.drift || filters.state !== null;
+  const anyFilter =
+    filters.lifecycle !== null || filters.needsInfo || filters.drift || filters.state !== null;
 
   return (
     <div className="space-y-6">
@@ -124,10 +119,7 @@ export default async function AssetsPage({
               </FilterChip>
             ))}
             <span className="mx-1 h-4 w-px bg-border" aria-hidden />
-            <FilterChip
-              active={filters.needsInfo}
-              href={toggle({ needsInfo: !filters.needsInfo })}
-            >
+            <FilterChip active={filters.needsInfo} href={toggle({ needsInfo: !filters.needsInfo })}>
               Needs product info
             </FilterChip>
             <FilterChip active={filters.drift} href={toggle({ drift: !filters.drift })}>
@@ -160,9 +152,7 @@ export default async function AssetsPage({
           filtered page can be sparse while more matches remain. */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          {cursor
-            ? `Page after token #${cursor}`
-            : "First page"}
+          {cursor ? `Page after token #${cursor}` : "First page"}
           {" · "}
           {rows.length} item{rows.length === 1 ? "" : "s"} shown
         </span>

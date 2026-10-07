@@ -14,7 +14,8 @@ import { templatesUpstream } from "@/lib/server/templates-upstream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return NextResponse.json(
       { ok: false, error: "id must be a template id (tpl_…)" },
@@ -23,7 +24,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
   if (!canPublishCatalog(await getActorRole())) {
     // META-T32 role map: publish is admin-level (editors keep draft writes).
-    return NextResponse.json({ ok: false, error: "publish requires the admin role" }, { status: 403 });
+    return NextResponse.json(
+      { ok: false, error: "publish requires the admin role" },
+      { status: 403 },
+    );
   }
   const res = await templatesUpstream(`/api/v1/admin/templates/${params.id}/publish`, {
     method: "POST",

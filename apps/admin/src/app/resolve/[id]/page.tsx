@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -64,7 +64,7 @@ import {
 } from "@/lib/mocks/flagged-assets";
 
 interface ResolveDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // tagit-services base URL (Recovery Resolver Agent). Public read endpoints.
@@ -1023,7 +1023,8 @@ function ResolveDetailContent({ tokenId }: { tokenId: string }) {
   );
 }
 
-export default function ResolveDetailPage({ params }: ResolveDetailPageProps) {
+export default function ResolveDetailPage(props: ResolveDetailPageProps) {
+  const params = use(props.params);
   return (
     <WagmiGuard>
       <RequireCapability capability={Capabilities.RESOLVER}>

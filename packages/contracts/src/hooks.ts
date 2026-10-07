@@ -242,17 +242,25 @@ export function useAllAssets(options?: {
   const startId = page * pageSize + 1;
   const endId = Math.min(startId + pageSize - 1, total);
 
-  // Build array of contract calls for batch fetching
-  const contracts =
-    total > 0 && startId <= total
-      ? Array.from({ length: endId - startId + 1 }, (_, i) => ({
-          address: chainContracts.TAGITCore as `0x${string}`,
-          abi: TAGITCoreABI,
-          functionName: "getAsset" as const,
-          args: [BigInt(startId + i)],
-          chainId,
-        }))
-      : [];
+  // Build array of contract calls for batch fetching. Memoized: wagmi hashes
+  // this array into the query key on every render, and consumers feed the
+  // derived `assets` into useReactTable, which re-renders whenever `data`
+  // changes identity — under React 19 an always-new array became an
+  // infinite synchronous render loop (admin /resolve froze on navigation).
+  const coreAddress = chainContracts.TAGITCore as `0x${string}`;
+  const contracts = useMemo(
+    () =>
+      total > 0 && startId <= total
+        ? Array.from({ length: endId - startId + 1 }, (_, i) => ({
+            address: coreAddress,
+            abi: TAGITCoreABI,
+            functionName: "getAsset" as const,
+            args: [BigInt(startId + i)],
+            chainId,
+          }))
+        : [],
+    [total, startId, endId, coreAddress, chainId],
+  );
 
   // Batch fetch all assets for this page
   const {
@@ -268,24 +276,29 @@ export function useAllAssets(options?: {
     },
   });
 
-  // Transform raw contract data into typed Asset objects
+  // Transform raw contract data into typed Asset objects (stable identity
+  // while `assetsData` is unchanged — see the note on `contracts` above).
   // Contract returns: [owner, timestamp, state, flags, reserved]
-  const assets: (Asset & { tokenId: bigint })[] = (assetsData ?? [])
-    .map((result, index) => {
-      if (result.status === "success" && result.result) {
-        const data = result.result as readonly [`0x${string}`, bigint, number, number, number];
-        return {
-          tokenId: BigInt(startId + index),
-          owner: data[0],
-          timestamp: data[1],
-          state: data[2] as AssetStateType,
-          flags: data[3],
-          reserved: data[4],
-        };
-      }
-      return null;
-    })
-    .filter((asset): asset is Asset & { tokenId: bigint } => asset !== null);
+  const assets = useMemo<(Asset & { tokenId: bigint })[]>(
+    () =>
+      (assetsData ?? [])
+        .map((result, index) => {
+          if (result.status === "success" && result.result) {
+            const data = result.result as readonly [`0x${string}`, bigint, number, number, number];
+            return {
+              tokenId: BigInt(startId + index),
+              owner: data[0],
+              timestamp: data[1],
+              state: data[2] as AssetStateType,
+              flags: data[3],
+              reserved: data[4],
+            };
+          }
+          return null;
+        })
+        .filter((asset): asset is Asset & { tokenId: bigint } => asset !== null),
+    [assetsData, startId],
+  );
 
   return {
     assets,
@@ -319,8 +332,11 @@ export function useAssetsByState(
     refetchInterval,
   });
 
-  // Filter by state client-side
-  const filteredAssets = assets.filter((asset) => asset.state === state).slice(0, pageSize);
+  // Filter by state client-side (memoized so table consumers get a stable `data`)
+  const filteredAssets = useMemo(
+    () => assets.filter((asset) => asset.state === state).slice(0, pageSize),
+    [assets, state, pageSize],
+  );
 
   return {
     assets: filteredAssets,

@@ -13,7 +13,8 @@ import { fetchAssetDetail } from "@/lib/catalog/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { tokenId: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ tokenId: string }> }) {
+  const params = await props.params;
   const tokenId = params.tokenId;
   if (!/^\d+$/.test(tokenId)) {
     return NextResponse.json(
@@ -24,10 +25,7 @@ export async function GET(_req: Request, { params }: { params: { tokenId: string
 
   const body = await fetchAssetDetail(tokenId);
   if (body === null) {
-    return NextResponse.json(
-      { ok: false, error: "services catalog unreachable" },
-      { status: 502 },
-    );
+    return NextResponse.json({ ok: false, error: "services catalog unreachable" }, { status: 502 });
   }
   return NextResponse.json(body);
 }

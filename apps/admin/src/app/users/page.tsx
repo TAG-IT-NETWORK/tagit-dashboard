@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { usePublicClient, useChainId } from "wagmi";
 import {
@@ -239,18 +239,25 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const filteredData = users.filter((user) => {
-    if (
-      badgeFilter.length > 0 &&
-      !badgeFilter.some((badge) => user.identityBadges.includes(badge))
-    ) {
-      return false;
-    }
-    if (capFilter.length > 0 && !capFilter.some((key) => user.capabilityBadges.includes(key))) {
-      return false;
-    }
-    return true;
-  });
+  // Memoized: useReactTable re-renders whenever `data` changes identity, and an
+  // unmemoized filter would hand it a new array every render (React 19 turns
+  // that into an infinite render loop — see packages/contracts/src/hooks.ts).
+  const filteredData = useMemo(
+    () =>
+      users.filter((user) => {
+        if (
+          badgeFilter.length > 0 &&
+          !badgeFilter.some((badge) => user.identityBadges.includes(badge))
+        ) {
+          return false;
+        }
+        if (capFilter.length > 0 && !capFilter.some((key) => user.capabilityBadges.includes(key))) {
+          return false;
+        }
+        return true;
+      }),
+    [users, badgeFilter, capFilter],
+  );
 
   const table = useReactTable({
     data: filteredData,

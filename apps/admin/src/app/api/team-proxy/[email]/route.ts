@@ -16,10 +16,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface RouteContext {
-  params: { email: string };
+  params: Promise<{ email: string }>;
 }
 
-export async function PUT(req: Request, { params }: RouteContext) {
+export async function PUT(req: Request, props: RouteContext) {
+  const params = await props.params;
   let body: unknown;
   try {
     body = await req.json();
@@ -29,6 +30,7 @@ export async function PUT(req: Request, { params }: RouteContext) {
   return proxyTeamRequest({ method: "PUT", path: teamUserPath(params.email), body });
 }
 
-export async function DELETE(_req: Request, { params }: RouteContext) {
+export async function DELETE(_req: Request, props: RouteContext) {
+  const params = await props.params;
   return proxyTeamRequest({ method: "DELETE", path: teamUserPath(params.email) });
 }

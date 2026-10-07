@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { getAddress } from "viem";
 import {
@@ -62,7 +62,7 @@ import {
 } from "lucide-react";
 
 interface UserDetailPageProps {
-  params: { address: string };
+  params: Promise<{ address: string }>;
 }
 
 // Mock data for user's assets
@@ -157,7 +157,13 @@ interface GrantBadgeModalProps {
   onSuccess: () => void;
 }
 
-function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }: GrantBadgeModalProps) {
+function GrantBadgeModal({
+  isOpen,
+  onClose,
+  address,
+  existingBadges,
+  onSuccess,
+}: GrantBadgeModalProps) {
   const chainId = useChainId();
   const [selectedBadge, setSelectedBadge] = useState<number | null>(null);
   const { grantBadge, hash, isPending, isConfirming, isSuccess, error } = useGrantBadge();
@@ -191,9 +197,7 @@ function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }
             <Shield className="h-5 w-5" />
             Grant Badge
           </DialogTitle>
-          <DialogDescription>
-            Select a badge to grant to this user.
-          </DialogDescription>
+          <DialogDescription>Select a badge to grant to this user.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -239,9 +243,7 @@ function GrantBadgeModal({ isOpen, onClose, address, existingBadges, onSuccess }
 
               {error && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">
-                    Error: {error.message?.slice(0, 100)}
-                  </p>
+                  <p className="text-sm text-destructive">Error: {error.message?.slice(0, 100)}</p>
                 </div>
               )}
 
@@ -284,14 +286,20 @@ interface GrantCapabilityModalProps {
   onSuccess: () => void;
 }
 
-function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, onSuccess }: GrantCapabilityModalProps) {
+function GrantCapabilityModal({
+  isOpen,
+  onClose,
+  address,
+  existingCapabilities,
+  onSuccess,
+}: GrantCapabilityModalProps) {
   const chainId = useChainId();
   const [selectedCapabilityId, setSelectedCapabilityId] = useState<CapabilityId | null>(null);
   const { grantCapability, hash, isPending, isConfirming, isSuccess, error } = useGrantCapability();
 
   // Available capabilities (not already granted) - compare hashes since TAGITAccess returns bytes32
   const availableCapabilities = CapabilityIdList.filter(
-    (c) => !existingCapabilities.includes(c.hash)
+    (c) => !existingCapabilities.includes(c.hash),
   );
 
   useEffect(() => {
@@ -320,9 +328,7 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
             <Award className="h-5 w-5" />
             Grant Capability
           </DialogTitle>
-          <DialogDescription>
-            Select a capability to grant to this user.
-          </DialogDescription>
+          <DialogDescription>Select a capability to grant to this user.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -346,7 +352,9 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
           ) : (
             <>
               {availableCapabilities.length === 0 ? (
-                <p className="text-muted-foreground">User already has all available capabilities.</p>
+                <p className="text-muted-foreground">
+                  User already has all available capabilities.
+                </p>
               ) : (
                 <div className="grid gap-2">
                   {availableCapabilities.map((cap) => (
@@ -368,9 +376,7 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
 
               {error && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">
-                    Error: {error.message?.slice(0, 100)}
-                  </p>
+                  <p className="text-sm text-destructive">Error: {error.message?.slice(0, 100)}</p>
                 </div>
               )}
 
@@ -404,7 +410,8 @@ function GrantCapabilityModal({ isOpen, onClose, address, existingCapabilities, 
   );
 }
 
-export default function UserDetailPage({ params }: UserDetailPageProps) {
+export default function UserDetailPage(props: UserDetailPageProps) {
+  const params = use(props.params);
   return (
     <WagmiGuard>
       <UserDetailContent address={params.address} />
@@ -568,12 +575,16 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
             <CardContent>
               {badgesError && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-                  <p className="text-sm text-destructive">Error loading badges: {badgesError.message}</p>
+                  <p className="text-sm text-destructive">
+                    Error loading badges: {badgesError.message}
+                  </p>
                 </div>
               )}
               {revokeBadgeError && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-                  <p className="text-sm text-destructive">Revoke error: {revokeBadgeError.message?.slice(0, 100)}</p>
+                  <p className="text-sm text-destructive">
+                    Revoke error: {revokeBadgeError.message?.slice(0, 100)}
+                  </p>
                 </div>
               )}
               {badgesLoading ? (
@@ -589,9 +600,7 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
                       key={badgeId}
                       className="flex items-center gap-2 p-3 rounded-lg border bg-card"
                     >
-                      <Badge variant={getBadgeVariant(badgeId)}>
-                        {getBadgeName(badgeId)}
-                      </Badge>
+                      <Badge variant={getBadgeVariant(badgeId)}>{getBadgeName(badgeId)}</Badge>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -632,12 +641,16 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
             <CardContent>
               {capabilitiesError && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-                  <p className="text-sm text-destructive">Error loading capabilities: {capabilitiesError.message}</p>
+                  <p className="text-sm text-destructive">
+                    Error loading capabilities: {capabilitiesError.message}
+                  </p>
                 </div>
               )}
               {revokeCapabilityError && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-                  <p className="text-sm text-destructive">Revoke error: {revokeCapabilityError.message?.slice(0, 100)}</p>
+                  <p className="text-sm text-destructive">
+                    Revoke error: {revokeCapabilityError.message?.slice(0, 100)}
+                  </p>
                 </div>
               )}
               {capabilitiesLoading ? (
@@ -812,8 +825,8 @@ function UserDetailContent({ address: rawAddress }: { address: string }) {
                           )}
                           {event.type === "capability_granted" && (
                             <div>
-                              <Badge variant="outline">{event.capability}</Badge> capability
-                              granted by <code>{event.granter}</code>
+                              <Badge variant="outline">{event.capability}</Badge> capability granted
+                              by <code>{event.granter}</code>
                             </div>
                           )}
                           <div className="flex items-center gap-2 mt-1">

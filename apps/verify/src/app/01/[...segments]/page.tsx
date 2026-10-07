@@ -27,13 +27,14 @@ import { BuyWidget } from "@/components/buy-widget";
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
 interface PageProps {
-  params: { segments: string[] };
-  searchParams: { picc?: string; cmac?: string; meta?: string; linkType?: string };
+  params: Promise<{ segments: string[] }>;
+  searchParams: Promise<{ picc?: string; cmac?: string; meta?: string; linkType?: string }>;
 }
 
 export default async function Gs1ResolverPage({ params, searchParams }: PageProps) {
-  const link = parseGs1Path(params.segments);
-  const { picc, cmac, meta } = searchParams;
+  const { segments } = await params;
+  const link = parseGs1Path(segments);
+  const { picc, cmac, meta } = await searchParams;
 
   // Identity-only fallback: a static carrier (no SUN) can't prove presence.
   if (!picc || !cmac) {

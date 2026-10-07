@@ -114,9 +114,9 @@ function errorResponse(status: number, code: VerdictErrorCode, message: string):
 
 export async function GET(
   _request: Request,
-  { params }: { params: { tokenId: string } },
+  { params }: { params: Promise<{ tokenId: string }> },
 ): Promise<Response> {
-  const verdict = await buildVerdict(params.tokenId);
+  const verdict = await buildVerdict((await params).tokenId);
   if (!verdict.ok) return errorResponse(verdict.status, verdict.code, verdict.message);
   return jsonResponse(verdict.body, 200, VERDICT_CACHE_CONTROL);
 }

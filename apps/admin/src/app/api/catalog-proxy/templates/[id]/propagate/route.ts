@@ -23,7 +23,8 @@ import { templatesUpstream } from "@/lib/server/templates-upstream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return NextResponse.json(
       { ok: false, error: "id must be a template id (tpl_…)" },
