@@ -46,11 +46,14 @@ import { RateWidget } from "@/components/rate-widget";
 import { fetchRatings } from "@/lib/ratings";
 import { PriceBlock } from "@/components/price-block";
 import { ProvenanceTimeline } from "@/components/provenance-timeline";
-import { CHAIN_READ_TTL_SECONDS } from "@/lib/cache";
 import { AssetClientIsland } from "./asset-client";
 
-/** Shared 60s cache for the token-id read path. See src/lib/cache.ts. */
-export const revalidate = CHAIN_READ_TTL_SECONDS;
+/**
+ * Shared 60s cache for the token-id read path. Next 15 requires segment
+ * config to be a literal, so this mirrors CHAIN_READ_TTL_SECONDS in
+ * src/lib/cache.ts — keep the two in sync.
+ */
+export const revalidate = 60;
 
 /**
  * THIS EMPTY ARRAY IS LOAD-BEARING — DO NOT DELETE IT AS DEAD CODE.
@@ -73,7 +76,7 @@ export async function generateStaticParams(): Promise<{ tokenId: string }[]> {
 const EXPLORER = `https://sepolia.basescan.org/address/${CONTRACT_ADDRESS}`;
 
 interface PageProps {
-  params: { tokenId: string };
+  params: Promise<{ tokenId: string }>;
 }
 
 /**
@@ -96,7 +99,7 @@ function formatUtc(tsSeconds: number): string {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { tokenId } = params;
+  const { tokenId } = await params;
   const lookup = await resolveAsset(tokenId);
 
   if (lookup.kind === "invalid") {
@@ -154,7 +157,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function AssetVerifyPage({ params }: PageProps) {
-  const { tokenId } = params;
+  const { tokenId } = await params;
   const lookup = await resolveAsset(tokenId);
 
   if (lookup.kind === "invalid") {

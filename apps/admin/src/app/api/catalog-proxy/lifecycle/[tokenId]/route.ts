@@ -7,10 +7,13 @@ import { templatesUpstream } from "@/lib/server/templates-upstream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { tokenId: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ tokenId: string }> }) {
+  const params = await props.params;
   if (!/^\d+$/.test(params.tokenId)) {
     return NextResponse.json({ ok: false, error: "tokenId must be numeric" }, { status: 400 });
   }
-  const res = await templatesUpstream(`/api/v1/admin/lifecycle/${params.tokenId}`, { method: "GET" });
+  const res = await templatesUpstream(`/api/v1/admin/lifecycle/${params.tokenId}`, {
+    method: "GET",
+  });
   return NextResponse.json(res.body, { status: res.status });
 }

@@ -62,9 +62,9 @@ function jsonResponse(body: unknown, status: number, cacheControl: string): Resp
 
 export async function GET(
   _request: Request,
-  { params }: { params: { tokenId: string } },
+  { params }: { params: Promise<{ tokenId: string }> },
 ): Promise<Response> {
-  const tokenId = parseTokenId(params.tokenId);
+  const tokenId = parseTokenId((await params).tokenId);
   if (tokenId === null) {
     return jsonResponse(
       { error: { code: "INVALID_TOKEN_ID", message: "token id must be a uint256 decimal" } },
@@ -81,7 +81,10 @@ export async function GET(
     try {
       const lookup = await fetchAsset(tokenId.toString());
       if (lookup.kind !== "record" && lookup.kind !== "restricted") return null;
-      const wire = servicesProvenanceToWire(lookup.dto.provenance, (code) => STATES[code]?.label ?? "UNKNOWN");
+      const wire = servicesProvenanceToWire(
+        lookup.dto.provenance,
+        (code) => STATES[code]?.label ?? "UNKNOWN",
+      );
       return wire.available ? jsonResponse(wire, 200, TIMELINE_CACHE_CONTROL) : null;
     } catch {
       return null;

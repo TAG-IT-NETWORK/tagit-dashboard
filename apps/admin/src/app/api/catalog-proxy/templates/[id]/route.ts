@@ -16,7 +16,8 @@ import { pickTemplateBody, templatesUpstream } from "@/lib/server/templates-upst
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return NextResponse.json(
       { ok: false, error: "id must be a template id (tpl_…)" },
@@ -27,7 +28,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json(res.body, { status: res.status });
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return NextResponse.json(
       { ok: false, error: "id must be a template id (tpl_…)" },

@@ -23,7 +23,8 @@ export const dynamic = "force-dynamic";
 /** Mirror of the services catalogListQuerySchema bounds (admin-list.ts). */
 const MAX_LIMIT = 100;
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!TEMPLATE_ID_RE.test(params.id)) {
     return NextResponse.json(
       { ok: false, error: "id must be a template id (tpl_…)" },
@@ -39,7 +40,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       { status: 400 },
     );
   }
-  if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= MAX_LIMIT)) {
+  if (
+    limit !== null &&
+    !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= MAX_LIMIT)
+  ) {
     return NextResponse.json(
       { ok: false, error: `limit must be an integer 1–${MAX_LIMIT}` },
       { status: 400 },

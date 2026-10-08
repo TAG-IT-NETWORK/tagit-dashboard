@@ -18,13 +18,12 @@ import { TEMPLATE_ID_RE } from "@/lib/catalog/template-logic";
 
 export const dynamic = "force-dynamic";
 
-export default async function BatchBindPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { batch?: string };
+export default async function BatchBindPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ batch?: string }>;
 }) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const fromQuery = typeof searchParams.batch === "string" ? searchParams.batch : "";
   const batchId = BATCH_ID_RE.test(params.id)
     ? params.id

@@ -18,13 +18,20 @@ import { batchesUpstream } from "@/lib/server/batches-upstream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!BATCH_ID_RE.test(params.id)) {
-    return NextResponse.json({ ok: false, error: "id must be a batch id (bat_…)" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "id must be a batch id (bat_…)" },
+      { status: 400 },
+    );
   }
   if (!canPublishCatalog(await getActorRole())) {
     // Stricter than the other batch writes: unstick force-resets server state.
-    return NextResponse.json({ ok: false, error: "unstick requires the admin role" }, { status: 403 });
+    return NextResponse.json(
+      { ok: false, error: "unstick requires the admin role" },
+      { status: 403 },
+    );
   }
   const res = await batchesUpstream(`/api/v1/admin/batches/${params.id}/unstick`, {
     method: "POST",

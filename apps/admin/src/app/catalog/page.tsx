@@ -24,10 +24,11 @@ import { fetchTemplatesList } from "@/lib/server/templates-upstream";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams?: { archived?: string };
+  searchParams?: Promise<{ archived?: string }>;
 }
 
-export default async function CatalogPage({ searchParams }: PageProps) {
+export default async function CatalogPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const showArchived = searchParams?.archived === "1";
   const [{ templates, error }, role] = await Promise.all([fetchTemplatesList(), getActorRole()]);
 
@@ -83,7 +84,10 @@ export default async function CatalogPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Price</th>
                 <th className="px-4 py-3 font-medium">Version</th>
-                <th className="px-4 py-3 font-medium" title="catalog_items rendered from this template (services itemsCount)">
+                <th
+                  className="px-4 py-3 font-medium"
+                  title="catalog_items rendered from this template (services itemsCount)"
+                >
                   Items
                 </th>
               </tr>

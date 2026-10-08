@@ -19,16 +19,16 @@
     "@tanstack/query-core": "^5.90.16",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
-    "@types/react": "^18",
+    "@types/react": "^19",
     "@vitejs/plugin-react": "^5.1.2",
     "jsdom": "^27.4.0",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^19",
+    "react-dom": "^19",
     "typescript": "^5.7.2",
     "vitest": "^4.1.11"
   },
   "peerDependencies": {
-    "react": "^18",
+    "react": "^19",
     "viem": "^2.21.51",
     "wagmi": "^2.19.5"
   }

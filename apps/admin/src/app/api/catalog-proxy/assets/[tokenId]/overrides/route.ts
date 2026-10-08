@@ -30,7 +30,8 @@ export const dynamic = "force-dynamic";
 
 const SERVICES_URL = process.env.SERVICES_URL || "https://api.tagit.network";
 
-export async function PUT(req: Request, { params }: { params: { tokenId: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ tokenId: string }> }) {
+  const params = await props.params;
   const tokenId = params.tokenId;
   if (!/^\d+$/.test(tokenId)) {
     return NextResponse.json(

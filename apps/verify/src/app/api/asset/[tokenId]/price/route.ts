@@ -15,8 +15,8 @@ import { SERVICES_URL } from "@/lib/services";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { tokenId: string } }) {
-  const { tokenId } = params;
+export async function GET(_req: Request, { params }: { params: Promise<{ tokenId: string }> }) {
+  const { tokenId } = await params;
   if (!/^\d+$/.test(tokenId)) {
     return NextResponse.json({ error: "INVALID_TOKEN_ID" }, { status: 400 });
   }

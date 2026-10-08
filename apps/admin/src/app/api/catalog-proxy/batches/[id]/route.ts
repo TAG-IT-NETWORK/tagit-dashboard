@@ -17,9 +17,13 @@ import { batchesUpstream } from "@/lib/server/batches-upstream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!BATCH_ID_RE.test(params.id)) {
-    return NextResponse.json({ ok: false, error: "id must be a batch id (bat_…)" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "id must be a batch id (bat_…)" },
+      { status: 400 },
+    );
   }
   const res = await batchesUpstream(`/api/v1/admin/batches/${params.id}`);
   return NextResponse.json(res.body, { status: res.status });
