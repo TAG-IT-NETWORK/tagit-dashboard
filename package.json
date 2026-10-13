@@ -14,20 +14,51 @@
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "turbo": "^2.11.7",
+    "typescript": "^5.7.2",
+    "vite": "7.3.6"
   },
   "pnpm": {
     "overrides": {
       "wagmi": "^2.19.5",
       "viem": "^2.21.51",
       "@tanstack/react-query": "^5.90.12",
-      "utf-8-validate": "5.0.10"
+      "utf-8-validate": "5.0.10",
+      "postcss": "8.5.29",
+      "uuid@<11.1.1": "11.1.1",
+      "js-yaml@>=4.0.0 <4.3.2": "4.3.2",
+      "semver@>=7.0.0 <7.5.2": "7.7.2",
+      "rollup": "4.64.2",
+      "fb-watchman": "2.0.2",
+      "bser": "2.1.1",
+      "bn.js@>=4.0.0 <4.12.5": "4.12.5",
+      "cross-spawn@>=7.0.0 <7.0.6": "7.0.6",
+      "defu@>=6.0.0 <6.1.7": "6.1.7",
+      "ejs@>=3.0.0 <3.1.10": "3.1.10",
+      "fast-copy@>=3.0.0 <3.1.0": "3.1.0",
+      "fast-copy@>=4.0.0 <4.1.2": "4.1.2",
+      "h3@>=1.0.0 <1.15.11": "1.15.11",
+      "hono@>=4.0.0 <4.13.13": "4.13.13",
+      "js-yaml@>=3.0.0 <3.15.2": "3.15.2",
+      "lodash@>=4.0.0 <4.18.1": "4.18.1",
+      "postcss-selector-parser@>=6.0.0 <6.1.4": "6.1.4",
+      "socket.io-parser@>=4.0.0 <4.2.7": "4.2.7",
+      "ws@>=8.0.0 <8.22.0": "8.22.0",
+      "yaml@>=1.0.0 <1.10.3": "1.10.3",
+      "axios@>=0.0.0 <0.34.0": "0.34.0",
+      "tar@>=6.0.0 <7.0.0": "7.5.21",
+      "immutable@>=4.0.0 <4.3.9": "4.3.9",
+      "happy-dom": "20.14.5",
+      "protobufjs@<7.6.6": "7.6.6",
+      "parse-duration@<2.1.9": "2.1.9",
+      "caniuse-lite": "1.0.30001806",
+      "@peculiar/asn1-schema": "2.6.0",
+      "baseline-browser-mapping": "2.11.7"
     }
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.9"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
