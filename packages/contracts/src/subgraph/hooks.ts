@@ -49,10 +49,15 @@ const STATE_NAMES = [
   "Recycled",
 ];
 
-// Generic hook for subgraph queries with polling support
+type QueryVariables = Record<string, unknown> | undefined;
+
+// Generic hook for subgraph queries with polling support.
+// `variables` may be a function: it is then evaluated right before each fetch
+// (initial, poll, refetch) instead of at render time, which keeps time-window
+// queries ("since 24h ago") from re-keying the hook on every render.
 function useSubgraphQuery<TData, TResult>(
   query: string,
-  variables: Record<string, unknown> | undefined,
+  variables: QueryVariables | (() => QueryVariables),
   transform: (data: TData) => TResult,
   options?: {
     pollingInterval?: number;
@@ -79,14 +84,21 @@ function useSubgraphQuery<TData, TResult>(
   variablesRef.current = variables;
   const transformRef = useRef(transform);
   transformRef.current = transform;
-  const variablesKey = JSON.stringify(variables ?? null);
+  // Function variables are resolved per fetch, so they never re-key the hook.
+  const variablesKey =
+    typeof variables === "function"
+      ? "__dynamic__"
+      : JSON.stringify(variables ?? null);
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
 
     try {
       const client = getSubgraphClient();
-      const result = await client.query<TData>(query, variablesRef.current);
+      const current = variablesRef.current;
+      const resolvedVariables =
+        typeof current === "function" ? current() : current;
+      const result = await client.query<TData>(query, resolvedVariables);
       setData(transformRef.current(result));
       setError(null);
     } catch (err) {
@@ -264,14 +276,18 @@ export function useTopUsers(
   );
 }
 
+// Unix-seconds timestamp `windowSeconds` before now, as the subgraph expects.
+// Evaluated per fetch (see useSubgraphQuery) so the window stays fresh while
+// polling without changing the query key on every render.
+function sinceSeconds(windowSeconds: number): string {
+  return (Math.floor(Date.now() / 1000) - windowSeconds).toString();
+}
+
 // Hook for daily mints count (last 24 hours)
 export function useDailyMints(options?: { pollingInterval?: number }) {
-  // Calculate timestamp for 24 hours ago
-  const since = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
-
   return useSubgraphQuery<{ transfers: { id: string }[] }, number>(
     MINTS_TODAY_QUERY,
-    { since: since.toString() },
+    () => ({ since: sinceSeconds(24 * 60 * 60) }),
     (data) => data.transfers.length,
     options,
   );
@@ -279,12 +295,9 @@ export function useDailyMints(options?: { pollingInterval?: number }) {
 
 // Hook for active users in the last 7 days
 export function useActiveUsers(options?: { pollingInterval?: number }) {
-  // Calculate timestamp for 7 days ago
-  const since = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
-
   return useSubgraphQuery<{ users: { id: string }[] }, number>(
     ACTIVE_USERS_QUERY,
-    { since: since.toString() },
+    () => ({ since: sinceSeconds(7 * 24 * 60 * 60) }),
     (data) => data.users.length,
     options,
   );

@@ -15,7 +15,7 @@ export interface SubgraphClientConfig {
 }
 
 export class SubgraphClient {
-  private url: string;
+  readonly url: string;
 
   constructor(config?: SubgraphClientConfig) {
     this.url = config?.url || DEFAULT_SUBGRAPH_URL;
@@ -70,9 +70,13 @@ export function getSubgraphClient(
   return clientInstance;
 }
 
-/** True when a subgraph URL is configured (non-empty) */
+/**
+ * True when a subgraph URL is configured (non-empty): either through
+ * NEXT_PUBLIC_SUBGRAPH_URL / window.__SUBGRAPH_URL__, or by configuring the
+ * singleton explicitly via `getSubgraphClient({ url })`.
+ */
 export function hasSubgraphUrl(): boolean {
-  return DEFAULT_SUBGRAPH_URL !== "";
+  return DEFAULT_SUBGRAPH_URL !== "" || Boolean(clientInstance?.url);
 }
 
 // Check if subgraph is available/deployed

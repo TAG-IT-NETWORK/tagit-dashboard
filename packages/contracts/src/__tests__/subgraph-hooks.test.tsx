@@ -141,3 +141,87 @@ describe("useSubgraphQuery hooks with a configured URL", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
+
+describe("time-window hooks (useDailyMints / useActiveUsers)", () => {
+  const URL = "https://subgraph.example/tagit";
+  const DAY = 24 * 60 * 60;
+
+  function sentSince(callIndex: number): string {
+    const init = fetchMock.mock.calls[callIndex][1] as { body: string };
+    return (JSON.parse(init.body) as { variables: { since: string } }).variables
+      .since;
+  }
+
+  it("compute `since` per fetch, not per render: later re-renders do not re-fetch, and polls carry a fresh window", async () => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "Date",
+      ],
+    });
+    const t0 = new Date("2026-10-13T12:00:00Z");
+    vi.setSystemTime(t0);
+    fetchMock.mockResolvedValue(
+      okResponse({ transfers: [{ id: "a" }, { id: "b" }] }),
+    );
+    const { useDailyMints } = await loadSubgraph(URL);
+
+    const { result, rerender } = renderHook(() =>
+      useDailyMints({ pollingInterval: 30_000 }),
+    );
+    await flushPromises();
+    expect(result.current.data).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sentSince(0)).toBe(String(Math.floor(t0.getTime() / 1000) - DAY));
+
+    // Unrelated renders a few seconds later (e.g. another dashboard hook's
+    // poll completing) must not issue requests outside the polling interval.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    for (let i = 0; i < 5; i++) rerender();
+    await flushPromises();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // The scheduled poll fires exactly once, with a freshly computed window.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(27_500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sentSince(1)).toBe(
+      String(Math.floor((t0.getTime() + 30_000) / 1000) - DAY),
+    );
+  });
+});
+
+describe("useSubgraphQuery hooks with a client configured via getSubgraphClient({ url })", () => {
+  it("treat the singleton's explicit URL as configured when no env/window URL is set", async () => {
+    const URL = "https://configured.example/tagit";
+    fetchMock.mockResolvedValue(okResponse({ globalStats: null }));
+    const mod = await loadSubgraph(undefined);
+    expect(mod.hasSubgraphUrl()).toBe(false);
+
+    mod.getSubgraphClient({ url: URL });
+    expect(mod.hasSubgraphUrl()).toBe(true);
+
+    const { result } = renderHook(() => mod.useGlobalStats());
+    expect(result.current.isLoading).toBe(true);
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(URL);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.data).toEqual({
+      totalAssets: 0,
+      totalUsers: 0,
+      totalTransfers: 0,
+      dailyMints: 0,
+      dailyTransfers: 0,
+      flaggedCount: 0,
+    });
+  });
+});
