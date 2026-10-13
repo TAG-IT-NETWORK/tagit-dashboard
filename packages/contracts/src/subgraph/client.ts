@@ -6,7 +6,8 @@ const _env = (globalThis as unknown as EnvLike).process?.env;
 
 const DEFAULT_SUBGRAPH_URL =
   _env?.NEXT_PUBLIC_SUBGRAPH_URL ||
-  (typeof window !== "undefined" && (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
+  (typeof window !== "undefined" &&
+    (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
   "";
 
 export interface SubgraphClientConfig {
@@ -14,13 +15,24 @@ export interface SubgraphClientConfig {
 }
 
 export class SubgraphClient {
-  private url: string;
+  readonly url: string;
 
   constructor(config?: SubgraphClientConfig) {
     this.url = config?.url || DEFAULT_SUBGRAPH_URL;
   }
 
-  async query<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  async query<T>(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
+    if (!this.url) {
+      // Never fall through to fetch(""): browsers resolve an empty URL to the
+      // current page, so an unconfigured subgraph would POST to the page itself.
+      throw new Error(
+        "Subgraph URL is not configured (set NEXT_PUBLIC_SUBGRAPH_URL)",
+      );
+    }
+
     const response = await fetch(this.url, {
       method: "POST",
       headers: {
@@ -49,16 +61,22 @@ export class SubgraphClient {
 // Singleton instance
 let clientInstance: SubgraphClient | null = null;
 
-export function getSubgraphClient(config?: SubgraphClientConfig): SubgraphClient {
+export function getSubgraphClient(
+  config?: SubgraphClientConfig,
+): SubgraphClient {
   if (!clientInstance || config?.url) {
     clientInstance = new SubgraphClient(config);
   }
   return clientInstance;
 }
 
-/** True when a subgraph URL is configured (non-empty) */
+/**
+ * True when a subgraph URL is configured (non-empty): either through
+ * NEXT_PUBLIC_SUBGRAPH_URL / window.__SUBGRAPH_URL__, or by configuring the
+ * singleton explicitly via `getSubgraphClient({ url })`.
+ */
 export function hasSubgraphUrl(): boolean {
-  return DEFAULT_SUBGRAPH_URL !== "";
+  return DEFAULT_SUBGRAPH_URL !== "" || Boolean(clientInstance?.url);
 }
 
 // Check if subgraph is available/deployed
