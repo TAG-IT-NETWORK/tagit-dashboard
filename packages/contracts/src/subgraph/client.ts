@@ -6,7 +6,8 @@ const _env = (globalThis as unknown as EnvLike).process?.env;
 
 const DEFAULT_SUBGRAPH_URL =
   _env?.NEXT_PUBLIC_SUBGRAPH_URL ||
-  (typeof window !== "undefined" && (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
+  (typeof window !== "undefined" &&
+    (window as { __SUBGRAPH_URL__?: string }).__SUBGRAPH_URL__) ||
   "";
 
 export interface SubgraphClientConfig {
@@ -20,7 +21,18 @@ export class SubgraphClient {
     this.url = config?.url || DEFAULT_SUBGRAPH_URL;
   }
 
-  async query<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+  async query<T>(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
+    if (!this.url) {
+      // Never fall through to fetch(""): browsers resolve an empty URL to the
+      // current page, so an unconfigured subgraph would POST to the page itself.
+      throw new Error(
+        "Subgraph URL is not configured (set NEXT_PUBLIC_SUBGRAPH_URL)",
+      );
+    }
+
     const response = await fetch(this.url, {
       method: "POST",
       headers: {
@@ -49,7 +61,9 @@ export class SubgraphClient {
 // Singleton instance
 let clientInstance: SubgraphClient | null = null;
 
-export function getSubgraphClient(config?: SubgraphClientConfig): SubgraphClient {
+export function getSubgraphClient(
+  config?: SubgraphClientConfig,
+): SubgraphClient {
   if (!clientInstance || config?.url) {
     clientInstance = new SubgraphClient(config);
   }

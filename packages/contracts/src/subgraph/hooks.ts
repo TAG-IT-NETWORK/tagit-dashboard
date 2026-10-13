@@ -40,7 +40,14 @@ import type {
 } from "./types";
 
 // State name mapping
-const STATE_NAMES = ["Minted", "Bound", "Activated", "Claimed", "Flagged", "Recycled"];
+const STATE_NAMES = [
+  "Minted",
+  "Bound",
+  "Activated",
+  "Claimed",
+  "Flagged",
+  "Recycled",
+];
 
 // Generic hook for subgraph queries with polling support
 function useSubgraphQuery<TData, TResult>(
@@ -50,47 +57,70 @@ function useSubgraphQuery<TData, TResult>(
   options?: {
     pollingInterval?: number;
     enabled?: boolean;
-  }
+  },
 ) {
+  // Never query without a configured subgraph. `SubgraphClient` would call
+  // `fetch("")`, which the browser resolves to the *current page URL* — on the
+  // admin dashboard that turned every poll into a POST against /dashboard.
+  const enabled = (options?.enabled ?? true) && hasSubgraphUrl();
+  const pollingInterval = options?.pollingInterval;
+
   const [data, setData] = useState<TResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const enabled = options?.enabled ?? true;
-  const pollingInterval = options?.pollingInterval;
+  // Callers pass inline `variables` objects and `transform` closures whose
+  // identity changes on every render. Read them through refs and key the
+  // fetch on the serialized variables; otherwise the effect below re-arms on
+  // every render, and a failed fetch (new Error → setState → render) re-runs
+  // it immediately — an unbounded request loop.
+  const variablesRef = useRef(variables);
+  variablesRef.current = variables;
+  const transformRef = useRef(transform);
+  transformRef.current = transform;
+  const variablesKey = JSON.stringify(variables ?? null);
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
 
     try {
       const client = getSubgraphClient();
-      const result = await client.query<TData>(query, variables);
-      setData(transform(result));
+      const result = await client.query<TData>(query, variablesRef.current);
+      setData(transformRef.current(result));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("Unknown error"));
+      const next = err instanceof Error ? err : new Error("Unknown error");
+      // Keep the previous Error when the message is unchanged so a repeating
+      // failure doesn't force a re-render per poll.
+      setError((prev) => (prev && prev.message === next.message ? prev : next));
     } finally {
       setIsLoading(false);
     }
-  }, [query, variables, transform, enabled]);
+    // `variables` is consumed via variablesRef and keyed by variablesKey.
+  }, [query, variablesKey, enabled]);
 
   const refetch = useCallback(() => {
+    if (!enabled) return Promise.resolve();
     setIsLoading(true);
     return fetchData();
-  }, [fetchData]);
+  }, [fetchData, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
+
+    setIsLoading(true);
     fetchData();
 
     // Set up polling if interval is specified
-    if (pollingInterval && enabled) {
+    if (pollingInterval) {
       intervalRef.current = setInterval(fetchData, pollingInterval);
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [fetchData, pollingInterval, enabled]);
@@ -124,7 +154,7 @@ export function useGlobalStats(options?: { pollingInterval?: number }) {
         flaggedCount: stats.flaggedCount || 0,
       };
     },
-    options
+    options,
   );
 }
 
@@ -147,14 +177,14 @@ export function useStateDistribution(options?: { pollingInterval?: number }) {
         { name: "Recycled", value: stats.recycledCount, state: 5 },
       ];
     },
-    options
+    options,
   );
 }
 
 // Hook for recent activity feed
 export function useRecentActivity(
   limit: number = 10,
-  options?: { pollingInterval?: number; enabled?: boolean }
+  options?: { pollingInterval?: number; enabled?: boolean },
 ) {
   return useSubgraphQuery<RecentActivityResponse, ActivityItem[]>(
     RECENT_ACTIVITY_QUERY,
@@ -168,14 +198,14 @@ export function useRecentActivity(
         txHash: sc.txHash,
       }));
     },
-    options
+    options,
   );
 }
 
 // Hook for recent transfers (ownership changes)
 export function useRecentTransfers(
   limit: number = 10,
-  options?: { pollingInterval?: number; enabled?: boolean }
+  options?: { pollingInterval?: number; enabled?: boolean },
 ) {
   return useSubgraphQuery<RecentTransfersResponse, TransferItem[]>(
     RECENT_TRANSFERS_QUERY,
@@ -189,7 +219,7 @@ export function useRecentTransfers(
         txHash: t.txHash,
       }));
     },
-    options
+    options,
   );
 }
 
@@ -197,7 +227,7 @@ export function useRecentTransfers(
 export function useRecentFlags(
   limit: number = 10,
   unresolvedOnly: boolean = false,
-  options?: { pollingInterval?: number; enabled?: boolean }
+  options?: { pollingInterval?: number; enabled?: boolean },
 ) {
   return useSubgraphQuery<RecentFlagsResponse, FlagItem[]>(
     RECENT_FLAGS_QUERY,
@@ -212,14 +242,14 @@ export function useRecentFlags(
         resolved: flag.resolved,
       }));
     },
-    options
+    options,
   );
 }
 
 // Hook for top users by assets owned
 export function useTopUsers(
   limit: number = 10,
-  options?: { pollingInterval?: number }
+  options?: { pollingInterval?: number },
 ) {
   return useSubgraphQuery<TopUsersResponse, TopUser[]>(
     TOP_USERS_BY_ASSETS_QUERY,
@@ -230,7 +260,7 @@ export function useTopUsers(
         assetCount: user.totalAssetsOwned,
       }));
     },
-    options
+    options,
   );
 }
 
@@ -243,7 +273,7 @@ export function useDailyMints(options?: { pollingInterval?: number }) {
     MINTS_TODAY_QUERY,
     { since: since.toString() },
     (data) => data.transfers.length,
-    options
+    options,
   );
 }
 
@@ -256,7 +286,7 @@ export function useActiveUsers(options?: { pollingInterval?: number }) {
     ACTIVE_USERS_QUERY,
     { since: since.toString() },
     (data) => data.users.length,
-    options
+    options,
   );
 }
 
@@ -270,17 +300,35 @@ function mergeSubgraphEvents(
   const all: FeedEvent[] = [];
   if (activity) {
     for (const a of activity) {
-      all.push({ type: "state_change", tokenId: a.tokenId, timestamp: a.timestamp, txHash: a.txHash, data: a });
+      all.push({
+        type: "state_change",
+        tokenId: a.tokenId,
+        timestamp: a.timestamp,
+        txHash: a.txHash,
+        data: a,
+      });
     }
   }
   if (transfers) {
     for (const t of transfers) {
-      all.push({ type: "transfer", tokenId: t.tokenId, timestamp: t.timestamp, txHash: t.txHash, data: t });
+      all.push({
+        type: "transfer",
+        tokenId: t.tokenId,
+        timestamp: t.timestamp,
+        txHash: t.txHash,
+        data: t,
+      });
     }
   }
   if (flags) {
     for (const f of flags) {
-      all.push({ type: "flag", tokenId: f.tokenId, timestamp: f.timestamp, txHash: f.txHash, data: f });
+      all.push({
+        type: "flag",
+        tokenId: f.tokenId,
+        timestamp: f.timestamp,
+        txHash: f.txHash,
+        data: f,
+      });
     }
   }
   all.sort((a, b) => b.timestamp - a.timestamp);
@@ -317,7 +365,9 @@ export function useEventFeedWithFallback(
     enabled: subgraphEnabled,
   });
 
-  const subgraphLoading = subgraphEnabled && (activityHook.isLoading || transfersHook.isLoading || flagsHook.isLoading);
+  const subgraphLoading =
+    subgraphEnabled &&
+    (activityHook.isLoading || transfersHook.isLoading || flagsHook.isLoading);
   const subgraphHasData =
     (activityHook.data?.length ?? 0) > 0 ||
     (transfersHook.data?.length ?? 0) > 0 ||
@@ -346,7 +396,9 @@ export function useEventFeedWithFallback(
         }
       } catch (err) {
         if (!cancelled) {
-          setRpcError(err instanceof Error ? err : new Error("RPC fetch failed"));
+          setRpcError(
+            err instanceof Error ? err : new Error("RPC fetch failed"),
+          );
         }
       } finally {
         if (!cancelled) setRpcLoading(false);
@@ -371,7 +423,12 @@ export function useEventFeedWithFallback(
   } => {
     if (subgraphEnabled && subgraphHasData) {
       return {
-        events: mergeSubgraphEvents(activityHook.data, transfersHook.data, flagsHook.data, limit),
+        events: mergeSubgraphEvents(
+          activityHook.data,
+          transfersHook.data,
+          flagsHook.data,
+          limit,
+        ),
         isLoading: false,
         error: null,
         source: "subgraph",
@@ -379,7 +436,13 @@ export function useEventFeedWithFallback(
       };
     }
     if (subgraphEnabled && subgraphLoading) {
-      return { events: [], isLoading: true, error: null, source: "subgraph", effectiveChainId: chainId };
+      return {
+        events: [],
+        isLoading: true,
+        error: null,
+        source: "subgraph",
+        effectiveChainId: chainId,
+      };
     }
     if (rpcEnabled) {
       return {
@@ -391,12 +454,27 @@ export function useEventFeedWithFallback(
       };
     }
     // Subgraph configured but returned no data
-    return { events: [], isLoading: false, error: null, source: "mock", effectiveChainId: chainId };
+    return {
+      events: [],
+      isLoading: false,
+      error: null,
+      source: "mock",
+      effectiveChainId: chainId,
+    };
   }, [
-    subgraphEnabled, subgraphHasData, subgraphLoading,
-    activityHook.data, transfersHook.data, flagsHook.data,
-    rpcEnabled, rpcEvents, rpcLoading, rpcError,
-    effectiveChainId, chainId, limit,
+    subgraphEnabled,
+    subgraphHasData,
+    subgraphLoading,
+    activityHook.data,
+    transfersHook.data,
+    flagsHook.data,
+    rpcEnabled,
+    rpcEvents,
+    rpcLoading,
+    rpcError,
+    effectiveChainId,
+    chainId,
+    limit,
   ]);
 
   return result;
@@ -438,7 +516,9 @@ export function useAssetHistory(chainId: number, tokenId: bigint) {
       setStateChanges(sc);
       setTransfers(tx);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("Failed to fetch asset history"));
+      setError(
+        err instanceof Error ? err : new Error("Failed to fetch asset history"),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -466,7 +546,8 @@ export function useDashboardData(pollingInterval: number = 30000) {
     stateDistribution.isLoading ||
     recentActivity.isLoading;
 
-  const error = globalStats.error || stateDistribution.error || recentActivity.error;
+  const error =
+    globalStats.error || stateDistribution.error || recentActivity.error;
 
   const refetchAll = useCallback(() => {
     globalStats.refetch();
