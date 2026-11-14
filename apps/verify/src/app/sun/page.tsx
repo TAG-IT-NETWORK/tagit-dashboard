@@ -10,7 +10,7 @@
  */
 import { Suspense } from "react";
 import Link from "next/link";
-import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
+import { formatUid, isAuthenticState } from "@/lib/resolve";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
 import { heroMedia } from "@/lib/services";
 import { HeroImage } from "@/components/hero-image";
@@ -19,8 +19,10 @@ import { RateWidget } from "@/components/rate-widget";
 import type { RatingsView } from "@/lib/ratings";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
+import { Checking, TapStatusHero, type CheckProgress } from "@/components/checking";
 import { BuyWidget } from "@/components/buy-widget";
 import { startTapLookups, type TapLookups } from "@/lib/tap-lookups";
+import { startTapRun, type TapRun } from "@/lib/tap-run";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
@@ -61,27 +63,13 @@ function RatingsPlaceholder() {
 
 export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   const { picc, cmac } = await searchParams;
-  const timer = createTapTimer();
-  // The item record only needs the item number, so it is requested the moment
-  // the tag resolves — WHILE the asset/anchor chain reads run, not after them.
-  // Ratings follow the record (see @/lib/tap-lookups for why not side by side).
-  const started: { lookups?: TapLookups } = {};
-  const res = await resolveTap(
-    picc,
-    cmac,
-    (tokenId) => {
-      started.lookups = startTapLookups(tokenId.toString(), timer);
-    },
-    timer,
-  );
 
-  // Every branch below that is not the resolved one renders right away.
-  const earlyTiming = timer.header();
-  if (res.kind !== "resolved") logTap("/sun", res.kind, timer);
-
-  if (res.kind === "bad-params") {
+  // No tap in the address: there is nothing to check, so no checking frame.
+  if (!picc || !cmac) {
+    const timer = createTapTimer();
+    logTap("/sun", "bad-params", timer);
     return (
-      <Shell timing={earlyTiming}>
+      <Shell timing={timer.header()}>
         <StatusHero
           tone="warn"
           glyph="?"
@@ -95,14 +83,61 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
     );
   }
 
-  if (res.kind === "not-configured") {
+  // Start the check and return at once (TAP-T07): the frame below is sent
+  // straight away and the verdict streams into its place when the check is
+  // done. The item record only needs the item number, so it is requested the
+  // moment the tag resolves — WHILE the item-state reads run, not after them.
+  // Ratings follow the record (see @/lib/tap-lookups for why not side by side).
+  const run = startTapRun(picc, cmac, startTapLookups);
+  const again = `/sun?picc=${encodeURIComponent(picc)}&cmac=${encodeURIComponent(cmac)}`;
+
+  return (
+    <Suspense
+      fallback={<Checking tagRead={run.tagRead} secondTick={run.secondTick} retryHref={again} />}
+    >
+      <SunVerdict run={run} />
+    </Suspense>
+  );
+}
+
+/** The verdict for a checked tap. Waits for the run; the frame shows meanwhile. */
+async function SunVerdict({ run }: { run: TapRun<TapLookups> }) {
+  const { timer } = run;
+  const res = await run.resolution;
+
+  // Every branch below that is not the resolved one renders right away.
+  const earlyTiming = timer.header();
+  if (res.kind !== "resolved") logTap("/sun", res.kind, timer);
+  // How far the check got, for the frame that resolves into each verdict.
+  const reached = (done: number): CheckProgress => ({
+    done,
+    seen: Math.min(done, run.stepsSeen()),
+    tookMs: timer.spans().total ?? 0,
+  });
+
+  if (res.kind === "bad-params") {
+    // Unreachable (the page handles it before starting a run); narrows the type.
     return (
       <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
+          glyph="?"
+          title="Bad SUN URL"
+          sub="Missing picc or cmac parameters."
+        />
+      </Shell>
+    );
+  }
+
+  if (res.kind === "not-configured") {
+    return (
+      <Shell timing={earlyTiming}>
+        <TapStatusHero
+          tone="warn"
           glyph="⚙"
           title="Verifier Not Configured"
           sub="SDM_MASTER_KEY env var is not set on this deployment."
+          progress={reached(0)}
         />
         <p className="text-center text-xs text-gray-500 mt-2">
           Set a 16-byte hex key in Vercel and redeploy.
@@ -114,11 +149,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "counterfeit") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero
+        <TapStatusHero
           tone="bad"
           glyph="✗"
           title="Counterfeit"
           sub="This tap failed cryptographic verification."
+          progress={reached(0)}
         />
         <div
           className="rounded-2xl border border-red-500/30 p-5 mb-5 animate-fadeUp"
@@ -138,11 +174,12 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "authentic-unbound") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero
+        <TapStatusHero
           tone="warn"
           glyph="✓"
           title="Chip Authentic"
           sub="Cryptographically verified, but not yet bound on-chain."
+          progress={reached(1)}
         />
         <DataCard
           rows={[
@@ -157,7 +194,13 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   if (res.kind === "lookup-failed") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero tone="warn" glyph="!" title="Lookup Failed" sub={res.reason} />
+        <TapStatusHero
+          tone="warn"
+          glyph="!"
+          title="Lookup Failed"
+          sub={res.reason}
+          progress={reached(1)}
+        />
       </Shell>
     );
   }
@@ -166,7 +209,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   // Product identity from the tagit-services assets API (META-T17 — the old
   // hardcoded metadata map is gone). The lookups were started when the tag
   // resolved; the fallback only runs if that callback somehow did not fire.
-  const { product, ratings } = started.lookups ?? startTapLookups(res.tokenId.toString(), timer);
+  const { product, ratings } = run.item() ?? startTapLookups(res.tokenId.toString(), timer);
   // `ratings` is NOT awaited: it streams in below and never holds the verdict back.
   const lookup = await product;
   logTap("/sun", "resolved", timer);
@@ -181,7 +224,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   return (
     <Shell timing={timer.header()}>
-      <StatusHero
+      <TapStatusHero
         tone={authentic ? "ok" : "warn"}
         glyph={authentic ? "✓" : "⚠"}
         title={
@@ -198,6 +241,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
             ? "Verified on-chain via NTAG 424 DNA SUN"
             : (STATE_DESCRIPTIONS[res.asset.state] ?? "")
         }
+        progress={reached(3)}
       />
 
       <div className="flex justify-center mb-8 animate-fadeUp" style={{ animationDelay: "0.25s" }}>

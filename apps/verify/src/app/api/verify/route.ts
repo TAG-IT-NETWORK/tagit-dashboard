@@ -20,12 +20,14 @@
  * the only query parameters this route reads.
  *
  * Every response carries a `Server-Timing` header with the tap's step
- * durations (see @/lib/tap-timing).
+ * durations, and every tap writes one log line with the same numbers (see
+ * @/lib/tap-timing) — this is the route the TAG IT app calls, so its taps are
+ * measured the same way the web page's are.
  */
 import { resolveTap, isAuthenticState } from "@/lib/resolve";
 import { loadProduct, CHAIN_ID, CHAIN_NAME, type ProductMetadata } from "@/lib/dpp";
 import { STATES } from "@/lib/states";
-import { createTapTimer } from "@/lib/tap-timing";
+import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -51,14 +53,13 @@ export async function GET(req: Request) {
   // The item record only needs the token id, so it is requested the moment the
   // tag resolves — while the asset/anchor chain reads run, not after them.
   let productLookup: Promise<ProductMetadata> | null = null;
-  const res = await resolveTap(
-    picc,
-    cmac,
-    (tokenId) => {
+  const res = await resolveTap(picc, cmac, {
+    onTokenId: (tokenId) => {
       productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
     },
     timer,
-  );
+  });
+  if (res.kind !== "resolved") logTap("/api/verify", res.kind, timer);
   const chain = { id: CHAIN_ID, name: CHAIN_NAME };
   const reply = (body: unknown, status = 200) => json(body, status, timer.header());
 
@@ -89,6 +90,7 @@ export async function GET(req: Request) {
     case "resolved": {
       const product = await (productLookup ??
         timer.time("product", () => loadProduct(res.tokenId.toString())));
+      logTap("/api/verify", "resolved", timer);
       return reply({
         verified: isAuthenticState(res.asset.state),
         bound: true,

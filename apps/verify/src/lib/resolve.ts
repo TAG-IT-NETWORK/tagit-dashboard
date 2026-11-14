@@ -47,23 +47,36 @@ export function getMasterKey(): Buffer | null {
 }
 
 /**
+ * What a caller may watch while a tap resolves. Observers only: none of them
+ * can change the result.
+ */
+export interface TapObservers {
+  /**
+   * Fires once the tag's code has been decoded and has passed its check — the
+   * tag is genuine. It fires synchronously, before `resolveTap` first yields,
+   * so a caller knows it by the time the call returns its promise.
+   */
+  onTagRead?: () => void;
+  /**
+   * Fires as soon as the tag resolves to an item — before the item-state and
+   * record-hash reads — so a caller can start its own lookup (the item record
+   * from tagit-services) alongside those reads instead of after them.
+   */
+  onTokenId?: (tokenId: bigint) => void;
+  /** Records how long each step took — see @/lib/tap-timing. */
+  timer?: TapTimer;
+}
+
+/**
  * Verify a SUN tap and resolve its on-chain digital twin. Pure data (no JSX) so
  * every surface (HTML page, JSON-LD VC endpoint) renders from one source.
- */
-/**
- * `onTokenId` fires as soon as the tag resolves to a token — before the asset
- * and anchor reads — so callers can start their own lookups (product DTO from
- * tagit-services) in parallel instead of after the chain round-trips.
- *
- * `timer` (optional) records how long each step took — see @/lib/tap-timing.
- * It only observes: passing one changes nothing about the result.
  */
 export async function resolveTap(
   picc?: string,
   cmac?: string,
-  onTokenId?: (tokenId: bigint) => void,
-  timer?: TapTimer,
+  observers: TapObservers = {},
 ): Promise<TapResolution> {
+  const { onTagRead, onTokenId, timer } = observers;
   if (!picc || !cmac) return { kind: "bad-params" };
 
   const masterKey = getMasterKey();
@@ -76,6 +89,7 @@ export async function resolveTap(
     ? timer.timeSync("sdm", () => verifySunUrl(picc, cmac, masterKey))
     : verifySunUrl(picc, cmac, masterKey);
   if (!result.valid) return { kind: "counterfeit", reason: result.reason };
+  onTagRead?.();
 
   const { uid, counter } = result;
   const tagHash = uidToTagHash(uid);

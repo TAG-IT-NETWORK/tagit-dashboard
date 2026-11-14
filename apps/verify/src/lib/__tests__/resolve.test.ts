@@ -94,7 +94,7 @@ describe("resolveTap — what it asks the chain, and when (TAP-T06)", () => {
     });
     const { picc, cmac } = mintTap();
 
-    const pending = resolveTap(picc, cmac, () => order.push("item known"));
+    const pending = resolveTap(picc, cmac, { onTokenId: () => order.push("item known") });
     await settle();
 
     // First wait: only the tag lookup is out.
@@ -144,7 +144,7 @@ describe("resolveTap — what it asks the chain, and when (TAP-T06)", () => {
     const onTokenId = vi.fn();
     const { picc, cmac } = mintTap();
 
-    expect(await resolveTap(picc, cmac, onTokenId)).toEqual({
+    expect(await resolveTap(picc, cmac, { onTokenId })).toEqual({
       kind: "authentic-unbound",
       uid: UID,
       counter: COUNTER,
@@ -172,11 +172,26 @@ describe("resolveTap — what it asks the chain, and when (TAP-T06)", () => {
     expect(res).toMatchObject({ kind: "resolved", tokenId: TOKEN_ID, metadataHash: null });
   });
 
+  it("says the tag was read before it first waits for the chain, and only for a tag that passes", async () => {
+    chain.getTokenByTag.mockReturnValue(new Promise(() => {})); // the chain never answers
+    const { picc, cmac } = mintTap();
+
+    const onTagRead = vi.fn();
+    void resolveTap(picc, cmac, { onTagRead });
+    // No await yet: the signal must already have fired.
+    expect(onTagRead).toHaveBeenCalledTimes(1);
+
+    const tampered = cmac.slice(0, -1) + (cmac.endsWith("0") ? "1" : "0");
+    const onTamperedRead = vi.fn();
+    await resolveTap(picc, tampered, { onTagRead: onTamperedRead });
+    expect(onTamperedRead).not.toHaveBeenCalled();
+  });
+
   it("a timer records the three steps and changes nothing about the result", async () => {
     const { picc, cmac } = mintTap();
     const timer = createTapTimer();
 
-    const timedResult = await resolveTap(picc, cmac, undefined, timer);
+    const timedResult = await resolveTap(picc, cmac, { timer });
     const plainResult = await resolveTap(picc, cmac);
 
     expect(timedResult).toEqual(plainResult);
