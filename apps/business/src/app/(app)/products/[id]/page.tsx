@@ -14,7 +14,6 @@ import {
   getExplorerAddressUrl,
   getContractsForChain,
 } from "@tagit/contracts";
-import { useBindViaRelayer } from "@/lib/bind";
 import {
   Button,
   Card,
@@ -31,37 +30,32 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 const ZERO_TAG = `0x${"0".repeat(64)}` as const;
 
-function BindTagPanel({ tokenId, onDone }: { tokenId: bigint; onDone: () => void }) {
-  const { bind, isPending, result, error } = useBindViaRelayer();
-  const [tagUid, setTagUid] = useState("");
+/** Where products that carry a tag are created. This app never binds: it holds no service credentials. */
+const CONSOLE_CATALOG_URL = "https://admin.tagit.network/catalog";
 
-  useEffect(() => {
-    if (result?.ok) onDone();
-  }, [result, onDone]);
-
+/**
+ * A MINTED product has no tag. Attaching one takes an NFC reader and a tap of the
+ * real chip, so it happens at the binding station in the TAG IT console, behind
+ * a signed-in session — and the station works on products created in the
+ * console's catalog. A product added from this app is not in that catalog, so
+ * the notice says so instead of pointing at a station that cannot list it.
+ * This app holds no service credentials and must not grow a bind route of its
+ * own (TAP-T01).
+ */
+function AttachTagNotice() {
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label htmlFor="tag-uid">NFC tag UID</Label>
-        <Input
-          id="tag-uid"
-          placeholder="04:A3:2F:..."
-          value={tagUid}
-          onChange={(e) => setTagUid(e.target.value)}
-          disabled={isPending}
-        />
-        <p className="text-xs text-muted-foreground">
-          The UID is hashed before it goes on-chain; only the hash is stored.
-        </p>
-      </div>
-      <p className="rounded-lg border border-dashed bg-secondary/40 px-3 py-2 text-[11px] text-muted-foreground">
-        Binding is performed by the oracle relayer service — it signs the attestation with the
-        trusted-oracle key and submits the transaction, so your wallet signs nothing. The NFC
-        challenge-response is still a placeholder pending physical reader integration.
+      <p className="text-sm text-muted-foreground">
+        Tags are attached at the binding station in the TAG IT console, with an NFC reader and a tap
+        of the real chip. The station works on products created in the console, so a product added
+        from this page cannot be tagged.
       </p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button onClick={() => bind(tokenId, tagUid.trim())} disabled={isPending || !tagUid.trim()}>
-        {isPending ? "Binding..." : "Bind tag"}
+      <p className="text-sm text-muted-foreground">To tag a product, create it in the console.</p>
+      <Button asChild variant="outline">
+        <a href={CONSOLE_CATALOG_URL} target="_blank" rel="noopener noreferrer">
+          Open the TAG IT console
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       </Button>
     </div>
   );
@@ -218,7 +212,7 @@ export default function ProductDetailPage() {
             {!isOwner ? (
               <p className="text-sm text-muted-foreground py-4">No actions available.</p>
             ) : asset.state === AssetState.MINTED ? (
-              <BindTagPanel tokenId={tokenId} onDone={refetch} />
+              <AttachTagNotice />
             ) : asset.state === AssetState.BOUND ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
