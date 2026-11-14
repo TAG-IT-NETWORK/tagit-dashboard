@@ -37,6 +37,9 @@ jobs:
       - name: Run Admin tests
         run: pnpm --filter @tagit/admin test
 
+      - name: Run Verify tests
+        run: pnpm --filter @tagit/verify test
+
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
