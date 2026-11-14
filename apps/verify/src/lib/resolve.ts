@@ -13,6 +13,7 @@
 import { verifySunUrl } from "./sdm";
 import { uidToTagHash } from "./contract";
 import { getAsset, getMetadataHash, getTokenByTag } from "./contract.server";
+import type { TapSpan, TapTimer } from "./tap-timing";
 
 export interface AssetState {
   owner: string;
@@ -53,18 +54,27 @@ export function getMasterKey(): Buffer | null {
  * `onTokenId` fires as soon as the tag resolves to a token — before the asset
  * and anchor reads — so callers can start their own lookups (product DTO from
  * tagit-services) in parallel instead of after the chain round-trips.
+ *
+ * `timer` (optional) records how long each step took — see @/lib/tap-timing.
+ * It only observes: passing one changes nothing about the result.
  */
 export async function resolveTap(
   picc?: string,
   cmac?: string,
   onTokenId?: (tokenId: bigint) => void,
+  timer?: TapTimer,
 ): Promise<TapResolution> {
   if (!picc || !cmac) return { kind: "bad-params" };
 
   const masterKey = getMasterKey();
   if (!masterKey) return { kind: "not-configured" };
 
-  const result = verifySunUrl(picc, cmac, masterKey);
+  const timed = <T>(span: TapSpan, step: () => Promise<T>): Promise<T> =>
+    timer ? timer.time(span, step) : step();
+
+  const result = timer
+    ? timer.timeSync("sdm", () => verifySunUrl(picc, cmac, masterKey))
+    : verifySunUrl(picc, cmac, masterKey);
   if (!result.valid) return { kind: "counterfeit", reason: result.reason };
 
   const { uid, counter } = result;
@@ -72,7 +82,7 @@ export async function resolveTap(
 
   let tokenId: bigint;
   try {
-    tokenId = (await getTokenByTag(tagHash)) as bigint;
+    tokenId = (await timed("tag", () => getTokenByTag(tagHash))) as bigint;
   } catch {
     return { kind: "lookup-failed", uid, counter, reason: "Could not query chain." };
   }
@@ -81,13 +91,16 @@ export async function resolveTap(
   onTokenId?.(tokenId);
 
   // Asset + anchor are independent reads — one round-trip instead of two.
-  const [assetRead, hashRead] = await Promise.allSettled([getAsset(tokenId), getMetadataHash(tokenId)]);
+  const [assetRead, hashRead] = await timed("chain", () =>
+    Promise.allSettled([getAsset(tokenId), getMetadataHash(tokenId)]),
+  );
   if (assetRead.status === "rejected") {
     return { kind: "lookup-failed", uid, counter, reason: "Asset read failed." };
   }
   const asset: AssetState = assetRead.value;
   // Non-fatal: the contract may predate the metadataHash getter. Anchor stays null.
-  const metadataHash: `0x${string}` | null = hashRead.status === "fulfilled" ? hashRead.value : null;
+  const metadataHash: `0x${string}` | null =
+    hashRead.status === "fulfilled" ? hashRead.value : null;
 
   return { kind: "resolved", uid, counter, tokenId, asset, metadataHash };
 }

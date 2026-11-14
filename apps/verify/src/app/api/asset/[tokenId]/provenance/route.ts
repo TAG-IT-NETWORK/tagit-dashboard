@@ -40,7 +40,7 @@ import { CHAIN_READ_TTL_SECONDS, neverCacheControl } from "@/lib/cache";
 import { getPublicClient } from "@/lib/contract.server";
 import { getLifecycleHistory } from "@/lib/lifecycle";
 import { servicesProvenanceToWire, toProvenanceWire } from "@/lib/provenance-wire";
-import { fetchAsset } from "@/lib/services";
+import { fetchAssetProvenance } from "@/lib/services";
 import { STATES } from "@/lib/states";
 import { parseTokenId } from "@/lib/verdict";
 
@@ -74,17 +74,16 @@ export async function GET(
   }
 
   // Fallback when this host cannot scan the chain (every reachable RPC caps
-  // eth_getLogs far below TAGITCore's history span): the per-token provenance
-  // list tagit-services keeps from its relayer receipts + reconciler reads.
+  // eth_getLogs far below TAGITCore's history span): the per-token history
+  // tagit-services serves from its own route (TAP-T06 — it used to ride along
+  // on the item record, which is why reading that record was slow).
   // Stamped `scan.source = "tagit-services"` so the timeline names the source.
+  // A restricted item has no history there, so it stays "unavailable" here.
   const fallback = async (): Promise<Response | null> => {
     try {
-      const lookup = await fetchAsset(tokenId.toString());
-      if (lookup.kind !== "record" && lookup.kind !== "restricted") return null;
-      const wire = servicesProvenanceToWire(
-        lookup.dto.provenance,
-        (code) => STATES[code]?.label ?? "UNKNOWN",
-      );
+      const entries = await fetchAssetProvenance(tokenId.toString());
+      if (!entries) return null;
+      const wire = servicesProvenanceToWire(entries, (code) => STATES[code]?.label ?? "UNKNOWN");
       return wire.available ? jsonResponse(wire, 200, TIMELINE_CACHE_CONTROL) : null;
     } catch {
       return null;

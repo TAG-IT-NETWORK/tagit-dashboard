@@ -245,7 +245,7 @@ export function addressCommitment(tokenId: bigint, address: string): `0x${string
 export async function untrustedEnvelope(tokenId: bigint): Promise<Record<string, unknown>> {
   let product: Awaited<ReturnType<typeof loadProduct>> = {};
   try {
-    product = await loadProduct(tokenId.toString(), null);
+    product = await loadProduct(tokenId.toString());
   } catch {
     product = {};
   }
@@ -280,7 +280,9 @@ export async function untrustedEnvelope(tokenId: bigint): Promise<Record<string,
  * A chainRef whose values cannot reproduce the verdict would be worse than no
  * chainRef at all, because it would look like a proof.
  */
-async function readAt(tokenId: bigint): Promise<
+async function readAt(
+  tokenId: bigint,
+): Promise<
   { ok: true; pinned: PinnedBlock; asset: Awaited<ReturnType<typeof getAsset>> } | { ok: false }
 > {
   try {

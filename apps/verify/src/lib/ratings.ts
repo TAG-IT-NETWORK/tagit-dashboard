@@ -5,15 +5,24 @@ import { parseRatingsView, type RatingsView } from "./ratings-shared";
 
 export type { PublicRating, RatingSummary, RatingsView } from "./ratings-shared";
 
+/**
+ * Ratings are a nice-to-have beside a verdict, never a reason to wait: past
+ * this, the block simply does not render.
+ */
+export const RATINGS_TIMEOUT_MS = 2_500;
+
 /** Server-side fetch with the same 60 s tag as the asset DTO. */
 export async function fetchRatings(tokenId: string): Promise<RatingsView | null> {
   if (!/^\d+$/.test(tokenId)) return null;
   try {
-    const res = await fetch(`${SERVICES_URL}/api/v1/assets/${tokenId}/ratings`, { headers: { accept: "application/json" }, next: { tags: [tokenTag(tokenId)], revalidate: 60 } });
+    const res = await fetch(`${SERVICES_URL}/api/v1/assets/${tokenId}/ratings`, {
+      headers: { accept: "application/json" },
+      next: { tags: [tokenTag(tokenId)], revalidate: 60 },
+      signal: AbortSignal.timeout(RATINGS_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     return parseRatingsView(await res.json(), tokenId);
   } catch {
     return null;
   }
 }
-

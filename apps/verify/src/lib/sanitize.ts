@@ -200,8 +200,8 @@ const ALLOWED_URL_SCHEMES = new Set(["https:", "http:", "ipfs:"]);
 /**
  * Same cleaning as text, plus a scheme allowlist. This validates the URL STRING
  * only — we never dereference it here, and neither should a caller without its
- * own SSRF guard (see safeMetaSource in @/lib/dpp for the version used when
- * this server does fetch).
+ * own SSRF guard. (This server no longer fetches caller-supplied metadata
+ * addresses at all: product copy resolves only from the token id.)
  */
 export function sanitizeUntrustedUrl(value: unknown, maxLength = MAX_URL): string | null {
   const text = sanitizeUntrustedText(value, maxLength);
