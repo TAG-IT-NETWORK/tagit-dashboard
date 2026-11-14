@@ -42,7 +42,11 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` moved to Ubuntu 26.04, and the Playwright version
+    # this repo installs (1.58) has no browser build for it, so the install step
+    # failed on every pull request. Go back to `ubuntu-latest` once Playwright
+    # is upgraded to a release that supports 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
