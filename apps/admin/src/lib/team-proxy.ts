@@ -14,6 +14,11 @@ import { hasRole, parseRole } from "@/lib/rbac";
  * but this re-checks the session itself — a matcher regression must not
  * expose team CRUD. Every forwarded request carries X-Actor (REQ-S-16), so
  * the services audit log names the signed-in human.
+ *
+ * Brand sessions (TAP-T02): a brand admin manages only its own business's
+ * roster. A body that names any other business — including none at all, which
+ * would make a platform user — is refused here, before services is called.
+ * Services enforces the same rule; this is the second lock.
  */
 
 const DEFAULT_SERVICES_URL = "https://api.tagit.network";
@@ -35,6 +40,11 @@ export async function proxyTeamRequest({ method, path, body }: TeamProxyRequest)
     return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
   }
 
+  const tenant = await getTenant();
+  if (tenant !== null && namesAnotherBusiness(body, tenant)) {
+    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const apiKey = process.env.SERVICES_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -50,7 +60,7 @@ export async function proxyTeamRequest({ method, path, body }: TeamProxyRequest)
       headers: {
         authorization: `Bearer ${apiKey}`,
         "x-actor": email.toLowerCase(),
-        ...tenantHeader(await getTenant()),
+        ...tenantHeader(tenant),
         ...(body !== undefined ? { "content-type": "application/json" } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -66,6 +76,15 @@ export async function proxyTeamRequest({ method, path, body }: TeamProxyRequest)
       { status: 502 },
     );
   }
+}
+
+/**
+ * True when a roster body carries a `businessId` other than the caller's own.
+ * Leaving the field out is fine (services fills in the caller's business).
+ */
+function namesAnotherBusiness(body: unknown, tenant: string): boolean {
+  if (typeof body !== "object" || body === null || !("businessId" in body)) return false;
+  return (body as { businessId: unknown }).businessId !== tenant;
 }
 
 /** Canonical upstream path for one roster row (email URL-encoded). */
