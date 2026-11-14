@@ -1,6 +1,6 @@
 /**
  * TAG IT Digital Product Passport (DPP) — data model + W3C Verifiable
- * Credential serializer. Server-only (reads on-chain data + IPFS).
+ * Credential serializer. Server-only (reads on-chain data + the item record).
  *
  * Layers (see DPP-001 spec in tagit-hardware):
  *   - Identity   : GS1 Digital Link (GTIN + serial) + the on-chain tokenId/UID.
@@ -30,56 +30,6 @@ export const CHAIN_NAME = "Base Sepolia";
 export const ISSUER_DID = "did:web:id.tagit.network";
 export const RESOLVER_BASE = "https://id.tagit.network";
 
-const IPFS_GATEWAY = "https://w3s.link/ipfs/";
-
-/** HTTPS hosts we trust to dereference a metadata source server-side. */
-const ALLOWED_META_HOSTS = new Set([
-  "media.tagit.network", // TAG IT media CDN (CloudFront in front of S3)
-  "w3s.link",
-  "ipfs.io",
-  "cloudflare-ipfs.com",
-  "gateway.pinata.cloud",
-  "nftstorage.link",
-]);
-
-/**
- * Convert an ipfs:// or https:// media URI for DISPLAY (rendered as an <img> the
- * browser fetches — not dereferenced by our server). Trusted-input only.
- */
-export function ipfsToHttp(uri?: string | null): string | undefined {
-  if (!uri) return undefined;
-  if (uri.startsWith("ipfs://")) return IPFS_GATEWAY + uri.slice("ipfs://".length);
-  return uri;
-}
-
-/**
- * SSRF guard: resolve a metadata SOURCE we will fetch() on the server into a
- * safe absolute URL, or undefined. The `?meta=` query param is attacker-
- * controlled, so we only honor ipfs:// (via our fixed gateway) or https:// on a
- * small gateway allowlist, and reject IP-literal / non-https hosts outright.
- * This blocks pivots to cloud metadata endpoints (169.254.169.254), localhost,
- * and internal services.
- */
-export function safeMetaSource(metaSource?: string | null): string | undefined {
-  if (!metaSource) return undefined;
-  if (metaSource.startsWith("ipfs://")) {
-    const path = metaSource.slice("ipfs://".length);
-    if (!/^[A-Za-z0-9./_-]+$/.test(path)) return undefined;
-    return IPFS_GATEWAY + path;
-  }
-  let u: URL;
-  try {
-    u = new URL(metaSource);
-  } catch {
-    return undefined;
-  }
-  if (u.protocol !== "https:") return undefined;
-  if (!ALLOWED_META_HOSTS.has(u.hostname)) return undefined;
-  // Defense-in-depth: reject IPv4/IPv6 literals even if somehow allowlisted.
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname) || u.hostname.includes(":")) return undefined;
-  return u.toString();
-}
-
 export interface ProductMetadata {
   name?: string;
   brand?: string;
@@ -92,79 +42,34 @@ export interface ProductMetadata {
   msrp?: string;
 }
 
-/** Off-chain metadata JSON shape (as pinned to IPFS). */
-interface RemoteMetadata extends ProductMetadata {}
-
-/**
- * Fetch + normalize off-chain product metadata from an ipfs:// or https:// URL.
- * IPFS content is immutable by CID, so it's safe to cache aggressively.
- */
-export async function fetchProductMetadata(metaSource?: string | null): Promise<ProductMetadata> {
-  const url = safeMetaSource(metaSource);
-  if (!url) return {};
-  try {
-    const res = await fetch(url, { cache: "force-cache" });
-    if (!res.ok) return {};
-    const m = (await res.json()) as RemoteMetadata;
-    return {
-      name: m.name,
-      brand: m.brand,
-      description: m.description,
-      image: ipfsToHttp(m.image),
-      images: m.images?.map((u) => ipfsToHttp(u)).filter((u): u is string => !!u),
-      sku: m.sku,
-      origin: m.origin,
-      size: m.size,
-      msrp: m.msrp,
-    };
-  } catch {
-    return {};
-  }
-}
-
 /**
  * Resolve a token's product fields from the tagit-services assets API
- * (META-T17 cutover — the old hardcoded ASSET_METADATA map is gone). One
+ * (META-T17 cutover — the old hardcoded ASSET_METADATA map is gone). ONE
  * source of truth for the HTML pages, the tap routes and the JSON-LD/VC
- * endpoints. A `?meta=` IPFS override (tap routes only) is still overlaid on
- * top for chips personalized with an explicit metadata pointer.
+ * endpoints: product copy resolves only from the token id, on every route.
+ * Nothing a caller puts in the URL can change the name, brand or image shown
+ * beside a verdict — the same rule /asset/[tokenId] and /api/asset already
+ * follow (see untrustedEnvelope in @/lib/verdict).
  *
  * Restricted items resolve to an EMPTY product: the services API redacts the
  * DTO, and this function must not resurrect product copy from anywhere else.
  * A services outage also resolves to empty — a metadata outage must never
  * block a verdict.
  */
-export async function loadProduct(
-  tokenId: string,
-  metaParam?: string | null,
-): Promise<ProductMetadata> {
+export async function loadProduct(tokenId: string): Promise<ProductMetadata> {
   const lookup = await fetchAsset(tokenId);
-  const base: ProductMetadata = {};
+  const product: ProductMetadata = {};
   if (lookup.kind === "record") {
     const { dto } = lookup;
-    base.name = dto.product?.name ?? dto.name;
-    base.brand = dto.product?.brand;
-    base.description = dto.description;
-    base.image = heroMedia(dto)?.url;
-    base.images = dto.media?.map((m) => m.url);
-    base.sku = dto.product?.sku;
-    base.origin = dto.product?.origin;
+    product.name = dto.product?.name ?? dto.name;
+    product.brand = dto.product?.brand;
+    product.description = dto.description;
+    product.image = heroMedia(dto)?.url;
+    product.images = dto.media?.map((m) => m.url);
+    product.sku = dto.product?.sku;
+    product.origin = dto.product?.origin;
   }
-
-  if (!metaParam) return base;
-
-  const remote = await fetchProductMetadata(metaParam);
-  return {
-    name: remote.name || base.name,
-    brand: remote.brand || base.brand,
-    description: remote.description || base.description,
-    image: remote.image || base.image,
-    images: remote.images ?? base.images,
-    sku: remote.sku || base.sku,
-    origin: remote.origin || base.origin,
-    size: remote.size,
-    msrp: remote.msrp,
-  };
+  return product;
 }
 
 export interface DppIdentifiers {

@@ -18,23 +18,24 @@
 import Link from "next/link";
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
-import { buildDpp, loadProduct } from "@/lib/dpp";
+import { buildDpp, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
+import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
 interface PageProps {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ picc?: string; cmac?: string; meta?: string; linkType?: string }>;
+  searchParams: Promise<{ picc?: string; cmac?: string; linkType?: string }>;
 }
 
 export default async function Gs1ResolverPage({ params, searchParams }: PageProps) {
   const { segments } = await params;
   const link = parseGs1Path(segments);
-  const { picc, cmac, meta } = await searchParams;
+  const { picc, cmac } = await searchParams;
 
   // Identity-only fallback: a static carrier (no SUN) can't prove presence.
   if (!picc || !cmac) {
@@ -59,11 +60,25 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
     );
   }
 
-  const res = await resolveTap(picc, cmac);
+  const timer = createTapTimer();
+  // The item record only needs the token id, so it is requested the moment the
+  // tag resolves — while the asset/anchor chain reads run, not after them.
+  let productLookup: Promise<ProductMetadata> | null = null;
+  const res = await resolveTap(
+    picc,
+    cmac,
+    (tokenId) => {
+      productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
+    },
+    timer,
+  );
+  // Every branch below that is not the resolved one renders right away.
+  const earlyTiming = timer.header();
+  if (res.kind !== "resolved") logTap("/01", res.kind, timer);
 
   if (res.kind === "not-configured") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="⚙"
@@ -76,7 +91,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   if (res.kind === "counterfeit") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="bad"
           glyph="✗"
@@ -96,7 +111,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   if (res.kind === "authentic-unbound") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="✓"
@@ -117,7 +132,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   if (res.kind === "lookup-failed") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero tone="warn" glyph="!" title="Lookup Failed" sub={res.reason} />
       </Shell>
     );
@@ -127,7 +142,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   // narrows the union to `resolved` for the renderer below.
   if (res.kind !== "resolved") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="?"
@@ -139,7 +154,11 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   }
 
   // ── Resolved — assemble + render the Digital Product Passport ──────────────
-  const product = await loadProduct(res.tokenId.toString(), meta);
+  // Product copy comes only from the item's own record (see loadProduct).
+  const product = await (productLookup ??
+    timer.time("product", () => loadProduct(res.tokenId.toString())));
+  logTap("/01", "resolved", timer);
+  const tapTiming = timer.header();
 
   const dpp = buildDpp({
     gtin: link.gtin,
@@ -185,7 +204,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   ];
 
   return (
-    <Shell>
+    <Shell timing={tapTiming}>
       <StatusHero
         tone={authentic ? "ok" : "warn"}
         glyph={authentic ? "✓" : dpp.lifecycle.stateCode === 5 ? "⚑" : "⚠"}

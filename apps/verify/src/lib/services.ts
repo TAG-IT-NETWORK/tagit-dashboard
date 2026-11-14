@@ -84,7 +84,10 @@ export interface AssetPrice {
   };
 }
 
-/** One lifecycle event as tagit-services records it (relayer receipts + reconciler chain reads). */
+/**
+ * One history event as tagit-services returns it from
+ * GET /api/v1/assets/:tokenId/provenance (see fetchAssetProvenance below).
+ */
 export interface AssetProvenanceEntry {
   type: string;
   label?: string;
@@ -94,6 +97,10 @@ export interface AssetProvenanceEntry {
   data?: Record<string, unknown>;
 }
 
+/**
+ * The item record this host reads — the LEAN view (see assetUrl). It carries
+ * no history: history has its own route and its own fetch.
+ */
 export interface AssetDto {
   tokenId: string;
   owner?: string; // truncated by the API (shortAddr)
@@ -112,7 +119,6 @@ export interface AssetDto {
   media?: AssetMediaEntry[];
   price?: AssetPrice;
   verification?: AssetVerificationBlock;
-  provenance?: AssetProvenanceEntry[];
 }
 
 export type AssetLookup =
@@ -139,23 +145,47 @@ export type AssetLookup =
 export const DISPLAY_CURRENCY = "EUR";
 
 /**
- * Server-side fetch of one asset DTO. Tagged + 60s ISR so a cache hit costs
- * nothing and the revalidate webhook can invalidate it precisely.
+ * How long this host waits for tagit-services before giving up on product
+ * copy. A tap must never hang on it: the lookup resolves to "unavailable" and
+ * the page still renders its verdict. Generous, because a cold services
+ * function can take a few seconds to start.
+ */
+export const ASSET_TIMEOUT_MS = 8_000;
+
+/**
+ * URL of the item record this host reads.
  *
- * `?currency=` asks the services API to include the price.fx approximation
+ * `view=lean` (TAP-T06) is the point: the full view builds the item's history
+ * by paging through the block explorer — about 5 s when it is not cached —
+ * and nothing rendered from this record shows history. Every page on this
+ * host, the tap pages first of all, reads the lean view. History is fetched
+ * separately (fetchAssetProvenance) by the one route that shows it.
+ *
+ * `currency=` asks the services API to include the price.fx approximation
  * block in the requested display currency (fx also appears without the param
  * when the listing carries an msrp currency).
+ */
+export function assetUrl(tokenId: string): string {
+  return `${SERVICES_URL}/api/v1/assets/${tokenId}?currency=${DISPLAY_CURRENCY}&view=lean`;
+}
+
+/** URL of the item's history on tagit-services. */
+export function assetProvenanceUrl(tokenId: string): string {
+  return `${SERVICES_URL}/api/v1/assets/${tokenId}/provenance`;
+}
+
+/**
+ * Server-side fetch of one asset DTO (lean view). Tagged + 60s ISR so a cache
+ * hit costs nothing and the revalidate webhook can invalidate it precisely.
  */
 export async function fetchAsset(tokenId: string): Promise<AssetLookup> {
   if (!/^\d+$/.test(tokenId)) return { kind: "none" };
   try {
-    const res = await fetch(
-      `${SERVICES_URL}/api/v1/assets/${tokenId}?currency=${DISPLAY_CURRENCY}`,
-      {
-        headers: { accept: "application/json" },
-        next: { tags: [tokenTag(tokenId)], revalidate: 60 },
-      },
-    );
+    const res = await fetch(assetUrl(tokenId), {
+      headers: { accept: "application/json" },
+      next: { tags: [tokenTag(tokenId)], revalidate: 60 },
+      signal: AbortSignal.timeout(ASSET_TIMEOUT_MS),
+    });
     if (res.status === 404) return { kind: "none" };
     if (!res.ok) return { kind: "unavailable" };
     const dto = (await res.json()) as AssetDto;
@@ -163,6 +193,42 @@ export async function fetchAsset(tokenId: string): Promise<AssetLookup> {
     return { kind: "record", dto };
   } catch {
     return { kind: "unavailable" };
+  }
+}
+
+/**
+ * How long this host waits for an item's history. The route behind it scans
+ * the block explorer (about 5 s when nothing is cached), so the limit is
+ * generous — but a hung call must still end, as "no history to show".
+ */
+export const PROVENANCE_TIMEOUT_MS = 15_000;
+
+/**
+ * Server-side fetch of one item's history from tagit-services, for the
+ * provenance timeline's fallback. Slow on a cache miss (the explorer scan
+ * lives behind this route now), so nothing on a tap path may call it.
+ *
+ * Returns null when there is nothing to show: services unreachable or too
+ * slow, the item unknown, or the item restricted (the protected envelope
+ * carries no history).
+ */
+export async function fetchAssetProvenance(
+  tokenId: string,
+): Promise<AssetProvenanceEntry[] | null> {
+  if (!/^\d+$/.test(tokenId)) return null;
+  try {
+    const res = await fetch(assetProvenanceUrl(tokenId), {
+      headers: { accept: "application/json" },
+      next: { tags: [tokenTag(tokenId)], revalidate: 60 },
+      signal: AbortSignal.timeout(PROVENANCE_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { provenance?: unknown } | null;
+    return body && Array.isArray(body.provenance)
+      ? (body.provenance as AssetProvenanceEntry[])
+      : null;
+  } catch {
+    return null;
   }
 }
 

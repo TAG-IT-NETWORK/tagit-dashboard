@@ -11,8 +11,9 @@
  */
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap } from "@/lib/resolve";
-import { buildDpp, dppToVerifiableCredential, loadProduct } from "@/lib/dpp";
+import { buildDpp, dppToVerifiableCredential, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { neverCacheControl } from "@/lib/cache";
+import { createTapTimer } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -53,36 +54,57 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
   const url = new URL(req.url);
   const picc = url.searchParams.get("picc") ?? undefined;
   const cmac = url.searchParams.get("cmac") ?? undefined;
-  const meta = url.searchParams.get("meta");
 
   const segs = (await params).segments ?? [];
   const link = segs[0] === "token" ? null : parseGs1Path(segs);
 
-  const res = await resolveTap(picc, cmac);
+  const timer = createTapTimer();
+  // The item record only needs the token id, so it is requested the moment the
+  // tag resolves — while the asset/anchor chain reads run, not after them.
+  // Product fields in the passport come only from that record.
+  let productLookup: Promise<ProductMetadata> | null = null;
+  const res = await resolveTap(
+    picc,
+    cmac,
+    (tokenId) => {
+      productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
+    },
+    timer,
+  );
+  const timing = (): Record<string, string> => {
+    const value = timer.header();
+    return value ? { "server-timing": value } : {};
+  };
 
   switch (res.kind) {
     case "bad-params":
-      return json({ verified: false, error: "missing picc or cmac query params" }, 400);
+      return json({ verified: false, error: "missing picc or cmac query params" }, 400, timing());
     case "not-configured":
       return json(
         { verified: false, error: "verifier not configured (SDM_MASTER_KEY unset)" },
         503,
+        timing(),
       );
     case "counterfeit":
-      return json({ verified: false, reason: res.reason });
+      return json({ verified: false, reason: res.reason }, 200, timing());
     case "authentic-unbound":
-      return json({
-        verified: true,
-        bound: false,
-        uid: res.uid,
-        tapCounter: res.counter,
-        gtin: link?.gtin ?? null,
-        serial: link?.serial ?? null,
-      });
+      return json(
+        {
+          verified: true,
+          bound: false,
+          uid: res.uid,
+          tapCounter: res.counter,
+          gtin: link?.gtin ?? null,
+          serial: link?.serial ?? null,
+        },
+        200,
+        timing(),
+      );
     case "lookup-failed":
-      return json({ verified: true, error: res.reason }, 502);
+      return json({ verified: true, error: res.reason }, 502, timing());
     case "resolved": {
-      const product = await loadProduct(res.tokenId.toString(), meta);
+      const product = await (productLookup ??
+        timer.time("product", () => loadProduct(res.tokenId.toString())));
       const dpp = buildDpp({
         gtin: link?.gtin ?? null,
         gtinValid: link?.gtinValid ?? false,
@@ -97,7 +119,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
       });
       return new Response(JSON.stringify(dppToVerifiableCredential(dpp), null, 2), {
         status: 200,
-        headers: JSON_LD_HEADERS,
+        headers: { ...JSON_LD_HEADERS, ...timing() },
       });
     }
   }

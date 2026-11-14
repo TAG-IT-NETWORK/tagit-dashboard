@@ -4,11 +4,17 @@
  */
 import React from "react";
 
-export function Shell({ children }: { children: React.ReactNode }) {
+/**
+ * `timing` (tap pages only): the tap's server-side step durations as a
+ * Server-Timing string, exposed as `data-tap-timing` because a server
+ * component cannot set a response header. See @/lib/tap-timing.
+ */
+export function Shell({ children, timing }: { children: React.ReactNode; timing?: string }) {
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{ background: "#000" }}
+      data-tap-timing={timing || undefined}
     >
       <div className="w-full max-w-[420px] py-[52px] px-5">{children}</div>
     </main>

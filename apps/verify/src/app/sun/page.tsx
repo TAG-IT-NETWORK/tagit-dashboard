@@ -8,17 +8,20 @@
  * GS1 Digital Link resolver at /01/...). This page just renders the result. New
  * chips should be personalized with the GS1 carrier; see DPP-001.
  */
+import { Suspense } from "react";
 import Link from "next/link";
 import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
-import { fetchAsset, heroMedia, type AssetLookup } from "@/lib/services";
+import { heroMedia } from "@/lib/services";
 import { HeroImage } from "@/components/hero-image";
 import { RatingSummary } from "@/components/rating-summary";
 import { RateWidget } from "@/components/rate-widget";
-import { fetchRatings } from "@/lib/ratings";
+import type { RatingsView } from "@/lib/ratings";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
 import { BuyWidget } from "@/components/buy-widget";
+import { startTapLookups, type TapLookups } from "@/lib/tap-lookups";
+import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
@@ -30,19 +33,55 @@ function truncateAddress(a: string): string {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
+/**
+ * Owner ratings, streamed. The fetch starts the moment the tag resolves, and
+ * the block renders when it lands — the verdict and the product above it are
+ * never held back for it.
+ */
+async function RatingsBlock({
+  ratings,
+  productName,
+}: {
+  ratings: Promise<RatingsView | null>;
+  productName: string;
+}) {
+  return <RatingSummary view={await ratings} productName={productName} />;
+}
+
+/** Holds the ratings card's place so the page does not jump when it arrives. */
+function RatingsPlaceholder() {
+  return (
+    <div
+      aria-hidden="true"
+      className="rounded-2xl border border-white/10 mb-5 h-[76px]"
+      style={{ background: "rgba(255,255,255,0.03)" }}
+    />
+  );
+}
+
 export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   const { picc, cmac } = await searchParams;
-  // The product DTO (tagit-services) only needs the token id, so it is fetched
-  // WHILE the asset/anchor chain reads run — not after them. On a cold
-  // services function that overlap is worth several seconds on a phone tap.
-  let productLookup: Promise<AssetLookup> | null = null;
-  const res = await resolveTap(picc, cmac, (tokenId) => {
-    productLookup = fetchAsset(tokenId.toString());
-  });
+  const timer = createTapTimer();
+  // The item record only needs the item number, so it is requested the moment
+  // the tag resolves — WHILE the asset/anchor chain reads run, not after them.
+  // Ratings follow the record (see @/lib/tap-lookups for why not side by side).
+  const started: { lookups?: TapLookups } = {};
+  const res = await resolveTap(
+    picc,
+    cmac,
+    (tokenId) => {
+      started.lookups = startTapLookups(tokenId.toString(), timer);
+    },
+    timer,
+  );
+
+  // Every branch below that is not the resolved one renders right away.
+  const earlyTiming = timer.header();
+  if (res.kind !== "resolved") logTap("/sun", res.kind, timer);
 
   if (res.kind === "bad-params") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="?"
@@ -58,7 +97,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   if (res.kind === "not-configured") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="⚙"
@@ -74,7 +113,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   if (res.kind === "counterfeit") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="bad"
           glyph="✗"
@@ -98,7 +137,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   if (res.kind === "authentic-unbound") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero
           tone="warn"
           glyph="✓"
@@ -117,7 +156,7 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   if (res.kind === "lookup-failed") {
     return (
-      <Shell>
+      <Shell timing={earlyTiming}>
         <StatusHero tone="warn" glyph="!" title="Lookup Failed" sub={res.reason} />
       </Shell>
     );
@@ -125,20 +164,23 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
 
   // ── Resolved ───────────────────────────────────────────────────────────────
   // Product identity from the tagit-services assets API (META-T17 — the old
-  // hardcoded metadata map is gone).
-  const lookup = await (productLookup ?? fetchAsset(res.tokenId.toString()));
+  // hardcoded metadata map is gone). The lookups were started when the tag
+  // resolved; the fallback only runs if that callback somehow did not fire.
+  const { product, ratings } = started.lookups ?? startTapLookups(res.tokenId.toString(), timer);
+  // `ratings` is NOT awaited: it streams in below and never holds the verdict back.
+  const lookup = await product;
+  logTap("/sun", "resolved", timer);
   // Restricted items resolve to an EMPTY product — the verdict never resurrects
   // copy the services API chose to redact (same rule as loadProduct in @/lib/dpp).
   const dto = lookup.kind === "record" ? lookup.dto : null;
   const hero = dto ? heroMedia(dto) : undefined;
-  const ratings = await fetchRatings(res.tokenId.toString());
   const state = STATES[res.asset.state] ?? STATES[0];
   const authentic = isAuthenticState(res.asset.state);
   const displayName = dto?.product?.name || dto?.name || `Token #${res.tokenId}`;
   const brand = dto?.product?.brand;
 
   return (
-    <Shell>
+    <Shell timing={timer.header()}>
       <StatusHero
         tone={authentic ? "ok" : "warn"}
         glyph={authentic ? "✓" : "⚠"}
@@ -177,7 +219,9 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
         ]}
       />
 
-      <RatingSummary view={ratings} productName={displayName} />
+      <Suspense fallback={<RatingsPlaceholder />}>
+        <RatingsBlock ratings={ratings} productName={displayName} />
+      </Suspense>
 
       <RateWidget tokenId={res.tokenId.toString()} productName={displayName} />
 
