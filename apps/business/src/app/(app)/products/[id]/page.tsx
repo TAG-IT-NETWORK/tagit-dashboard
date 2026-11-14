@@ -30,25 +30,30 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 const ZERO_TAG = `0x${"0".repeat(64)}` as const;
 
-/** Where tags are attached. This app never binds: it holds no service credentials. */
-const BINDING_STATION_URL = "https://admin.tagit.network/station";
+/** Where products that carry a tag are created. This app never binds: it holds no service credentials. */
+const CONSOLE_CATALOG_URL = "https://admin.tagit.network/catalog";
 
 /**
- * A MINTED product needs its tag attached. That takes an NFC reader and a tap of
- * the real chip, so it happens at the binding station in the TAG IT console,
- * behind a signed-in session. This app holds no service credentials and must
- * not grow a bind route of its own (TAP-T01).
+ * A MINTED product has no tag. Attaching one takes an NFC reader and a tap of the
+ * real chip, so it happens at the binding station in the TAG IT console, behind
+ * a signed-in session — and the station works on products created in the
+ * console's catalog. A product added from this app is not in that catalog, so
+ * the notice says so instead of pointing at a station that cannot list it.
+ * This app holds no service credentials and must not grow a bind route of its
+ * own (TAP-T01).
  */
 function AttachTagNotice() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Attaching a tag needs an NFC reader and a tap of the real chip, so it is done at the binding
-        station in the TAG IT console.
+        Tags are attached at the binding station in the TAG IT console, with an NFC reader and a tap
+        of the real chip. The station works on products created in the console, so a product added
+        from this page cannot be tagged.
       </p>
+      <p className="text-sm text-muted-foreground">To tag a product, create it in the console.</p>
       <Button asChild variant="outline">
-        <a href={BINDING_STATION_URL} target="_blank" rel="noopener noreferrer">
-          Open the binding station
+        <a href={CONSOLE_CATALOG_URL} target="_blank" rel="noopener noreferrer">
+          Open the TAG IT console
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </Button>

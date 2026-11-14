@@ -50,8 +50,8 @@ function MintDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
         <DialogHeader>
           <DialogTitle>Add product</DialogTitle>
           <DialogDescription>
-            Mints an on-chain digital twin for a physical product. You can bind an NFC tag after
-            minting.
+            Creates an on-chain record for a product from your wallet. A product that will carry a
+            TAG IT tag is created in the TAG IT console instead, where tags are attached.
           </DialogDescription>
         </DialogHeader>
 
