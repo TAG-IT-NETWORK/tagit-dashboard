@@ -15,15 +15,18 @@
  *
  * Server component — the SDM master key + RPC stay on the Vercel Node runtime.
  */
+import { Suspense } from "react";
 import Link from "next/link";
-import { parseGs1Path } from "@/lib/gs1";
-import { resolveTap, formatUid, isAuthenticState } from "@/lib/resolve";
+import { parseGs1Path, type Gs1Link } from "@/lib/gs1";
+import { formatUid, isAuthenticState } from "@/lib/resolve";
 import { buildDpp, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
 import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
 import { Shell, StatusHero, DataCard } from "@/components/passport";
+import { Checking, TapStatusHero, type CheckProgress } from "@/components/checking";
 import { BuyWidget } from "@/components/buy-widget";
-import { createTapTimer, logTap } from "@/lib/tap-timing";
+import { startTapRun, type TapRun } from "@/lib/tap-run";
+import { logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
@@ -60,30 +63,57 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
     );
   }
 
-  const timer = createTapTimer();
-  // The item record only needs the token id, so it is requested the moment the
-  // tag resolves — while the asset/anchor chain reads run, not after them.
-  let productLookup: Promise<ProductMetadata> | null = null;
-  const res = await resolveTap(
-    picc,
-    cmac,
-    (tokenId) => {
-      productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
-    },
-    timer,
+  // Start the check and return at once (TAP-T07): the frame below is sent
+  // straight away and the passport streams into its place when the check is
+  // done. The item record only needs the token id, so it is requested the
+  // moment the tag resolves — while the item-state reads run, not after them.
+  const run = startTapRun(picc, cmac, (tokenId, timer) =>
+    timer.time("product", () => loadProduct(tokenId)),
   );
+  const again = `/01/${segments.map(encodeURIComponent).join("/")}?${new URLSearchParams({ picc, cmac })}`;
+
+  return (
+    <Suspense
+      fallback={<Checking tagRead={run.tagRead} secondTick={run.secondTick} retryHref={again} />}
+    >
+      <Gs1Verdict run={run} link={link} picc={picc} cmac={cmac} />
+    </Suspense>
+  );
+}
+
+/** The passport for a checked tap. Waits for the run; the frame shows meanwhile. */
+async function Gs1Verdict({
+  run,
+  link,
+  picc,
+  cmac,
+}: {
+  run: TapRun<Promise<ProductMetadata>>;
+  link: Gs1Link;
+  picc: string;
+  cmac: string;
+}) {
+  const { timer } = run;
+  const res = await run.resolution;
   // Every branch below that is not the resolved one renders right away.
   const earlyTiming = timer.header();
   if (res.kind !== "resolved") logTap("/01", res.kind, timer);
+  // How far the check got, for the frame that resolves into each verdict.
+  const reached = (done: number): CheckProgress => ({
+    done,
+    seen: Math.min(done, run.stepsSeen()),
+    tookMs: timer.spans().total ?? 0,
+  });
 
   if (res.kind === "not-configured") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero
+        <TapStatusHero
           tone="warn"
           glyph="⚙"
           title="Verifier Not Configured"
           sub="SDM_MASTER_KEY env var is not set on this deployment."
+          progress={reached(0)}
         />
       </Shell>
     );
@@ -92,11 +122,12 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   if (res.kind === "counterfeit") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero
+        <TapStatusHero
           tone="bad"
           glyph="✗"
           title="Counterfeit"
           sub="This tap failed cryptographic verification."
+          progress={reached(0)}
         />
         <div
           className="rounded-2xl border border-red-500/30 p-5 mb-5 animate-fadeUp"
@@ -112,11 +143,12 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   if (res.kind === "authentic-unbound") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero
+        <TapStatusHero
           tone="warn"
           glyph="✓"
           title="Chip Authentic"
           sub="Cryptographically verified, but not yet bound on-chain."
+          progress={reached(1)}
         />
         <DataCard
           rows={[
@@ -133,7 +165,13 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   if (res.kind === "lookup-failed") {
     return (
       <Shell timing={earlyTiming}>
-        <StatusHero tone="warn" glyph="!" title="Lookup Failed" sub={res.reason} />
+        <TapStatusHero
+          tone="warn"
+          glyph="!"
+          title="Lookup Failed"
+          sub={res.reason}
+          progress={reached(1)}
+        />
       </Shell>
     );
   }
@@ -155,7 +193,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   // ── Resolved — assemble + render the Digital Product Passport ──────────────
   // Product copy comes only from the item's own record (see loadProduct).
-  const product = await (productLookup ??
+  const product = await (run.item() ??
     timer.time("product", () => loadProduct(res.tokenId.toString())));
   logTap("/01", "resolved", timer);
   const tapTiming = timer.header();
@@ -205,7 +243,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
 
   return (
     <Shell timing={tapTiming}>
-      <StatusHero
+      <TapStatusHero
         tone={authentic ? "ok" : "warn"}
         glyph={authentic ? "✓" : dpp.lifecycle.stateCode === 5 ? "⚑" : "⚠"}
         title={
@@ -222,6 +260,7 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
             ? "Verified on-chain via NTAG 424 DNA SUN"
             : (STATE_DESCRIPTIONS[dpp.lifecycle.stateCode] ?? "")
         }
+        progress={reached(3)}
       />
 
       <div className="flex justify-center mb-8 animate-fadeUp" style={{ animationDelay: "0.25s" }}>

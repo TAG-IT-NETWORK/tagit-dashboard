@@ -13,7 +13,7 @@ import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap } from "@/lib/resolve";
 import { buildDpp, dppToVerifiableCredential, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { neverCacheControl } from "@/lib/cache";
-import { createTapTimer } from "@/lib/tap-timing";
+import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -63,14 +63,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
   // tag resolves — while the asset/anchor chain reads run, not after them.
   // Product fields in the passport come only from that record.
   let productLookup: Promise<ProductMetadata> | null = null;
-  const res = await resolveTap(
-    picc,
-    cmac,
-    (tokenId) => {
+  const res = await resolveTap(picc, cmac, {
+    onTokenId: (tokenId) => {
       productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
     },
     timer,
-  );
+  });
+  if (res.kind !== "resolved") logTap("/api/dpp", res.kind, timer);
   const timing = (): Record<string, string> => {
     const value = timer.header();
     return value ? { "server-timing": value } : {};
@@ -105,6 +104,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
     case "resolved": {
       const product = await (productLookup ??
         timer.time("product", () => loadProduct(res.tokenId.toString())));
+      logTap("/api/dpp", "resolved", timer);
       const dpp = buildDpp({
         gtin: link?.gtin ?? null,
         gtinValid: link?.gtinValid ?? false,
