@@ -188,6 +188,65 @@ describe("computePublishState", () => {
   });
 });
 
+describe("workingCopySnapshot product facts (TAP-T09)", () => {
+  const FACTS = { size: "50 ml", ingredients: "Aqua, Glycerin", useWithinMonths: 12 };
+  const SNAPSHOT_KEYS = [
+    "name",
+    "brand",
+    "model",
+    "sku",
+    "category",
+    "origin",
+    "description",
+    "attributes",
+    "priceUsdc6",
+    "msrpAmount",
+    "msrpCurrency",
+    "slug",
+  ];
+
+  it("keeps the twelve-key shape for a template without facts", () => {
+    // Absent (an API older than facts), null (unset) and undefined all mean none.
+    for (const t of [
+      makeTemplate(),
+      makeTemplate({ facts: null }),
+      makeTemplate({ facts: undefined }),
+    ]) {
+      expect(Object.keys(workingCopySnapshot(t))).toEqual(SNAPSHOT_KEYS);
+    }
+  });
+
+  it("does not report unpublished changes against a snapshot published before facts existed", () => {
+    const published = makeTemplate({ status: "published", version: 1 });
+    const oldSnapshot = versionOf(published, 1);
+    expect(oldSnapshot.snapshot).not.toHaveProperty("facts");
+    // The same template read from an API that now returns facts: null.
+    const reread = makeTemplate({ status: "published", version: 1, facts: null });
+    expect(computePublishState(reread, [oldSnapshot]).workingDirty).toBe(false);
+  });
+
+  it("carries the facts when there are some, the way services snapshots them", () => {
+    const snapshot = workingCopySnapshot(makeTemplate({ facts: FACTS }));
+    expect(snapshot.facts).toEqual(FACTS);
+    expect(Object.keys(snapshot)).toEqual([...SNAPSHOT_KEYS, "facts"]);
+  });
+
+  it("reports unpublished changes when the facts were added, edited or cleared", () => {
+    const withFacts = makeTemplate({ status: "published", version: 1, facts: FACTS });
+    const published = [versionOf(withFacts, 1)];
+    expect(computePublishState(withFacts, published).workingDirty).toBe(false);
+
+    const edited = makeTemplate({ ...withFacts, facts: { ...FACTS, size: "30 ml" } });
+    expect(computePublishState(edited, published).workingDirty).toBe(true);
+    const cleared = makeTemplate({ ...withFacts, facts: null });
+    expect(computePublishState(cleared, published).workingDirty).toBe(true);
+
+    const plain = makeTemplate({ status: "published", version: 1, facts: null });
+    const added = makeTemplate({ ...plain, facts: FACTS });
+    expect(computePublishState(added, [versionOf(plain, 1)]).workingDirty).toBe(true);
+  });
+});
+
 describe("parseTokenIdInput", () => {
   it("parses ids separated by commas, whitespace and semicolons", () => {
     expect(parseTokenIdInput("1, 2\n3;4\t5").ids).toEqual(["1", "2", "3", "4", "5"]);
@@ -311,9 +370,9 @@ describe("template media attributes", () => {
         { trait_type: "media:hero", value: "https://h.example/1.webp" },
       ]),
     ).toBe("https://h.example/1.webp");
-    expect(templateThumbUrl([{ trait_type: "media:gallery", value: "https://g.example/1.webp" }])).toBe(
-      "https://g.example/1.webp",
-    );
+    expect(
+      templateThumbUrl([{ trait_type: "media:gallery", value: "https://g.example/1.webp" }]),
+    ).toBe("https://g.example/1.webp");
     expect(templateThumbUrl([{ trait_type: "Volume", value: "100ml" }])).toBeNull();
     expect(templateThumbUrl(null)).toBeNull();
   });

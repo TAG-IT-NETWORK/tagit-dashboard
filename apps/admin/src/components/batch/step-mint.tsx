@@ -22,6 +22,7 @@ import {
   canUnstickBatch,
   isBatchInFlight,
 } from "@/lib/catalog/batch-logic";
+import { describeBatchFacts } from "@/lib/catalog/product-facts";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import type {
   BatchDto,
@@ -119,6 +120,7 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
     }
   };
 
+  const batchFactsLine = describeBatchFacts(batch.facts);
   const minted = progress?.minted ?? 0;
   const expected = progress?.expected ?? batch.size;
   const pct = expected > 0 ? Math.round((minted / expected) * 100) : 0;
@@ -128,7 +130,9 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
       {/* Execute controls */}
       {canExecuteBatch(batch.state) && (
         <div className="space-y-2 max-w-lg">
-          <Label htmlFor="mint-to">Mint recipient (treasury/admin address holding the batch pre-bind)</Label>
+          <Label htmlFor="mint-to">
+            Mint recipient (treasury/admin address holding the batch pre-bind)
+          </Label>
           <div className="flex gap-2">
             <Input
               id="mint-to"
@@ -177,6 +181,13 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
         </div>
       )}
 
+      {/* Batch details every item shares (TAP-T09) */}
+      {batchFactsLine && (
+        <p className="text-sm text-muted-foreground" data-testid="batch-facts-line">
+          {batchFactsLine}
+        </p>
+      )}
+
       {/* Progress */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
@@ -210,7 +221,12 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
       {/* Unstick (admin-only, stale 'minting' only) */}
       {inFlight && role === "admin" && (
         <div className="space-y-2">
-          <Button variant="outline" size="sm" onClick={unstick} disabled={!unstickable || busy !== null}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={unstick}
+            disabled={!unstickable || busy !== null}
+          >
             {busy === "unstick" ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
