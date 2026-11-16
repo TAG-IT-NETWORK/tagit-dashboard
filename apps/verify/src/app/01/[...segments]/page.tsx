@@ -5,28 +5,28 @@
  * is the GS1 primary-key AI; the catch-all captures GTIN + qualifier segments).
  *
  * On every tap:
- *   1. verify the SUN crypto from the query  → "is this chip genuine & fresh?"
+ *   1. verify the SUN crypto from the query  → "is this tag genuine & fresh?"
  *   2. resolve the on-chain twin via the decrypted UID
- *   3. render the Digital Product Passport (identity + lifecycle + anchor)
+ *   3. show the result the same way /sun does: the checking frame, then one of
+ *      the 12 approved states (<Checking>, <TapVerdict>)
  *
  * Identity (GTIN/serial) comes from the static URL path; proof-of-presence
- * (picc/cmac) from the SUN query the chip rewrites each tap. A machine-readable
- * W3C Verifiable Credential of the same passport is served at /api/dpp/...
+ * (picc/cmac) from the SUN query the chip rewrites each tap. The identity and
+ * the link to the machine-readable passport (a W3C Verifiable Credential,
+ * served at /api/dpp/...) sit in the page's Technical details.
  *
  * Server component — the SDM master key + RPC stay on the Vercel Node runtime.
  */
 import { Suspense } from "react";
-import Link from "next/link";
-import { parseGs1Path, type Gs1Link } from "@/lib/gs1";
-import { formatUid, isAuthenticState } from "@/lib/resolve";
-import { buildDpp, loadProduct, type ProductMetadata } from "@/lib/dpp";
-import { CONTRACT_ADDRESS } from "@/lib/contract";
-import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
-import { Shell, StatusHero, DataCard } from "@/components/passport";
-import { Checking, TapStatusHero, type CheckProgress } from "@/components/checking";
-import { BuyWidget } from "@/components/buy-widget";
-import { startTapRun, type TapRun } from "@/lib/tap-run";
-import { logTap } from "@/lib/tap-timing";
+
+import { Checking } from "@/components/checking";
+import type { TechLink, TechRow } from "@/components/consumer";
+import { TapResult } from "@/components/tap-result";
+import { TapVerdict } from "@/components/tap-verdict";
+import { COPY } from "@/lib/consumer-copy";
+import { parseGs1Path } from "@/lib/gs1";
+import { startTapLookups } from "@/lib/tap-lookups";
+import { startTapRun } from "@/lib/tap-run";
 
 export const dynamic = "force-dynamic"; // always re-verify; never cache
 
@@ -40,279 +40,50 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   const link = parseGs1Path(segments);
   const { picc, cmac } = await searchParams;
 
-  // Identity-only fallback: a static carrier (no SUN) can't prove presence.
+  // What the link itself says about the product. Technical details only.
+  const identity: TechRow[] = [
+    ...(link.gtin ? [{ label: COPY.technical.productNumber, value: link.gtin }] : []),
+    ...(link.serial ? [{ label: COPY.technical.serial, value: link.serial }] : []),
+  ];
+
+  // Identity-only fallback: a static carrier (no SUN) can't prove presence, so
+  // nothing was checked. Ask for a tap.
   if (!picc || !cmac) {
-    return (
-      <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="◇"
-          title="Tap to Verify"
-          sub="Product identity recognized — tap the TAG IT chip to prove authenticity."
-        />
-        <DataCard
-          rows={[
-            ["GTIN", link.gtin ?? "—"],
-            ["Serial", link.serial ?? "—"],
-          ]}
-        />
-        <p className="text-center text-xs text-gray-600">
-          This is a GS1 Digital Link. A live NFC tap adds cryptographic proof-of-presence.
-        </p>
-      </Shell>
-    );
+    return <TapResult state="linkIncomplete" technical={{ rows: identity, links: [] }} />;
   }
 
   // Start the check and return at once (TAP-T07): the frame below is sent
-  // straight away and the passport streams into its place when the check is
+  // straight away and the result streams into its place when the check is
   // done. The item record only needs the token id, so it is requested the
   // moment the tag resolves — while the item-state reads run, not after them.
-  const run = startTapRun(picc, cmac, (tokenId, timer) =>
-    timer.time("product", () => loadProduct(tokenId)),
-  );
-  const again = `/01/${segments.map(encodeURIComponent).join("/")}?${new URLSearchParams({ picc, cmac })}`;
+  const run = startTapRun(picc, cmac, startTapLookups);
+  const path = `/01/${segments.map(encodeURIComponent).join("/")}`;
+  const query = new URLSearchParams({ picc, cmac }).toString();
+  const again = `${path}?${query}`;
+
+  // The machine-readable passport for this same tap (the live SUN params are
+  // kept on the link). By product number when the link carries one, otherwise
+  // by record number once the tap has resolved to an item.
+  const serialSeg = link.serial ? `/21/${encodeURIComponent(link.serial)}` : "";
+  const passport = (recordNumber: string | null): TechLink[] => {
+    const href = link.gtin
+      ? `/api/dpp/01/${link.gtin}${serialSeg}?${query}`
+      : recordNumber
+        ? `/api/dpp/token/${recordNumber}?${query}`
+        : null;
+    return href ? [{ label: COPY.technical.machinePassport, href }] : [];
+  };
 
   return (
     <Suspense
       fallback={<Checking tagRead={run.tagRead} secondTick={run.secondTick} retryHref={again} />}
     >
-      <Gs1Verdict run={run} link={link} picc={picc} cmac={cmac} />
-    </Suspense>
-  );
-}
-
-/** The passport for a checked tap. Waits for the run; the frame shows meanwhile. */
-async function Gs1Verdict({
-  run,
-  link,
-  picc,
-  cmac,
-}: {
-  run: TapRun<Promise<ProductMetadata>>;
-  link: Gs1Link;
-  picc: string;
-  cmac: string;
-}) {
-  const { timer } = run;
-  const res = await run.resolution;
-  // Every branch below that is not the resolved one renders right away.
-  const earlyTiming = timer.header();
-  if (res.kind !== "resolved") logTap("/01", res.kind, timer);
-  // How far the check got, for the frame that resolves into each verdict.
-  const reached = (done: number): CheckProgress => ({
-    done,
-    seen: Math.min(done, run.stepsSeen()),
-    tookMs: timer.spans().total ?? 0,
-  });
-
-  if (res.kind === "not-configured") {
-    return (
-      <Shell timing={earlyTiming}>
-        <TapStatusHero
-          tone="warn"
-          glyph="⚙"
-          title="Verifier Not Configured"
-          sub="SDM_MASTER_KEY env var is not set on this deployment."
-          progress={reached(0)}
-        />
-      </Shell>
-    );
-  }
-
-  if (res.kind === "counterfeit") {
-    return (
-      <Shell timing={earlyTiming}>
-        <TapStatusHero
-          tone="bad"
-          glyph="✗"
-          title="Counterfeit"
-          sub="This tap failed cryptographic verification."
-          progress={reached(0)}
-        />
-        <div
-          className="rounded-2xl border border-red-500/30 p-5 mb-5 animate-fadeUp"
-          style={{ background: "rgba(239,68,68,0.08)", animationDelay: "0.35s" }}
-        >
-          <div className="text-red-400 text-sm font-semibold mb-1">Reason</div>
-          <div className="text-red-300 text-sm font-mono">{res.reason}</div>
-        </div>
-      </Shell>
-    );
-  }
-
-  if (res.kind === "authentic-unbound") {
-    return (
-      <Shell timing={earlyTiming}>
-        <TapStatusHero
-          tone="warn"
-          glyph="✓"
-          title="Chip Authentic"
-          sub="Cryptographically verified, but not yet bound on-chain."
-          progress={reached(1)}
-        />
-        <DataCard
-          rows={[
-            ["GTIN", link.gtin ?? "—"],
-            ["Serial", link.serial ?? "—"],
-            ["UID", formatUid(res.uid)],
-            ["Tap counter", String(res.counter)],
-          ]}
-        />
-      </Shell>
-    );
-  }
-
-  if (res.kind === "lookup-failed") {
-    return (
-      <Shell timing={earlyTiming}>
-        <TapStatusHero
-          tone="warn"
-          glyph="!"
-          title="Lookup Failed"
-          sub={res.reason}
-          progress={reached(1)}
-        />
-      </Shell>
-    );
-  }
-
-  // `bad-params` is already handled by the !picc/!cmac guard above; this
-  // narrows the union to `resolved` for the renderer below.
-  if (res.kind !== "resolved") {
-    return (
-      <Shell timing={earlyTiming}>
-        <StatusHero
-          tone="warn"
-          glyph="?"
-          title="Bad SUN URL"
-          sub="Missing picc or cmac parameters."
-        />
-      </Shell>
-    );
-  }
-
-  // ── Resolved — assemble + render the Digital Product Passport ──────────────
-  // Product copy comes only from the item's own record (see loadProduct).
-  const product = await (run.item() ??
-    timer.time("product", () => loadProduct(res.tokenId.toString())));
-  logTap("/01", "resolved", timer);
-  const tapTiming = timer.header();
-
-  const dpp = buildDpp({
-    gtin: link.gtin,
-    gtinValid: link.gtinValid,
-    serial: link.serial,
-    tokenId: res.tokenId,
-    uid: res.uid,
-    counter: res.counter,
-    asset: res.asset,
-    metadataHash: res.metadataHash,
-    product,
-    verifiedAt: new Date().toISOString(),
-  });
-
-  const authentic = isAuthenticState(dpp.lifecycle.stateCode);
-  const state = STATES[dpp.lifecycle.stateCode] ?? STATES[0];
-  const displayName = product.name || `Token #${res.tokenId}`;
-
-  // Preserve the live SUN params on the machine-readable VC link.
-  const q = new URLSearchParams({ picc, cmac });
-  const serialSeg = link.serial ? `/21/${encodeURIComponent(link.serial)}` : "";
-  const vcHref = link.gtin
-    ? `/api/dpp/01/${link.gtin}${serialSeg}?${q.toString()}`
-    : `/api/dpp/token/${res.tokenId}?${q.toString()}`;
-
-  const rows: [string, string][] = [
-    ["Product", displayName],
-    ...(link.gtin
-      ? ([["GTIN", `${link.gtin}${link.gtinValid ? "" : " ⚠"}`]] as [string, string][])
-      : []),
-    ...(link.serial ? ([["Serial", link.serial]] as [string, string][]) : []),
-    ...(product.brand ? ([["Brand", product.brand]] as [string, string][]) : []),
-    ...(product.origin ? ([["Origin", product.origin]] as [string, string][]) : []),
-    ...(product.msrp ? ([["MSRP", product.msrp]] as [string, string][]) : []),
-    ["Owner", `${dpp.lifecycle.owner.slice(0, 6)}…${dpp.lifecycle.owner.slice(-4)}`],
-    ["UID", formatUid(res.uid)],
-    ["Tap counter", String(res.counter)],
-    ["Token ID", res.tokenId.toString()],
-    [
-      "Anchor",
-      dpp.integrity.metadataHash ? `${dpp.integrity.metadataHash.slice(0, 10)}…` : "not set",
-    ],
-  ];
-
-  return (
-    <Shell timing={tapTiming}>
-      <TapStatusHero
-        tone={authentic ? "ok" : "warn"}
-        glyph={authentic ? "✓" : dpp.lifecycle.stateCode === 5 ? "⚑" : "⚠"}
-        title={
-          authentic
-            ? "Authentic"
-            : dpp.lifecycle.stateCode === 5
-              ? "Flagged"
-              : dpp.lifecycle.stateCode === 6
-                ? "Retired"
-                : "Not Bound"
-        }
-        sub={
-          authentic
-            ? "Verified on-chain via NTAG 424 DNA SUN"
-            : (STATE_DESCRIPTIONS[dpp.lifecycle.stateCode] ?? "")
-        }
-        progress={reached(3)}
+      <TapVerdict
+        run={run}
+        route="/01"
+        retryHref={again}
+        extra={{ rows: identity, links: passport }}
       />
-
-      <div className="flex justify-center mb-8 animate-fadeUp" style={{ animationDelay: "0.25s" }}>
-        <div
-          className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border ${state.bg} ${state.border}`}
-        >
-          <span className="w-2 h-2 rounded-full animate-pulse-dot" />
-          <span className={`text-sm font-bold tracking-wider ${state.text}`}>{state.label}</span>
-        </div>
-      </div>
-
-      <DataCard rows={rows} />
-
-      {dpp.lifecycle.stateCode === 3 && (
-        <div className="mt-5">
-          {/* Price comes from the pricing API inside the widget; it hides
-              itself when there is no live listing. */}
-          <BuyWidget tokenId={res.tokenId.toString()} productName={displayName} />
-        </div>
-      )}
-
-      {product.description && (
-        <div
-          className="rounded-2xl border border-white/10 p-5 mb-5 animate-fadeUp"
-          style={{ background: "rgba(255,255,255,0.03)", animationDelay: "0.4s" }}
-        >
-          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">
-            {product.description}
-          </p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-center gap-2 mb-4 animate-fadeUp">
-        <span className="text-sm">&#x1F512;</span>
-        <span className="text-xs" style={{ color: "#00D68F" }}>
-          Digital Product Passport · GS1 Digital Link · Base
-        </span>
-      </div>
-
-      <div className="text-center space-y-2 text-xs text-gray-600 font-mono">
-        <Link href={vcHref} className="text-[#00D68F] hover:underline block" prefetch={false}>
-          View machine-readable passport (JSON-LD)
-        </Link>
-        <Link
-          href={`https://sepolia.basescan.org/address/${CONTRACT_ADDRESS}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-gray-500 hover:underline block"
-        >
-          View contract on Base Sepolia
-        </Link>
-      </div>
-    </Shell>
+    </Suspense>
   );
 }

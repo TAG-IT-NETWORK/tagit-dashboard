@@ -1,0 +1,208 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`what a reader sees on the record page, state by state > noRecord 1`] = `
+"Product check
+# No record with this number
+No product is registered under this number.
+A missing record is not a warning about a product. It only means this number was never registered.
+[Check another product → /]
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%20999)]
+[closed drawer]
+Technical details
+Record number: 999
+Network: Base Sepolia (test network)
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > notANumber 1`] = `
+"Product check
+# This link is incomplete
+A record number is a whole number, like 58.
+[Check another product → /]
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > notLoaded 1`] = `
+"Product check
+# We couldn't load this record
+Something went wrong on our side. Please try again.
+[Try again → /asset/58]
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > notReleased 1`] = `
+"Product check
+# Not released for sale yet
+The brand has registered this item but has not released it.
+[image: Photo of Renewal Cream]
+- Not released yet
+## Renewal Cream
+TAG IT Demo · Made in South Korea
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Registered on: Sep 5, 2026
+## Product history
+(product history loads here)
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+Record state: BOUND (2)
+Registered: 2026-09-05 09:30:00 UTC
+Product details: Match the brand's public record
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > privateItem 1`] = `
+"Product check
+# Private item
+The owner keeps this item's details private. To check the product in your hand, tap its tag.
+## How the check works
+- Every tag proves itself
+Each tap makes a one-time code that only the real tag can produce. A copy fails.
+- Brands register each item
+The check compares the tag with the brand's record of that exact item.
+- Records can't be quietly changed
+They are kept on a public ledger that anyone can inspect.
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > registered 1`] = `
+"Product check
+# Registered product
+This is the brand's record for this item. To check the product in your hand, tap its tag.
+[image: Photo of Renewal Cream]
+- New
+- For sale
+## Renewal Cream
+$23.33
+TAG IT Demo · Made in South Korea
+≈ €21.11
+[button: Buy now · $23.33]
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Registered on: Sep 5, 2026
+## How the check works
+- Every tag proves itself
+Each tap makes a one-time code that only the real tag can produce. A copy fails.
+- Brands register each item
+The check compares the tag with the brand's record of that exact item.
+- Records can't be quietly changed
+They are kept on a public ledger that anyone can inspect.
+## Owner reviews
+4.5
+(4.5 out of 5 stars) 2 verified owner reviews
+Only people who own this product can review it, so every review is from a real buyer.
+- (5.0 out of 5 stars) Verified owner Oct 12, 2026
+Soaks in fast and lasts all day.
+## Product history
+(product history loads here)
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+Record state: ACTIVATED (3)
+Registered: 2026-09-05 09:30:00 UTC
+Product details: Match the brand's public record
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > reported 1`] = `
+"Product check
+# Reported lost or stolen
+Please don't buy this item.
+[image: Photo of Renewal Cream]
+- Reported
+## Renewal Cream
+TAG IT Demo · Made in South Korea
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Registered on: Sep 5, 2026
+## Product history
+(product history loads here)
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+Record state: FLAGGED (5)
+Registered: 2026-09-05 09:30:00 UTC
+Product details: Match the brand's public record
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`what a reader sees on the record page, state by state > retired 1`] = `
+"Product check
+# Retired
+This item was recycled and its record is closed.
+[image: Photo of Renewal Cream]
+- Retired
+## Renewal Cream
+TAG IT Demo · Made in South Korea
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Registered on: Sep 5, 2026
+## Product history
+(product history loads here)
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20record%20(record%2058)]
+[closed drawer]
+Technical details
+Record number: 58
+Network: Base Sepolia (test network)
+Record state: RECYCLED (6)
+Registered: 2026-09-05 09:30:00 UTC
+Product details: Match the brand's public record
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[end of drawer]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;

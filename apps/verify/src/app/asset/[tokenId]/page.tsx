@@ -25,26 +25,31 @@
  * QUERY-PARAM PRODUCT OVERRIDES REMAIN GONE. Product copy resolves only from
  * the token id through the services API; nothing on this route honors
  * caller-supplied metadata.
+ *
+ * WHAT A PERSON READS HERE (TAP-T08). Plain words, from @/lib/consumer-copy,
+ * laid out by <RecordResult>: what the brand's record says, the product, and
+ * a closed "Technical details" section holding the record number, the network,
+ * the state code and the link to the public record. Nobody tapped a tag to
+ * reach this page, so it never says the product in the reader's hand was
+ * checked. The <title>, meta description and JSON-LD below are written for
+ * machines and are unchanged.
  */
 import { cache } from "react";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { CONTRACT_ADDRESS } from "@/lib/contract";
 // CHAIN_ID / CHAIN_NAME come from @/lib/dpp rather than being redeclared here,
 // so this page, the JSON-LD passport and the tap routes can never disagree
 // about which chain a verdict was read from.
 import { CHAIN_ID, CHAIN_NAME } from "@/lib/dpp";
-import { fetchAsset, heroMedia, type AssetLookup } from "@/lib/services";
-import { anchorVerdict, newerVersionPropagating } from "@/lib/anchor-verdict";
-import { buildProductJsonLd } from "@/lib/jsonld";
-import { siteUrl } from "@/lib/site";
-import { STATES, STATE_DESCRIPTIONS } from "@/lib/states";
-import { Shell, StatusHero, DataCard } from "@/components/passport";
+import { fetchAsset, type AssetLookup } from "@/lib/services";
+import { COPY } from "@/lib/consumer-copy";
+import { STATES } from "@/lib/states";
+import { recordPageModel } from "@/lib/tap-page";
 import { HeroImage } from "@/components/hero-image";
-import { RatingSummary } from "@/components/rating-summary";
+import { ReviewsSection } from "@/components/rating-summary";
 import { RateWidget } from "@/components/rate-widget";
+import { RecordResult } from "@/components/record-result";
 import { fetchRatings } from "@/lib/ratings";
-import { PriceBlock } from "@/components/price-block";
 import { ProvenanceTimeline } from "@/components/provenance-timeline";
 import { AssetClientIsland } from "./asset-client";
 
@@ -72,8 +77,6 @@ export const revalidate = 60;
 export async function generateStaticParams(): Promise<{ tokenId: string }[]> {
   return [];
 }
-
-const EXPLORER = `https://sepolia.basescan.org/address/${CONTRACT_ADDRESS}`;
 
 interface PageProps {
   params: Promise<{ tokenId: string }>;
@@ -159,266 +162,62 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function AssetVerifyPage({ params }: PageProps) {
   const { tokenId } = await params;
   const lookup = await resolveAsset(tokenId);
+  // What the page may show. The record's owner field is not part of it.
+  const model = recordPageModel(lookup, tokenId);
+  const { product } = model;
 
-  if (lookup.kind === "invalid") {
+  // Everything but a full record is a short page: no product, no extras.
+  if (lookup.kind !== "record" || !product) {
     return (
-      <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="?"
-          title="Invalid Token"
-          sub="A TAG IT token id is a non-negative integer."
-        />
-        <Disclosure />
-        <HomeLink />
-      </Shell>
-    );
-  }
-
-  if (lookup.kind === "unavailable") {
-    return (
-      <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="!"
-          title="Verification Unavailable"
-          sub="Could not read the TAG IT record for this token. No verdict is being asserted."
-        />
-        <DataCard
-          rows={[
-            ["Token ID", tokenId],
-            ["Contract", CONTRACT_ADDRESS],
-            ["Chain", `${CHAIN_NAME} (chainId ${CHAIN_ID})`],
-          ]}
-        />
-        <Disclosure />
-        <HomeLink />
-      </Shell>
-    );
-  }
-
-  // "No record" is a real, honest answer, not an error.
-  if (lookup.kind === "none") {
-    return (
-      <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="○"
-          title="No Record"
-          sub="No TAG IT digital twin exists for this token id."
-        />
-        <DataCard
-          rows={[
-            ["Token ID", tokenId],
-            ["Contract", CONTRACT_ADDRESS],
-            ["Chain", `${CHAIN_NAME} (chainId ${CHAIN_ID})`],
-          ]}
-        />
-        <p className="text-center text-xs text-gray-500 mb-5">
-          This token id has not been registered. Absence of a record is not evidence that a physical
-          product is counterfeit — it means this id was never registered with TAG IT.
-        </p>
-        <Disclosure />
-        <HomeLink />
-      </Shell>
-    );
-  }
-
-  // ── Protected item: minimal render, NO product copy, NO JSON-LD ────────────
-  if (lookup.kind === "restricted") {
-    return (
-      <Shell>
-        <StatusHero
-          tone="warn"
-          glyph="🛡"
-          title="Protected Item"
-          sub="Details for this item are protected by its owner."
-        />
-        <DataCard
-          rows={[
-            ["Token ID", tokenId],
-            ["Contract", CONTRACT_ADDRESS],
-            ["Chain", `${CHAIN_NAME} (chainId ${CHAIN_ID})`],
-          ]}
-        />
-        <p className="text-center text-xs text-gray-500 mb-5">
-          Tap the physical TAG IT tag to verify this item&apos;s authenticity. The owner has
-          restricted its public details.
-        </p>
-        <Disclosure />
-        <HomeLink />
-      </Shell>
-    );
-  }
-
-  const { dto } = lookup;
-  const stateCode = dto.stateCode ?? 0;
-  const name = stateName(stateCode);
-  const displayName = dto.product?.name || dto.name || `Token #${tokenId}`;
-  const authentic = stateCode >= 1 && stateCode <= 4;
-  const state = STATES[stateCode] ?? STATES[0];
-  const hero = heroMedia(dto);
-  const ratings = await fetchRatings(tokenId);
-  const anchor = anchorVerdict(dto.verification);
-  const propagating = newerVersionPropagating(dto.verification);
-  const jsonLd = buildProductJsonLd({ url: siteUrl(`/asset/${tokenId}`), dto });
-
-  const rows: [string, string][] = [
-    ["Product", displayName],
-    ["Token ID", tokenId],
-    ["Lifecycle state", `${name} (${stateCode})`],
-    ...(dto.product?.brand ? ([["Brand", dto.product.brand]] as [string, string][]) : []),
-    ...(dto.product?.model ? ([["Model", dto.product.model]] as [string, string][]) : []),
-    ...(dto.product?.sku ? ([["SKU", dto.product.sku]] as [string, string][]) : []),
-    ...(dto.product?.origin ? ([["Origin", dto.product.origin]] as [string, string][]) : []),
-    ...(dto.timestamp ? ([["Registered", formatUtc(dto.timestamp)]] as [string, string][]) : []),
-    ["Contract", CONTRACT_ADDRESS],
-    ["Chain", `${CHAIN_NAME} (chainId ${CHAIN_ID})`],
-  ];
-
-  const bandClasses: Record<string, string> = {
-    green: "border-[#00D68F]/40 bg-[#00D68F]/10 text-[#00D68F]",
-    yellow: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-    red: "border-red-500/40 bg-red-500/10 text-red-400",
-  };
-
-  return (
-    <Shell>
-      {/* ONE JSON-LD block per page — the www.tagit.network convention. */}
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-
-      <StatusHero
-        tone={authentic ? "ok" : "warn"}
-        glyph={authentic ? "✓" : stateCode === 5 ? "⚑" : "⌀"}
-        title={
-          authentic
-            ? "Authentic"
-            : stateCode === 5
-              ? "Flagged"
-              : stateCode === 6
-                ? "Retired"
-                : "Unknown"
-        }
-        sub={
-          authentic
-            ? `Verified on-chain — lifecycle state ${name}`
-            : (STATE_DESCRIPTIONS[stateCode] ?? "")
-        }
+      <RecordResult
+        state={model.state}
+        recordNumber={model.recordNumber}
+        technical={model.technical}
+        retryHref={lookup.kind === "unavailable" ? `/asset/${tokenId}` : undefined}
       />
+    );
+  }
 
-      <div className="flex justify-center mb-4 animate-fadeUp" style={{ animationDelay: "0.25s" }}>
-        <div
-          className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border ${state.bg} ${state.border}`}
-        >
-          <span className="w-2 h-2 rounded-full animate-pulse-dot" />
-          <span className={`text-sm font-bold tracking-wider ${state.text}`}>
-            {name} ({stateCode})
-          </span>
-        </div>
-      </div>
+  const ratings = await fetchRatings(tokenId);
 
-      {/* Tri-state metadata-anchor verdict band (green / yellow / red). */}
-      <div
-        className={`rounded-xl border px-4 py-2.5 ${propagating ? "mb-2" : "mb-6"} text-center animate-fadeUp ${bandClasses[anchor.tone]}`}
-        style={{ animationDelay: "0.3s" }}
-      >
-        <span className="text-sm font-bold tracking-wide">{anchor.label}</span>
-        <span className="block text-[11px] opacity-80 mt-0.5">{anchor.detail}</span>
-      </div>
-
-      {/* Subtle propagation hint (META-T37). Informational only, links
-          nothing, and never alters the tri-state verdict above — that band
-          stays the authoritative statement about metadata integrity. */}
-      {propagating && (
-        <p className="text-center text-[11px] text-amber-300/80 mb-6 animate-fadeUp">
-          A newer version of this product record exists and is still propagating to its on-chain
-          anchor.
-        </p>
-      )}
-
-      {hero && <HeroImage src={hero.url} alt={displayName} lqip={hero.lqip} />}
-
-      <DataCard rows={rows} />
-
-      <RatingSummary view={ratings} productName={displayName} />
-
-      <RateWidget tokenId={tokenId} productName={displayName} />
-
-      {/* Server-rendered price incl. the "≈ €xx.xx" fx approximation. The buy
-          widget below re-fetches the live price before any purchase. */}
-      <PriceBlock price={dto.price} />
-
-      {dto.description && (
-        <div
-          className="rounded-2xl border border-white/10 p-5 mb-5 animate-fadeUp"
-          style={{ background: "rgba(255,255,255,0.03)", animationDelay: "0.4s" }}
-        >
-          <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-line">
-            {dto.description}
-          </p>
-        </div>
-      )}
-
-      {/* The buy flow lives in the client island; the widget fetches its own
-          server price and hides itself when there is no live listing. */}
-      <AssetClientIsland tokenId={tokenId} stateCode={stateCode} productName={displayName} />
-
-      {/* Below-the-fold provenance timeline, loaded CLIENT-SIDE after mount
-          (DASH-T37-SUSPENSE-ISR): this route is SSG/ISR and Next 14 does not
-          stream static renders, so a Suspense boundary here made a cold
-          cache-miss block first paint on the eth_getLogs history scan. The
-          static HTML carries only the skeleton; the island fetches
-          /api/asset/[tokenId]/provenance — zero timeline work in this render. */}
-      <ProvenanceTimeline tokenId={tokenId} />
-
-      <Disclosure />
-
-      <div className="text-center space-y-2 text-xs text-gray-600 font-mono">
-        <Link
-          href={EXPLORER}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-gray-500 hover:underline block"
-        >
-          View contract on {CHAIN_NAME}
-        </Link>
-      </div>
-    </Shell>
-  );
-}
-
-/**
- * Explicit network + audit disclosure, server-rendered on every branch. A
- * verification host that does not say which chain it read, and whether that
- * code has been audited, is asserting more confidence than it has earned.
- */
-function Disclosure() {
   return (
-    // Interpolated into single strings rather than written as mixed JSX: React
-    // splits adjacent text nodes with `<!-- -->` markers in the HTML, which
-    // breaks the disclosure into fragments for anything doing plain text
-    // extraction. The disclosure is the part that most needs to survive that.
-    <p className="text-center text-xs text-gray-600 leading-relaxed mb-5">
-      {`${CHAIN_NAME} testnet (chainId ${CHAIN_ID}) · UNAUDITED contract`}
-      <br />
-      {
-        "Testnet records carry no economic guarantee and this deployment has not completed a security audit. Do not rely on it for commercial settlement."
-      }
-    </p>
-  );
-}
-
-function HomeLink() {
-  return (
-    <div className="text-center">
-      <Link href="/" className="text-[#00D68F] hover:underline text-sm">
-        Back to TAG IT Verify
-      </Link>
-    </div>
+    <RecordResult
+      state={model.state}
+      product={product}
+      chips={model.chips}
+      recordNumber={model.recordNumber}
+      technical={model.technical}
+      detailsCheck={model.detailsCheck}
+      jsonLd={model.jsonLd}
+      slots={{
+        photo: product.photo ? (
+          <HeroImage
+            src={product.photo.url}
+            alt={COPY.product.photoAlt(product.name)}
+            lqip={product.photo.lqip}
+          />
+        ) : undefined,
+        // The buy flow lives in the client island; the widget fetches its own
+        // server price and hides itself when there is no live listing.
+        buy: (
+          <AssetClientIsland
+            tokenId={tokenId}
+            stateCode={model.stateCode}
+            productName={product.name}
+          />
+        ),
+        reviews: (
+          <ReviewsSection
+            view={ratings}
+            write={<RateWidget tokenId={tokenId} productName={product.name} />}
+          />
+        ),
+        // Loaded CLIENT-SIDE after mount (DASH-T37-SUSPENSE-ISR): this route is
+        // SSG/ISR, so the static HTML carries only the skeleton and the island
+        // fetches /api/asset/[tokenId]/provenance — zero history work in this
+        // render.
+        history: <ProvenanceTimeline tokenId={tokenId} brand={product.brand} />,
+      }}
+    />
   );
 }

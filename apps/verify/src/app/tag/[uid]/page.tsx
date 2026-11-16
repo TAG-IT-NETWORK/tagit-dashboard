@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { TapResult } from "@/components/tap-result";
+import { COPY } from "@/lib/consumer-copy";
+
 /**
  * NFC fallback route — /tag/{uid}
  *
@@ -43,6 +46,8 @@ import { redirect } from "next/navigation";
  * is `getTokenByTag(uidToTagHash(uid))` in @/lib/contract.server, called from a
  * server component — NOT from the browser. Until such a chip exists, an
  * unparseable uid renders the static screen below without touching the chain.
+ * Nothing was looked up, so that screen does not say the tag is unknown: it
+ * says the link cannot be checked on its own and asks for a tap (TAP-T08).
  *
  * 307, not 308: reversible. Consolidating ranking signals onto /asset/{id} argues
  * for a permanent redirect, but a 308 is cached hard by browsers and is painful to
@@ -50,7 +55,7 @@ import { redirect } from "next/navigation";
  */
 
 export const metadata: Metadata = {
-  title: "NFC tag lookup | TAG IT Verify",
+  title: "Product check | TAG IT Verify",
   robots: { index: false, follow: false },
 };
 
@@ -62,9 +67,15 @@ function parseTokenId(raw: string): string | null {
   return BigInt(clean).toString(); // normalises leading zeros: "050" -> "50"
 }
 
-function formatUid(uid: string): string {
+/**
+ * The tag ID from the address, written 04:A1:…, or null when the address does
+ * not hold one. Only something shaped like a tag ID (4 to 10 bytes of hex) is
+ * ever shown back: this page does not echo arbitrary text from a link.
+ */
+function tagIdFrom(uid: string): string | null {
   const clean = uid.replace(/[:\-\s]/g, "").toUpperCase();
-  return clean.match(/.{1,2}/g)?.join(":") || clean;
+  if (!/^(?:[0-9A-F]{2}){4,10}$/.test(clean)) return null;
+  return (clean.match(/.{2}/g) ?? []).join(":");
 }
 
 export default async function TagVerifyPage({ params }: { params: Promise<{ uid: string }> }) {
@@ -72,20 +83,13 @@ export default async function TagVerifyPage({ params }: { params: Promise<{ uid:
   const tokenId = parseTokenId(uid);
   if (tokenId !== null) redirect(`/asset/${tokenId}`);
 
+  const tagId = tagIdFrom(uid);
   return (
-    <main
-      className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ background: "#000" }}
-    >
-      <div className="text-center max-w-sm">
-        <div className="text-5xl mb-4 text-gray-600">?</div>
-        <h1 className="text-2xl font-syne font-bold text-white mb-2">Tag Not Found</h1>
-        <p className="text-gray-400 text-sm mb-2">This NFC tag is not registered on-chain.</p>
-        <p className="text-gray-600 text-xs font-mono mb-6">{formatUid(uid)}</p>
-        <a href="/" className="text-[#00D68F] hover:underline text-sm">
-          Back to TAG IT Verify
-        </a>
-      </div>
-    </main>
+    <TapResult
+      state="linkIncomplete"
+      technical={
+        tagId ? { rows: [{ label: COPY.technical.tagId, value: tagId }], links: [] } : undefined
+      }
+    />
   );
 }

@@ -1,82 +1,96 @@
 "use client";
 
 /**
- * Provenance timeline for /asset/[tokenId] (META-T37, reworked for
- * DASH-T37-SUSPENSE-ISR) — the on-chain lifecycle event history, rendered
- * below the fold and loaded CLIENT-SIDE after mount.
+ * Product history for the shopper pages — the item's recorded life, in plain
+ * words, loaded CLIENT-SIDE after mount (META-T37 / DASH-T37-SUSPENSE-ISR,
+ * reworded for TAP-T08).
  *
- * WHY CLIENT-SIDE AND NOT SUSPENSE. The first cut of this component was an
- * async server component inside a <Suspense> boundary, on the theory that the
- * eth_getLogs scan would stream in behind the first flush. That theory is
- * wrong for THIS route: /asset/[tokenId] is SSG/ISR, and Next 14 does not
- * stream static renders — a static/ISR render resolves every Suspense
- * boundary to completion before the HTML is stored, so on a cache MISS the
- * whole page blocked on the chain scan and the 'first-paint fast' intent
- * failed exactly on cold pages. Now the static page carries only the skeleton
- * (the pre-fetch state below); after hydration this component fetches
- * GET /api/asset/[tokenId]/provenance, which runs the same
- * @/lib/lifecycle scan server-side and returns the projection in
- * @/lib/provenance-wire. The static page contains zero timeline blocking
- * work.
+ * WHY CLIENT-SIDE AND NOT SUSPENSE. /asset/[tokenId] is SSG/ISR, and a static
+ * render resolves every Suspense boundary to completion before the HTML is
+ * stored, so on a cache MISS the whole page would block on the history scan.
+ * The static page carries only the skeleton below; after hydration this
+ * component fetches GET /api/asset/[tokenId]/provenance, which runs the scan
+ * server-side and returns the projection in @/lib/provenance-wire.
  *
  * HONESTY RULES (inherited from @/lib/lifecycle, do not soften them):
- *   - an unavailable scan renders an explicit "could not be read" note, never
- *     an empty timeline — "we could not look" and "there is no history" are
+ *   - an unavailable scan renders an explicit "couldn't load" note, never an
+ *     empty history — "we could not look" and "there is no history" are
  *     different claims. A failed fetch, a non-200 and `available: false` all
  *     land on that note.
  *   - A partial scan never reaches this component; lifecycle.ts aborts rather
- *     than returning a timeline with silent holes.
- *   - NO RAW ADDRESSES: the wire shape carries only what these rows render —
- *     event labels, block numbers and tx hashes. Tx hashes ARE shown — they
- *     are the re-derivation handle and were never secret.
+ *     than returning a history with silent holes.
+ *
+ * WHAT IS SHOWN. Steps only: made, tag attached, released for sale, bought and
+ * so on, in order. Block numbers, transaction hashes and state names are not
+ * shown here; the public record behind "Technical details" has them all. The
+ * wire carries no dates, so none are shown (showing one for some steps and
+ * not others would read as if the others had no date).
  */
 import { useEffect, useState } from "react";
+
+import { COPY } from "@/lib/consumer-copy";
 import type { ProvenanceWire, ProvenanceWireEvent } from "@/lib/provenance-wire";
 
-function eventLabel(event: ProvenanceWireEvent): string {
+/** One wire event in the shopper's words, or null when it adds nothing. */
+export function historyLabel(event: ProvenanceWireEvent, brand?: string): string | null {
   switch (event.type) {
     case "AssetMinted":
-      return "Minted — digital twin created";
+      return brand ? COPY.history.madeBy(brand) : COPY.history.made;
     case "TagBound":
-      return "NFC tag bound";
+      return COPY.history.tagAttached;
     case "AssetResold":
-      return "Resold";
+      return COPY.history.resold;
     case "StateChanged":
-      return event.from_state && event.to_state
-        ? `${event.from_state} → ${event.to_state}`
-        : "State changed";
+      switch (event.to_state) {
+        // Minting and binding have their own events; the state change that
+        // comes with each would only repeat the line.
+        case "MINTED":
+        case "BOUND":
+          return null;
+        case "ACTIVATED":
+          return COPY.history.released;
+        case "CLAIMED":
+          return event.from_state === "FLAGGED" ? COPY.history.reportClosed : COPY.history.bought;
+        case "FLAGGED":
+          return COPY.history.reported;
+        case "RECYCLED":
+          return COPY.history.retired;
+        default:
+          return COPY.history.updated;
+      }
   }
 }
 
-function QuietNote({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-gray-600 leading-relaxed text-center">{children}</p>;
+/** The steps to show, in order, without a step repeating itself back to back. */
+export function historySteps(events: ProvenanceWireEvent[], brand?: string): string[] {
+  const steps: string[] = [];
+  for (const event of events) {
+    const label = historyLabel(event, brand);
+    if (label && steps[steps.length - 1] !== label) steps.push(label);
+  }
+  return steps;
 }
 
-function TimelineFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <section
-      className="rounded-2xl border border-white/10 p-5 mb-5"
-      style={{ background: "rgba(255,255,255,0.03)" }}
-      aria-label="Provenance timeline"
-    >
-      <h2 className="text-gray-500 text-xs uppercase tracking-wider mb-3">Provenance</h2>
-      {children}
-    </section>
-  );
+function Frame({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-2xl border border-line p-4">{children}</div>;
+}
+
+function QuietNote({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm leading-5 text-muted">{children}</p>;
 }
 
 /** Pre-fetch skeleton — occupies the frame so the layout does not jump. This
  *  is also what the stored static HTML contains. */
-function TimelineFallback() {
+function Skeleton() {
   return (
-    <TimelineFrame>
-      <div className="space-y-3 animate-pulse" aria-hidden="true">
-        <div className="h-3 w-2/3 rounded bg-white/5" />
-        <div className="h-3 w-1/2 rounded bg-white/5" />
-        <div className="h-3 w-3/5 rounded bg-white/5" />
+    <Frame>
+      <div className="flex flex-col gap-4" aria-hidden="true">
+        <div className="h-3.5 w-2/3 rounded bg-surface" />
+        <div className="h-3.5 w-1/2 rounded bg-surface" />
+        <div className="h-3.5 w-3/5 rounded bg-surface" />
       </div>
-      <p className="sr-only">Loading provenance timeline…</p>
-    </TimelineFrame>
+      <p className="sr-only">{COPY.history.loading}</p>
+    </Frame>
   );
 }
 
@@ -85,7 +99,7 @@ type TimelineState =
   | { phase: "unavailable" }
   | { phase: "ready"; wire: Extract<ProvenanceWire, { available: true }> };
 
-export function ProvenanceTimeline({ tokenId }: { tokenId: string }) {
+export function ProvenanceTimeline({ tokenId, brand }: { tokenId: string; brand?: string }) {
   const [state, setState] = useState<TimelineState>({ phase: "loading" });
 
   useEffect(() => {
@@ -115,63 +129,36 @@ export function ProvenanceTimeline({ tokenId }: { tokenId: string }) {
     return () => controller.abort();
   }, [tokenId]);
 
-  if (state.phase === "loading") return <TimelineFallback />;
+  if (state.phase === "loading") return <Skeleton />;
 
   if (state.phase === "unavailable") {
     return (
-      <TimelineFrame>
-        <QuietNote>
-          The lifecycle timeline could not be read from the chain right now. This says nothing
-          about the item itself — the verdict above is unaffected.
-        </QuietNote>
-      </TimelineFrame>
+      <Frame>
+        <QuietNote>{COPY.history.unavailable}</QuietNote>
+      </Frame>
     );
   }
 
-  const { events, scan } = state.wire;
+  const steps = historySteps(state.wire.events, brand);
 
-  if (events.length === 0) {
+  if (steps.length === 0) {
     return (
-      <TimelineFrame>
-        <QuietNote>No lifecycle events found on-chain for this token.</QuietNote>
-      </TimelineFrame>
+      <Frame>
+        <QuietNote>{COPY.history.empty}</QuietNote>
+      </Frame>
     );
   }
 
   return (
-    <TimelineFrame>
-      <ol className="space-y-0">
-        {events.map((event, i) => (
-          <li key={`${event.transaction_hash}-${event.log_index}`}>
-            {i > 0 && <div className="border-t border-white/5" />}
-            <div className="flex items-start gap-3 py-3">
-              <span
-                className="mt-1.5 w-2 h-2 rounded-full bg-[#00D68F]/60 flex-shrink-0"
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <p className="text-white text-sm">{eventLabel(event)}</p>
-                <p className="text-gray-600 text-[11px] font-mono break-all">
-                  block {event.block_number} ·{" "}
-                  <a
-                    href={`https://sepolia.basescan.org/tx/${event.transaction_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:underline"
-                  >
-                    {event.transaction_hash.slice(0, 10)}…{event.transaction_hash.slice(-8)}
-                  </a>
-                </p>
-              </div>
-            </div>
+    <Frame>
+      <ol className="flex list-none flex-col gap-4">
+        {steps.map((step, i) => (
+          <li key={`${i}-${step}`} className="flex items-start gap-3">
+            <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-full bg-ink" aria-hidden="true" />
+            <p className="text-[15px] font-semibold leading-[22px]">{step}</p>
           </li>
         ))}
       </ol>
-      <p className="text-[10px] text-gray-700 mt-2 font-mono">
-        {scan.source === "tagit-services"
-          ? `blocks ${scan.from_block}–${scan.to_block} · from TAG IT services records (relayer receipts)`
-          : `scanned blocks ${scan.from_block}–${scan.to_block} via eth_getLogs`}
-      </p>
-    </TimelineFrame>
+    </Frame>
   );
 }

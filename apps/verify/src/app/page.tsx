@@ -3,63 +3,69 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ConsumerPage, Icon, PRIMARY_BUTTON } from "@/components/consumer";
+import { COPY } from "@/lib/consumer-copy";
+
+/**
+ * The front door. Most people never see it: a tap opens the result directly.
+ * It says what to do (tap the tag) and lets someone look a record up by its
+ * number.
+ */
 export default function VerifyHome() {
-  const [tokenId, setTokenId] = useState("");
+  const [value, setValue] = useState("");
+  const [invalid, setInvalid] = useState(false);
   const router = useRouter();
 
-  function handleVerify(e: React.FormEvent) {
+  function handleLookup(e: React.FormEvent) {
     e.preventDefault();
-    const id = tokenId.trim();
+    const id = value.trim();
     if (!id) return;
-    // If it looks like a hex UID (contains A-F or is longer than a typical number), route to tag lookup
-    if (/^[0-9a-fA-F:]{8,}$/.test(id) && /[a-fA-F]/.test(id)) {
-      const clean = id.replace(/[:\-\s]/g, "");
-      router.push(`/tag/${clean}`);
-    } else if (!isNaN(Number(id))) {
+    // A record number is digits. Anything else has nowhere useful to go, so
+    // say what is expected instead of opening a page that cannot help.
+    if (/^\d{1,78}$/.test(id)) {
       router.push(`/asset/${id}`);
+    } else {
+      setInvalid(true);
     }
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#000" }}>
-      <div className="w-full max-w-sm text-center">
-        <div className="inline-flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-[#D4AF37]" />
-          <span className="text-[#D4AF37] text-xs font-semibold tracking-widest uppercase">
-            TAG IT Network
-          </span>
-        </div>
-        <h1 className="text-3xl font-bold text-white mt-4 mb-2">
-          Verify Authenticity
-        </h1>
-        <p className="text-gray-400 text-sm mb-8">
-          Tap an NFC tag or enter a token ID to verify any product on-chain.
-        </p>
-
-        <form onSubmit={handleVerify} className="space-y-3">
-          <input
-            type="text"
-            inputMode="text"
-            value={tokenId}
-            onChange={(e) => setTokenId(e.target.value)}
-            placeholder="Token ID or NFC UID (e.g. 18 or 04113A2E5F6180)"
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 text-center focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:border-[#D4AF37]/50"
-          />
-          <button
-            type="submit"
-            className="w-full py-3 rounded-lg bg-[#D4AF37] text-black font-semibold hover:bg-[#C4A030] transition-colors"
-          >
-            Verify Product
-          </button>
-        </form>
-
-        <div className="mt-12 space-y-1">
-          <p className="text-gray-600 text-xs">No wallet required</p>
-          <p className="text-gray-600 text-xs">
-            Reads directly from Base Sepolia
-          </p>
-        </div>
+    <ConsumerPage>
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-5 py-8 text-center">
+        <Icon name="tag" size={48} strokeWidth={1.6} />
+        <h1 className="text-2xl font-bold leading-[30px]">{COPY.home.title}</h1>
+        <p className="text-[15px] leading-[22px] text-body">{COPY.home.lead}</p>
+        <p className="text-[13px] leading-[18px] text-muted">{COPY.checking.reassurance}</p>
       </div>
-    </main>
+
+      <form onSubmit={handleLookup} className="flex flex-col gap-3 pt-4" noValidate>
+        <label htmlFor="record-number" className="text-[15px] font-semibold leading-[22px]">
+          {COPY.home.lookupLabel}
+        </label>
+        <input
+          id="record-number"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setInvalid(false);
+          }}
+          placeholder={COPY.home.placeholder}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? "record-number-error" : undefined}
+          className="min-h-[52px] w-full rounded-[14px] border border-line-field bg-white px-4 text-[17px] leading-6 text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        />
+        {invalid && (
+          <p id="record-number-error" role="alert" className="text-sm leading-5 text-bad">
+            {COPY.home.notANumber}
+          </p>
+        )}
+        <button type="submit" className={PRIMARY_BUTTON}>
+          {COPY.home.lookupButton}
+        </button>
+      </form>
+    </ConsumerPage>
   );
 }

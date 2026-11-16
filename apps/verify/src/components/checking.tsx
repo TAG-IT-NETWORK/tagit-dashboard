@@ -10,7 +10,6 @@
  *                       a second: the remaining steps tick, the ring turns into
  *                       the verdict, and the frame fades to show the page. It
  *                       is why the check never just flashes past.
- *   <TapStatusHero>     a verdict header that carries <CheckingResolved>.
  *
  * Server components, CSS and inline SVG only — see checking.module.css. No
  * client JavaScript is involved, so the frame works before the page's scripts
@@ -18,19 +17,13 @@
  */
 import { Suspense, type ReactNode } from "react";
 
-import { StatusHero } from "./passport";
+import { COPY } from "@/lib/consumer-copy";
+
+import { PageHeader } from "./consumer";
 import styles from "./checking.module.css";
 
-/** Words from the approved copy deck (PRD-TAP-001 §8). */
-export const CHECKING_COPY = {
-  title: "Checking your product…",
-  usual: "This usually takes a second or two.",
-  slow: "Still checking. This can take a few seconds.",
-  steps: ["Reading the tag", "Confirming it's authentic", "Finding the product record"],
-  retry: "Try again",
-  reassurance: "No app and no sign-in needed to check a product.",
-  opening: "Opening the product page",
-} as const;
+/** Words from the approved copy deck (PRD-TAP-001 §8); they live in @/lib/consumer-copy. */
+export const CHECKING_COPY = COPY.checking;
 
 /**
  * When the frame swaps "This usually takes…" for "Still checking…". The
@@ -45,7 +38,9 @@ export const STILL_CHECKING_AFTER_MS = 4_000;
 export const MIN_ON_SCREEN_MS = 600;
 
 export type StepState = "waiting" | "active" | "done";
-export type CheckTone = "ok" | "warn" | "bad";
+export type CheckTone = "ok" | "warn" | "bad" | "neutral";
+/** The mark the ring turns into. */
+export type CheckGlyph = "check" | "alert" | "cross" | "info" | "clock";
 type StepNumber = 1 | 2 | 3;
 
 const STEP_STATUS: Record<StepState, string> = {
@@ -151,10 +146,17 @@ const RING_PENDING = (
   </div>
 );
 
-const DISC_GLYPH: Record<CheckTone, ReactNode> = {
-  ok: <path d="M5 12.5 10 17.5 19 7" strokeLinejoin="round" />,
-  warn: <path d="M12 6v7.5M12 17.5v.5" />,
-  bad: <path d="M7 7l10 10M17 7 7 17" />,
+const DISC_GLYPH: Record<CheckGlyph, ReactNode> = {
+  check: <path d="M5 12.5 10 17.5 19 7" strokeLinejoin="round" />,
+  alert: <path d="M12 6v7.5M12 17.5v.5" />,
+  cross: <path d="M7 7l10 10M17 7 7 17" />,
+  info: <path d="M12 11v6M12 7v.5" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="7" />
+      <path d="M12 8.5v4l2.5 1.5" strokeLinejoin="round" />
+    </>
+  ),
 };
 
 const FOOT = (
@@ -236,6 +238,9 @@ export function Checking({
   return (
     <div className={styles.frame} data-tap-frame="checking" data-phase="checking" role="status">
       <NoScript />
+      <div className={styles.top}>
+        <PageHeader />
+      </div>
       <div className={styles.body}>
         <div className={styles.ring} aria-hidden="true">
           {RING_TRACK}
@@ -281,10 +286,12 @@ export interface CheckProgress {
  */
 export function CheckingResolved({
   tone,
+  glyph,
   title,
   progress,
 }: {
   tone: CheckTone;
+  glyph: CheckGlyph;
   title: string;
   progress: CheckProgress;
 }) {
@@ -299,6 +306,9 @@ export function CheckingResolved({
       data-pace={progress.tookMs >= MIN_ON_SCREEN_MS ? "brisk" : "full"}
       aria-hidden="true"
     >
+      <div className={styles.top}>
+        <PageHeader />
+      </div>
       <div className={styles.body}>
         <div className={styles.ring}>
           {RING_TRACK}
@@ -313,7 +323,7 @@ export function CheckingResolved({
               strokeWidth="2.4"
               strokeLinecap="round"
             >
-              {DISC_GLYPH[tone]}
+              {DISC_GLYPH[glyph]}
             </svg>
           </div>
         </div>
@@ -339,27 +349,5 @@ export function CheckingResolved({
       </div>
       {FOOT}
     </div>
-  );
-}
-
-/**
- * The verdict header of a tap page: the usual <StatusHero>, with the checking
- * frame resolving into it. Use it only where a tap was actually checked.
- */
-export function TapStatusHero({
-  progress,
-  ...hero
-}: {
-  tone: CheckTone;
-  glyph: string;
-  title: string;
-  sub: string;
-  progress: CheckProgress;
-}) {
-  return (
-    <>
-      <CheckingResolved tone={hero.tone} title={hero.title} progress={progress} />
-      <StatusHero {...hero} />
-    </>
   );
 }

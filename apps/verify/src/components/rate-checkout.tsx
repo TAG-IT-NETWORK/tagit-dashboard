@@ -3,10 +3,23 @@
 import { useState } from "react";
 import { PrivyProvider, usePrivy, useSignMessage, useWallets } from "@privy-io/react-auth";
 import { baseSepolia } from "viem/chains";
+
+import { COPY } from "@/lib/consumer-copy";
 import { ratingMessage, reviewDigestBrowser } from "@/lib/ratings-shared";
 
-/** Privy context + the rating form (lazy chunk, see rate-widget.tsx). */
-export default function RateCheckout({ tokenId, productName, onClose }: { tokenId: string; productName: string; onClose: () => void }) {
+const PRIMARY =
+  "flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-brand px-4 text-[17px] font-semibold leading-6 text-white hover:bg-brand-strong disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+
+/** Sign-in context + the review form (lazy chunk, see rate-widget.tsx). */
+export default function RateCheckout({
+  tokenId,
+  productName,
+  onClose,
+}: {
+  tokenId: string;
+  productName: string;
+  onClose: () => void;
+}) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID!;
   return (
     <PrivyProvider
@@ -16,7 +29,7 @@ export default function RateCheckout({ tokenId, productName, onClose }: { tokenI
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
-        appearance: { theme: "dark", accentColor: "#00D68F" },
+        appearance: { theme: "light", accentColor: "#0b72d9" },
       }}
     >
       <RateForm tokenId={tokenId} productName={productName} onClose={onClose} />
@@ -24,14 +37,22 @@ export default function RateCheckout({ tokenId, productName, onClose }: { tokenI
   );
 }
 
-function RateForm({ tokenId, productName, onClose }: { tokenId: string; productName: string; onClose: () => void }) {
+function RateForm({
+  tokenId,
+  productName,
+  onClose,
+}: {
+  tokenId: string;
+  productName: string;
+  onClose: () => void;
+}) {
   const { ready, authenticated, login } = usePrivy();
   const { wallets } = useWallets();
   const { signMessage } = useSignMessage();
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const wallet = wallets.find((w) => w.walletClientType === "privy") ?? wallets[0];
@@ -44,64 +65,107 @@ function RateForm({ tokenId, productName, onClose }: { tokenId: string; productN
       const timestamp = Date.now();
       const digest = await reviewDigestBrowser(review);
       const message = ratingMessage(tokenId, stars, digest, timestamp);
-      const signed = (await signMessage({ message }, { address: wallet.address })) as { signature?: string } | string;
+      const signed = (await signMessage({ message }, { address: wallet.address })) as
+        | { signature?: string }
+        | string;
       const signature = typeof signed === "string" ? signed : signed.signature;
-      if (!signature) throw new Error("wallet did not return a signature");
+      if (!signature) throw new Error("no signature");
       const res = await fetch(`/api/asset/${tokenId}/rating`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stars, review: review.trim() || null, rater: wallet.address, signature, timestamp }),
+        body: JSON.stringify({
+          stars,
+          review: review.trim() || null,
+          rater: wallet.address,
+          signature,
+          timestamp,
+        }),
       });
-      const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; code?: string; item?: { average?: number; count?: number } } | null;
+      const body = (await res.json().catch(() => null)) as { ok?: boolean } | null;
       if (!res.ok || !body?.ok) {
-        if (res.status === 403) throw new Error("Only the current owner of this item can rate it. Claim it first, then rate.");
-        throw new Error(body?.error ?? `could not save the rating (HTTP ${res.status})`);
+        // The server's own wording can name internals; the shopper gets ours.
+        setError(res.status === 403 ? COPY.reviews.notOwner : COPY.reviews.failed);
+        return;
       }
-      setDone(`Thank you — your ${stars}-star rating is on record. ${productName} now averages ${body.item?.average?.toFixed(1) ?? stars} from ${body.item?.count ?? 1} verified owner${(body.item?.count ?? 1) === 1 ? "" : "s"}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setDone(true);
+    } catch {
+      setError(COPY.reviews.failed);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border border-[#00D68F]/30 p-5" style={{ background: "rgba(0,214,143,0.05)" }}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Rate {productName}</p>
-        <button type="button" onClick={onClose} className="text-xs text-gray-500 hover:text-gray-300">close</button>
+    <div className="flex flex-col gap-3 rounded-2xl border border-line p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-[15px] font-semibold leading-[22px]">
+          {COPY.reviews.formTitle(productName)}
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="-mr-2 inline-flex min-h-[44px] items-center px-2 text-sm font-semibold text-brand-link underline underline-offset-2"
+        >
+          {COPY.reviews.close}
+        </button>
       </div>
       {done ? (
-        <p className="mt-3 text-sm text-[#00D68F]">{done}</p>
+        <p role="status" className="text-[15px] leading-[22px] text-ok">
+          {COPY.reviews.thanks}
+        </p>
       ) : !ready ? (
-        <p className="mt-3 text-xs text-gray-500">Preparing your wallet…</p>
+        <p className="text-sm leading-5 text-muted">{COPY.reviews.preparing}</p>
       ) : !authenticated ? (
-        <div className="mt-3">
-          <p className="text-xs text-gray-400 mb-3">Sign in with the email you used to claim this item. Your rating is signed by your wallet, so only real owners can rate.</p>
-          <button type="button" onClick={() => login()} className="w-full rounded-2xl bg-[#00D68F] px-5 py-3 text-sm font-bold text-black">Sign in to rate</button>
-        </div>
+        <>
+          <p className="text-sm leading-5 text-body">{COPY.reviews.signInBody}</p>
+          <button type="button" onClick={() => login()} className={PRIMARY}>
+            {COPY.reviews.signIn}
+          </button>
+        </>
       ) : (
-        <div className="mt-3 space-y-3">
-          <div className="flex gap-1" role="radiogroup" aria-label="stars">
+        <>
+          <div className="flex gap-1" role="radiogroup" aria-label={COPY.reviews.starsGroup}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <button key={i} type="button" role="radio" aria-checked={stars === i} onClick={() => setStars(i)} className={`text-3xl leading-none ${i <= stars ? "text-[#00D68F]" : "text-gray-700"} hover:text-[#00D68F]`}>
-                ★
+              <button
+                key={i}
+                type="button"
+                role="radio"
+                aria-checked={stars === i}
+                aria-label={COPY.reviews.starOption(i)}
+                onClick={() => setStars(i)}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg text-3xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${i <= stars ? "text-[#b45309]" : "text-line-field"}`}
+              >
+                <span aria-hidden="true">★</span>
               </button>
             ))}
           </div>
           <textarea
             value={review}
             onChange={(e) => setReview(e.target.value.slice(0, 500))}
-            placeholder="Optional: a few words for other owners (500 characters max)"
-            className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-gray-200 placeholder:text-gray-600"
+            placeholder={COPY.reviews.placeholder}
+            aria-label={COPY.reviews.placeholder}
+            className="w-full rounded-xl border border-line-field bg-white p-3 text-[15px] leading-[22px] text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
             rows={3}
           />
-          <p className="text-[11px] text-gray-500">Signing with {wallet ? `${wallet.address.slice(0, 6)}…${wallet.address.slice(-4)}` : "your wallet"}. Nothing is sent to the chain; the signature proves ownership.</p>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <button type="button" disabled={busy || stars < 1 || !wallet} onClick={() => void submit()} className="w-full rounded-2xl bg-[#00D68F] px-5 py-3 text-sm font-bold text-black disabled:opacity-50">
-            {busy ? "Signing…" : stars ? `Submit ${stars}-star rating` : "Pick a star rating"}
+          <p className="text-[13px] leading-[18px] text-muted">{COPY.reviews.ownerNote}</p>
+          {error && (
+            <p role="alert" className="text-sm leading-5 text-bad">
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={busy || stars < 1 || !wallet}
+            onClick={() => void submit()}
+            className={PRIMARY}
+          >
+            {busy
+              ? COPY.reviews.sending
+              : stars
+                ? COPY.reviews.send(stars)
+                : COPY.reviews.pickStars}
           </button>
-        </div>
+        </>
       )}
     </div>
   );

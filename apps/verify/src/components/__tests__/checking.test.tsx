@@ -8,7 +8,6 @@ import {
   CheckingResolved,
   MIN_ON_SCREEN_MS,
   STILL_CHECKING_AFTER_MS,
-  TapStatusHero,
 } from "../checking";
 
 /**
@@ -110,6 +109,7 @@ describe("<CheckingResolved> — the frame replayed over the finished page", () 
     renderToStaticMarkup(
       <CheckingResolved
         tone="ok"
+        glyph="check"
         title="Authentic"
         progress={{ done: 3, seen: 1, tookMs: 300 }}
         {...props}
@@ -134,19 +134,21 @@ describe("<CheckingResolved> — the frame replayed over the finished page", () 
   it("ticks nothing it cannot stand behind when the check failed", () => {
     const html = render({
       tone: "bad",
-      title: "Counterfeit",
+      glyph: "cross",
+      title: "We couldn't verify this tag",
       progress: { done: 0, seen: 0, tookMs: 2 },
     });
     expect(states(html)).toEqual(["waiting", "waiting", "waiting"]);
     expect(html).toContain('data-tone="bad"');
-    expect(html).toContain("Counterfeit");
+    expect(html).toContain("We couldn&#x27;t verify this tag");
     expect(html).not.toContain(CHECKING_COPY.opening);
   });
 
   it("shows only the steps that finished for a genuine tag with no product", () => {
     const html = render({
       tone: "warn",
-      title: "Chip Authentic",
+      glyph: "info",
+      title: "Tag not linked to a product",
       progress: { done: 1, seen: 1, tookMs: 150 },
     });
     expect(states(html)).toEqual(["done", "waiting", "waiting"]);
@@ -174,22 +176,5 @@ describe("<CheckingResolved> — the frame replayed over the finished page", () 
     expect(html).toMatch(/data-tap-frame="resolved"[^>]*aria-hidden="true"/);
     expect(html).not.toContain("<h1");
     expect(html).not.toContain("<a ");
-  });
-});
-
-describe("<TapStatusHero>", () => {
-  it("renders the page's real heading under the resolving frame", () => {
-    const html = renderToStaticMarkup(
-      <TapStatusHero
-        tone="ok"
-        glyph="✓"
-        title="Authentic"
-        sub="Verified"
-        progress={{ done: 3, seen: 1, tookMs: 250 }}
-      />,
-    );
-    expect(html).toContain('data-tap-frame="resolved"');
-    expect(html.match(/<h1/g)).toHaveLength(1);
-    expect(html).toMatch(/<h1[^>]*>Authentic<\/h1>/);
   });
 });

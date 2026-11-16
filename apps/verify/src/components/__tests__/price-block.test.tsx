@@ -18,6 +18,10 @@ import type { AssetPrice } from "@/lib/services";
  *
  * PriceBlock is a synchronous server component with no hooks, so
  * renderToStaticMarkup drives it directly — no DOM, no client runtime.
+ *
+ * TAP-T08: the price itself moved onto the product card (the server's
+ * `display` string, as-is). PriceBlock is now the approximation line under it,
+ * and that line — the part these snapshots exist for — is unchanged in words.
  */
 
 function listed(fx: AssetPrice["fx"]): AssetPrice {
