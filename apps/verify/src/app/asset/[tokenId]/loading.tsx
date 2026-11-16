@@ -1,25 +1,17 @@
+import { ConsumerPage } from "@/components/consumer";
+import { COPY } from "@/lib/consumer-copy";
+
+/** Light skeleton in the shape of the record page: a banner, a photo, a name. */
 export default function Loading() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 bg-[#0a0a0a]">
-      <div className="w-full max-w-sm animate-pulse">
-        <div className="text-center mb-8">
-          <div className="h-4 w-24 bg-white/10 rounded mx-auto mb-2" />
-          <div className="h-3 w-20 bg-white/5 rounded mx-auto" />
-        </div>
-        <div className="h-8 w-48 bg-white/10 rounded mx-auto mb-2" />
-        <div className="h-4 w-16 bg-white/5 rounded mx-auto mb-6" />
-        <div className="flex justify-center mb-8">
-          <div className="h-12 w-36 bg-white/10 rounded-full" />
-        </div>
-        <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex justify-between">
-              <div className="h-4 w-16 bg-white/10 rounded" />
-              <div className="h-4 w-24 bg-white/10 rounded" />
-            </div>
-          ))}
-        </div>
+    <ConsumerPage>
+      <div className="flex flex-col gap-4" aria-hidden="true">
+        <div className="h-[72px] rounded-2xl bg-surface" />
+        <div className="rounded-2xl bg-surface" style={{ aspectRatio: "4 / 3" }} />
+        <div className="h-7 w-2/3 rounded bg-surface" />
+        <div className="h-5 w-1/2 rounded bg-surface" />
       </div>
-    </main>
+      <p className="sr-only">{COPY.recordLoading}</p>
+    </ConsumerPage>
   );
 }

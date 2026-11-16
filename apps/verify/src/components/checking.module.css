@@ -8,23 +8,28 @@
  *   resolved  the same frame replayed on top of the finished page for a
  *             moment, so the check visibly completes before the page shows
  *
- * Colours are tokens on .frame. They match today's dark tap page; the light
- * page (TAP-T08) changes the tokens, nothing else.
+ * Colours are tokens on .frame, and they are the light page's colours (see
+ * tailwind.config.ts) so the frame and the page it opens look like one thing.
  */
 
 .frame {
-  --ck-bg: #000000;
-  --ck-fg: #ffffff;
-  --ck-muted: #a1a7b3;
-  --ck-line: rgba(255, 255, 255, 0.14);
-  --ck-ring: rgba(255, 255, 255, 0.3);
-  --ck-accent: #00d68f;
-  --ck-ok: #00d68f;
-  --ck-ok-ink: #00170d;
-  --ck-warn: #fbbf24;
-  --ck-warn-ink: #1c1300;
-  --ck-bad: #ef4444;
+  --ck-bg: #ffffff;
+  --ck-fg: #0b0f17;
+  --ck-muted: #4a5363;
+  --ck-line: #e3e6eb;
+  --ck-ring: #8a94a3; /* 3.1:1 on white: a step that is not done must still be seen */
+  --ck-accent: #0b72d9; /* the spinners */
+  --ck-link: #0b63be;
+  --ck-tick: #0b7a45;
+  --ck-tick-ink: #ffffff;
+  --ck-ok: #0b7a45;
+  --ck-ok-ink: #ffffff;
+  --ck-warn: #7a4b00;
+  --ck-warn-ink: #ffffff;
+  --ck-bad: #a3231b;
   --ck-bad-ink: #ffffff;
+  --ck-neutral: #0b0f17;
+  --ck-neutral-ink: #ffffff;
 
   /* When each beat of the resolved phase starts. With the 0.2 s fade the frame
      is on screen for 0.78 s after the verdict arrives — it cannot flash past. */
@@ -40,7 +45,7 @@
   flex-direction: column;
   align-items: center;
   box-sizing: border-box;
-  padding: clamp(36px, 12vh, 96px) 24px 28px;
+  padding: clamp(84px, 16vh, 128px) 24px 28px;
   background: var(--ck-bg);
   color: var(--ck-fg);
   font-family: var(--font-inter), system-ui, sans-serif;
@@ -62,6 +67,19 @@
 .frame[data-tone="bad"] {
   --ck-ok: var(--ck-bad);
   --ck-ok-ink: var(--ck-bad-ink);
+}
+
+.frame[data-tone="neutral"] {
+  --ck-ok: var(--ck-neutral);
+  --ck-ok-ink: var(--ck-neutral-ink);
+}
+
+/* The page header, in the same place the page itself has it. */
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .body {
@@ -136,7 +154,6 @@
 .title,
 .verdict {
   margin: 0;
-  font-family: var(--font-syne), system-ui, sans-serif;
   font-weight: 700;
 }
 
@@ -266,8 +283,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--ck-accent);
-  color: var(--ck-ok-ink);
+  background: var(--ck-tick);
+  color: var(--ck-tick-ink);
 }
 
 .step[data-state="done"] .tick {
@@ -295,7 +312,7 @@
   font-size: 15px;
   font-weight: 600;
   line-height: 22px;
-  color: var(--ck-accent);
+  color: var(--ck-link);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

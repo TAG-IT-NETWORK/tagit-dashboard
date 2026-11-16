@@ -36,12 +36,17 @@ export default function BuyCheckout({
         defaultChain: baseSepolia,
         supportedChains: [baseSepolia],
         appearance: {
-          theme: "dark",
-          accentColor: "#00D68F",
+          theme: "light",
+          accentColor: "#0b72d9",
         },
       }}
     >
-      <BuyButton tokenId={tokenId} productName={productName} price={price} refetchPrice={refetchPrice} />
+      <BuyButton
+        tokenId={tokenId}
+        productName={productName}
+        price={price}
+        refetchPrice={refetchPrice}
+      />
     </PrivyProvider>
   );
 }

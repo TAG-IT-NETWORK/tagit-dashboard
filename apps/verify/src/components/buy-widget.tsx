@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { COPY } from "@/lib/consumer-copy";
 import { fetchPriceFromProxy, isPurchasable, type CanonicalPrice } from "@/lib/price";
 
 /**
@@ -35,9 +36,9 @@ function BuyPlaceholder() {
       type="button"
       disabled
       aria-busy="true"
-      className="w-full rounded-2xl bg-[#00D68F]/70 px-5 py-4 text-center text-base font-bold text-black opacity-80"
+      className="flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-brand px-4 text-[17px] font-semibold leading-6 text-white opacity-60"
     >
-      Buy now{placeholderDisplay ? ` · ${placeholderDisplay}` : ""}
+      {placeholderDisplay ? COPY.buy.button(placeholderDisplay) : COPY.buy.buttonNoPrice}
     </button>
   );
 }
