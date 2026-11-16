@@ -30,7 +30,7 @@ export function HeroImage({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-2xl bg-surface"
+      className="relative w-full overflow-hidden rounded-3xl bg-surface"
       style={{ aspectRatio: "4 / 3" }}
     >
       <Image

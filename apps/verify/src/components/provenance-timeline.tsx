@@ -25,8 +25,14 @@
  * shown here; the public record behind "Technical details" has them all. The
  * wire carries no dates, so none are shown (showing one for some steps and
  * not others would read as if the others had no date).
+ *
+ * WHEN IT LOADS. The history sits in a row that is closed until a shopper
+ * opens it (see <HistoryRow>), and reading it costs a scan on the server. So
+ * the request is made the first time the row is opened, not when the page
+ * loads: a page nobody opens the history on never asks for it. Outside a
+ * closed row (or in a row that is already open) it loads at once, as before.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { COPY } from "@/lib/consumer-copy";
 import type { ProvenanceWire, ProvenanceWireEvent } from "@/lib/provenance-wire";
@@ -134,27 +140,45 @@ export function historySteps(
   return steps;
 }
 
-function Frame({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-line p-4">{children}</div>;
-}
-
 function QuietNote({ children }: { children: React.ReactNode }) {
   return <p className="text-sm leading-5 text-muted">{children}</p>;
 }
 
-/** Pre-fetch skeleton — occupies the frame so the layout does not jump. This
- *  is also what the stored static HTML contains. */
+/** Pre-fetch skeleton — holds the list's place so the row does not jump when
+ *  the steps land. This is also what the stored static HTML contains. */
 function Skeleton() {
   return (
-    <Frame>
-      <div className="flex flex-col gap-4" aria-hidden="true">
+    <>
+      <div className="flex flex-col gap-4 py-1" aria-hidden="true">
         <div className="h-3.5 w-2/3 rounded bg-surface" />
         <div className="h-3.5 w-1/2 rounded bg-surface" />
         <div className="h-3.5 w-3/5 rounded bg-surface" />
       </div>
       <p className="sr-only">{COPY.history.loading}</p>
-    </Frame>
+    </>
   );
+}
+
+/**
+ * True once the history should be on screen: at once when the list is not
+ * inside a closed <details>, otherwise from the first time that row opens.
+ * It never goes back to false, so closing the row does not ask again.
+ */
+function useWanted(anchor: React.RefObject<HTMLElement | null>): boolean {
+  const [wanted, setWanted] = useState(false);
+  useEffect(() => {
+    const row = anchor.current?.closest("details");
+    if (!row || row.open) {
+      setWanted(true);
+      return;
+    }
+    const onToggle = () => {
+      if (row.open) setWanted(true);
+    };
+    row.addEventListener("toggle", onToggle);
+    return () => row.removeEventListener("toggle", onToggle);
+  }, [anchor]);
+  return wanted;
 }
 
 type TimelineState =
@@ -173,8 +197,11 @@ export function ProvenanceTimeline({
   status?: HistoryStatus;
 }) {
   const [state, setState] = useState<TimelineState>({ phase: "loading" });
+  const anchor = useRef<HTMLDivElement>(null);
+  const wanted = useWanted(anchor);
 
   useEffect(() => {
+    if (!wanted) return;
     const controller = new AbortController();
     (async () => {
       try {
@@ -199,38 +226,42 @@ export function ProvenanceTimeline({
       }
     })();
     return () => controller.abort();
-  }, [tokenId]);
+  }, [tokenId, wanted]);
 
-  if (state.phase === "loading") return <Skeleton />;
-
-  if (state.phase === "unavailable") {
-    return (
-      <Frame>
-        <QuietNote>{COPY.history.unavailable}</QuietNote>
-      </Frame>
-    );
-  }
-
-  const steps = historySteps(state.wire.events, brand, status);
-
-  if (steps.length === 0) {
-    return (
-      <Frame>
-        <QuietNote>{COPY.history.empty}</QuietNote>
-      </Frame>
-    );
-  }
+  const steps = state.phase === "ready" ? historySteps(state.wire.events, brand, status) : [];
 
   return (
-    <Frame>
-      <ol className="flex list-none flex-col gap-4">
-        {steps.map((step, i) => (
-          <li key={`${i}-${step}`} className="flex items-start gap-3">
-            <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-full bg-ink" aria-hidden="true" />
-            <p className="text-[15px] font-semibold leading-[22px]">{step}</p>
-          </li>
-        ))}
-      </ol>
-    </Frame>
+    <div ref={anchor} data-history={state.phase}>
+      {state.phase === "loading" ? (
+        <Skeleton />
+      ) : state.phase === "unavailable" ? (
+        <QuietNote>{COPY.history.unavailable}</QuietNote>
+      ) : steps.length === 0 ? (
+        <QuietNote>{COPY.history.empty}</QuietNote>
+      ) : (
+        <ol className="flex list-none flex-col">
+          {steps.map((step, i) => (
+            <li key={`${i}-${step}`} className="relative flex items-start gap-3 pb-4 last:pb-0">
+              {/* The line that joins a step to the next one. */}
+              {i < steps.length - 1 && (
+                <span
+                  className="absolute bottom-0 left-[4.5px] top-[18px] w-px bg-line-strong"
+                  aria-hidden="true"
+                />
+              )}
+              <span
+                className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${i === steps.length - 1 ? "bg-ink ring-4 ring-surface" : "bg-line-field"}`}
+                aria-hidden="true"
+              />
+              <p
+                className={`text-[15px] leading-[22px] ${i === steps.length - 1 ? "font-semibold" : "text-body"}`}
+              >
+                {step}
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

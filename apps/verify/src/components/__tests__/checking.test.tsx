@@ -8,6 +8,7 @@ import {
   CheckingResolved,
   MIN_ON_SCREEN_MS,
   STILL_CHECKING_AFTER_MS,
+  paceOf,
 } from "../checking";
 
 /**
@@ -107,21 +108,23 @@ describe("<Checking> — the frame shown while a tap is checked", () => {
 describe("<CheckingResolved> — the frame replayed over the finished page", () => {
   const render = (props: Partial<Parameters<typeof CheckingResolved>[0]> = {}) =>
     renderToStaticMarkup(
-      <CheckingResolved
-        tone="ok"
-        glyph="check"
-        title="Authentic"
-        progress={{ done: 3, seen: 1, tookMs: 300 }}
-        {...props}
-      />,
+      <CheckingResolved opening progress={{ done: 3, seen: 1, tookMs: 300 }} {...props} />,
     );
 
-  it("ticks every finished step and names the verdict", () => {
+  it("ticks every finished step and says the product page is opening", () => {
     const html = render();
     expect(states(html)).toEqual(["done", "done", "done"]);
-    expect(html).toContain("Authentic");
     expect(html).toContain(CHECKING_COPY.opening);
-    expect(html).toContain('data-tone="ok"');
+  });
+
+  it("draws no verdict of its own: the page's verdict arrives over it", () => {
+    // One verdict, drawn once. A second copy here could come to say something
+    // else than the page under it.
+    for (const html of [render(), render({ opening: false })]) {
+      expect(html).not.toMatch(/Authentic|verify|Reported|Retired|expired/);
+      expect(html).not.toContain("data-tone");
+      expect(html).not.toContain("data-verdict");
+    }
   });
 
   it("keeps still the ticks the shopper already saw, and replays the rest", () => {
@@ -132,36 +135,24 @@ describe("<CheckingResolved> — the frame replayed over the finished page", () 
   });
 
   it("ticks nothing it cannot stand behind when the check failed", () => {
-    const html = render({
-      tone: "bad",
-      glyph: "cross",
-      title: "We couldn't verify this tag",
-      progress: { done: 0, seen: 0, tookMs: 2 },
-    });
+    const html = render({ opening: false, progress: { done: 0, seen: 0, tookMs: 2 } });
     expect(states(html)).toEqual(["waiting", "waiting", "waiting"]);
-    expect(html).toContain('data-tone="bad"');
-    expect(html).toContain("We couldn&#x27;t verify this tag");
     expect(html).not.toContain(CHECKING_COPY.opening);
   });
 
   it("shows only the steps that finished for a genuine tag with no product", () => {
-    const html = render({
-      tone: "warn",
-      glyph: "info",
-      title: "Tag not linked to a product",
-      progress: { done: 1, seen: 1, tookMs: 150 },
-    });
+    const html = render({ opening: false, progress: { done: 1, seen: 1, tookMs: 150 } });
     expect(states(html)).toEqual(["done", "waiting", "waiting"]);
     expect(html).not.toContain(CHECKING_COPY.opening);
   });
 
-  it("wraps up briskly once the check has already taken the minimum time on screen", () => {
-    expect(render({ progress: { done: 3, seen: 1, tookMs: MIN_ON_SCREEN_MS - 1 } })).toContain(
-      'data-pace="full"',
-    );
-    expect(render({ progress: { done: 3, seen: 2, tookMs: MIN_ON_SCREEN_MS } })).toContain(
-      'data-pace="brisk"',
-    );
+  it("says a page is opening only when every step finished, whatever it is told", () => {
+    for (const done of [0, 1, 2]) {
+      expect(render({ opening: true, progress: { done, seen: 0, tookMs: 300 } })).not.toContain(
+        CHECKING_COPY.opening,
+      );
+    }
+    expect(render({ opening: false })).not.toContain(CHECKING_COPY.opening);
   });
 
   it("stays on the 'Still checking' line when the wait had already passed it", () => {
@@ -176,5 +167,14 @@ describe("<CheckingResolved> — the frame replayed over the finished page", () 
     expect(html).toMatch(/data-tap-frame="resolved"[^>]*aria-hidden="true"/);
     expect(html).not.toContain("<h1");
     expect(html).not.toContain("<a ");
+  });
+});
+
+describe("the pace of the wrap-up", () => {
+  it("is brisk once the check has already taken the minimum time on screen", () => {
+    expect(paceOf(0)).toBe("full");
+    expect(paceOf(MIN_ON_SCREEN_MS - 1)).toBe("full");
+    expect(paceOf(MIN_ON_SCREEN_MS)).toBe("brisk");
+    expect(paceOf(STILL_CHECKING_AFTER_MS)).toBe("brisk");
   });
 });

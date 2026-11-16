@@ -8,6 +8,11 @@
  *   resolved  the same frame replayed on top of the finished page for a
  *             moment, so the check visibly completes before the page shows
  *
+ * The verdict itself is not part of this frame. When the check completes, the
+ * page's own verdict (see stage.module.css) arrives above the frame, exactly
+ * where the ring is, and the frame fades away under it. The clock both follow
+ * (--ck-next-tick, --ck-reveal, --ck-leave) is set once, on the page's stage.
+ *
  * Colours are tokens on .frame, and they are the light page's colours (see
  * tailwind.config.ts) so the frame and the page it opens look like one thing.
  */
@@ -22,20 +27,6 @@
   --ck-link: #0b63be;
   --ck-tick: #0b7a45;
   --ck-tick-ink: #ffffff;
-  --ck-ok: #0b7a45;
-  --ck-ok-ink: #ffffff;
-  --ck-warn: #7a4b00;
-  --ck-warn-ink: #ffffff;
-  --ck-bad: #a3231b;
-  --ck-bad-ink: #ffffff;
-  --ck-neutral: #0b0f17;
-  --ck-neutral-ink: #ffffff;
-
-  /* When each beat of the resolved phase starts. With the 0.2 s fade the frame
-     is on screen for 0.78 s after the verdict arrives — it cannot flash past. */
-  --ck-next-tick: 0.14s; /* the last step ticks after the one before it */
-  --ck-reveal: 0.22s; /* ring and headline turn into the verdict */
-  --ck-leave: 0.58s; /* the frame starts to fade away */
 
   position: fixed;
   inset: 0;
@@ -50,28 +41,6 @@
   color: var(--ck-fg);
   font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-/* The shopper has already watched the frame for a while: wrap up briskly. */
-.frame[data-pace="brisk"] {
-  --ck-next-tick: 0.07s;
-  --ck-reveal: 0.12s;
-  --ck-leave: 0.42s;
-}
-
-.frame[data-tone="warn"] {
-  --ck-ok: var(--ck-warn);
-  --ck-ok-ink: var(--ck-warn-ink);
-}
-
-.frame[data-tone="bad"] {
-  --ck-ok: var(--ck-bad);
-  --ck-ok-ink: var(--ck-bad-ink);
-}
-
-.frame[data-tone="neutral"] {
-  --ck-ok: var(--ck-neutral);
-  --ck-ok-ink: var(--ck-neutral-ink);
 }
 
 /* The page header, in the same place the page itself has it. */
@@ -106,8 +75,7 @@
 
 .track,
 .arc,
-.pending,
-.disc {
+.pending {
   position: absolute;
   inset: 0;
 }
@@ -128,16 +96,6 @@
   justify-content: center;
 }
 
-.disc {
-  inset: 4px; /* the ring's outer edge, so the disc fills the ring exactly */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--ck-ok);
-  color: var(--ck-ok-ink);
-}
-
 /* ── Headline ─────────────────────────────────────────────────────────────── */
 
 .head {
@@ -151,22 +109,17 @@
   grid-area: 1 / 1;
 }
 
-.title,
-.verdict {
-  margin: 0;
-  font-weight: 700;
-}
-
 .title {
+  margin: 0;
   font-size: 24px;
+  font-weight: 700;
   line-height: 30px;
 }
 
-/* Same line height as the title it replaces, so the swap moves nothing. */
-.verdict {
-  font-size: 28px;
-  line-height: 30px;
-  color: var(--ck-ok);
+/* The page's verdict arrives over the headline's line; the note that can
+   follow it keeps the place of the line under the headline. */
+.after {
+  padding-top: 30px;
 }
 
 /* Two lines share one cell, so swapping them moves nothing. */
@@ -345,32 +298,32 @@
 
 /* ── Resolved: the check completes, then the frame gets out of the way ────── */
 
+/* The three beats come from the page's stage (see stage.module.css); the
+   numbers after the commas only apply to a frame shown outside one. */
 .frame[data-phase="resolved"] {
-  animation: ck-out 0.2s ease-in var(--ck-leave) both;
+  animation: ck-out 0.24s ease-out var(--ck-leave, 0.92s) both;
 }
 
 /* Remaining ticks land one after the other… */
 .frame[data-phase="resolved"] .step[data-step="3"] .tick {
-  animation-delay: var(--ck-next-tick);
+  animation-delay: var(--ck-next-tick, 0.14s);
 }
 
 .frame[data-phase="resolved"] .step[data-step="2"][data-still] ~ .step[data-step="3"] .tick {
   animation-delay: 0s;
 }
 
-/* …then the spinner and the "checking" headline give way to the verdict. The
-   old headline is gone before the new one comes in, so the two never overlap. */
+/* …then the ring and the "checking" headline give way to the page's verdict,
+   which arrives in their place. They are gone before it has come in, so the
+   two never overlap. */
+.frame[data-phase="resolved"] .track,
 .frame[data-phase="resolved"] .pending,
 .frame[data-phase="resolved"] .checkingHead {
-  animation: ck-out 0.08s ease-out var(--ck-reveal) both;
+  animation: ck-out 0.08s ease-out var(--ck-reveal, 0.22s) both;
 }
 
-.frame[data-phase="resolved"] .disc {
-  animation: ck-pop 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2) var(--ck-reveal) both;
-}
-
-.frame[data-phase="resolved"] .verdictHead {
-  animation: ck-in 0.16s ease-out calc(var(--ck-reveal) + 0.08s) both;
+.frame[data-phase="resolved"] .after {
+  animation: ck-in 0.16s ease-out calc(var(--ck-reveal, 0.22s) + 0.3s) both;
 }
 
 /* ── Motion turned off: a still frame, and no replay over the page ────────── */
@@ -382,8 +335,7 @@
 
   .arc,
   .spin,
-  .tick,
-  .disc {
+  .tick {
     animation: none !important;
   }
 

@@ -47,7 +47,7 @@ import { STATES } from "@/lib/states";
 import { recordPageModel } from "@/lib/tap-page";
 import { recordHistoryStatus } from "@/lib/tap-view";
 import { HeroImage } from "@/components/hero-image";
-import { ReviewsSection } from "@/components/rating-summary";
+import { RatingLine, ReviewsSection } from "@/components/rating-summary";
 import { RateWidget } from "@/components/rate-widget";
 import { RecordResult } from "@/components/record-result";
 import { fetchRatings } from "@/lib/ratings";
@@ -209,6 +209,7 @@ export default async function AssetVerifyPage({ params }: PageProps) {
             productName={product.name}
           />
         ),
+        rating: <RatingLine view={ratings} />,
         reviews: (
           <ReviewsSection
             view={ratings}

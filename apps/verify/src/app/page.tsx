@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ConsumerPage, Icon, NEEDS_SCRIPT, PRIMARY_BUTTON } from "@/components/consumer";
+import { ConsumerPage, Icon } from "@/components/consumer";
+import { NEEDS_SCRIPT, PRIMARY_BUTTON } from "@/components/shared";
 import { COPY } from "@/lib/consumer-copy";
 
 /**

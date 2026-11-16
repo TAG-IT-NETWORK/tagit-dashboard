@@ -17,7 +17,7 @@ import {
   recordWithFacts,
   resolvedTap,
 } from "@/test-support/shopper-fixtures";
-import { outsideDrawer, readable } from "@/test-support/readable";
+import { onShow, outsideDrawer, readable, rowNames, rowOf } from "@/test-support/readable";
 
 import { RecordResult } from "../record-result";
 import { TapResult } from "../tap-result";
@@ -60,14 +60,21 @@ function recordPage(lookup: AssetLookup): string {
   );
 }
 
-/** The "About this product" section of a page, as it is read out. */
-function about(html: string): string {
-  const text = readable(html);
-  const start = text.indexOf(`## ${COPY.about.title}`);
-  expect(start, "the page has an About section").toBeGreaterThan(-1);
-  const next = text.indexOf("\n## ", start + 4);
-  return next === -1 ? text.slice(start) : text.slice(start, next);
+/**
+ * One row of a page, as it is read out: its title, then what it holds. The
+ * facts live in rows that open (see <ProductRows>): "about" for the short
+ * facts, and one row each for how to use, warnings and ingredients.
+ */
+function row(html: string, name: string): string[] {
+  const markup = rowOf(html, name);
+  expect(markup, `the page has a "${name}" row`).not.toBe("");
+  return readable(markup)
+    .split("\n")
+    .filter((line) => line !== "[closed drawer]" && line !== "[end of drawer]");
 }
+
+/** The "About this product" row, as one text. */
+const about = (html: string) => row(html, "about").join("\n");
 
 describe("the view model", () => {
   it("carries the facts of a record that has them, and none for one that has not", () => {
@@ -107,29 +114,40 @@ describe("the tap page, for an item with product facts", () => {
   const html = tapPage(recordWithFacts(STATE.ACTIVATED, true));
 
   it("reads, in About this product, exactly this", () => {
-    expect(about(html)).toBe(
-      [
-        "## About this product",
-        "A light daily face cream for dry skin. 50 ml jar.",
-        "Brand: TAG IT Demo",
-        "Size: 50 ml",
-        "Made in: South Korea",
-        "Product code: TD-RC-50",
-        "Batch: L2406A",
-        "Made on: Jun 1, 2026",
-        "Best before: Jun 1, 2028",
-        "Use within: 12 months of opening",
-        "Last updated: Sep 5, 2026",
-        "### How to use",
-        "Apply a small amount to clean skin, morning and evening.",
-        "### Warnings",
-        "For external use only. Avoid contact with eyes.",
-        "[closed drawer]",
-        "Ingredients",
-        "Aqua, Glycerin, Sodium DNA, Niacinamide, Panthenol",
-        "[end of drawer]",
-      ].join("\n"),
-    );
+    expect(row(html, "about")).toEqual([
+      "## About this product",
+      "A light daily face cream for dry skin. 50 ml jar.",
+      "Brand: TAG IT Demo",
+      "Size: 50 ml",
+      "Made in: South Korea",
+      "Product code: TD-RC-50",
+      "Batch: L2406A",
+      "Made on: Jun 1, 2026",
+      "Best before: Jun 1, 2028",
+      "Use within: 12 months of opening",
+      "Last updated: Sep 5, 2026",
+    ]);
+  });
+
+  it("reads, in the three rows for the brand's longer texts, exactly this", () => {
+    expect(row(html, "how-to-use")).toEqual([
+      "## How to use",
+      "Apply a small amount to clean skin, morning and evening.",
+    ]);
+    expect(row(html, "warnings")).toEqual([
+      "## Warnings",
+      "For external use only. Avoid contact with eyes.",
+    ]);
+    expect(row(html, "ingredients")).toEqual([
+      "## Ingredients",
+      "Aqua, Glycerin, Sodium DNA, Niacinamide, Panthenol",
+    ]);
+  });
+
+  it("puts those rows right after About this product, in that order", () => {
+    const names = rowNames(html);
+    const at = names.indexOf("about");
+    expect(names.slice(at, at + 4)).toEqual(["about", "how-to-use", "warnings", "ingredients"]);
   });
 
   it("names the size under the product's name", () => {
@@ -144,17 +162,25 @@ describe("the tap page, for an item with product facts", () => {
     expect((html.match(/<h1\b/g) ?? []).length).toBe(1);
   });
 
-  it("shows how to use and the warnings in full, and the ingredients in a drawer that needs no script", () => {
-    expect(html).toMatch(/<h3[^>]*>How to use<\/h3>/);
-    expect(html).toMatch(/<h3[^>]*>Warnings<\/h3>/);
-    const drawer = /<details\b[^>]*data-text-drawer[^>]*>([\s\S]*?)<\/details>/.exec(html);
-    expect(drawer, "an ingredients drawer").not.toBeNull();
-    expect(drawer![1]).toContain("<summary");
-    expect(drawer![1]).toContain("Ingredients");
-    expect(drawer![1]).toContain(FACTS.ingredients);
-    // The text is in the page whether or not the drawer is open: nothing but
-    // the browser's own closed state keeps it out of sight.
-    expect(drawer![0]).not.toMatch(/\shidden[\s=>]|display:\s*none/);
+  it("keeps every one of those texts in a row that needs no script to open", () => {
+    for (const [name, text] of [
+      ["how-to-use", FACTS.howToUse],
+      ["warnings", FACTS.warnings],
+      ["ingredients", FACTS.ingredients],
+    ] as const) {
+      const markup = rowOf(html, name);
+      expect(markup, name).toMatch(/^<details[^>]*><summary/);
+      expect(markup, name).toContain(text);
+      // The text is in the page whether or not the row is open: nothing but
+      // the browser's own closed state keeps it out of sight.
+      expect(markup, name).not.toMatch(/\shidden[\s=>]|display:\s*none/);
+      expect(markup, name).not.toContain("data-needs-script");
+    }
+    // …and none of it is on show before a row is opened
+    const shown = readable(onShow(html));
+    for (const text of [FACTS.howToUse!, FACTS.warnings!, FACTS.ingredients!, "Batch"]) {
+      expect(shown).not.toContain(text);
+    }
   });
 
   it("adds nothing a shopper page must not show", () => {
@@ -167,45 +193,45 @@ describe("the tap page, for an item with product facts", () => {
 
 describe("only what the brand filled in", () => {
   it("shows a lone fact and none of the empty ones", () => {
-    const section = about(tapPage(recordWithFacts(STATE.ACTIVATED, false, { size: "50 ml" })));
+    const page = tapPage(recordWithFacts(STATE.ACTIVATED, false, { size: "50 ml" }));
+    const section = about(page);
     expect(section).toContain("Size: 50 ml");
-    for (const label of [
-      "Batch",
-      "Made on",
-      "Best before",
-      "Use within",
-      "How to use",
-      "Warnings",
-      "Ingredients",
-    ]) {
+    for (const label of ["Batch", "Made on", "Best before", "Use within"]) {
       expect(section, label).not.toContain(label);
     }
-    expect(section).not.toContain("[closed drawer]");
+    // no row for a text the brand did not write
+    for (const name of ["how-to-use", "warnings", "ingredients"]) {
+      expect(rowNames(page), name).not.toContain(name);
+    }
+    for (const title of [COPY.about.howToUse, COPY.about.warnings, COPY.about.ingredients]) {
+      expect(readable(page), title).not.toContain(title);
+    }
   });
 
   it("an item without facts reads as it did before facts existed", () => {
-    const section = about(tapPage(record(STATE.ACTIVATED)));
-    expect(section).toBe(
-      [
-        "## About this product",
-        "A light daily face cream for dry skin. 50 ml jar.",
-        "Brand: TAG IT Demo",
-        "Made in: South Korea",
-        "Product code: TD-RC-50",
-        "Last updated: Sep 5, 2026",
-      ].join("\n"),
-    );
+    const page = tapPage(record(STATE.ACTIVATED));
+    expect(row(page, "about")).toEqual([
+      "## About this product",
+      "A light daily face cream for dry skin. 50 ml jar.",
+      "Brand: TAG IT Demo",
+      "Made in: South Korea",
+      "Product code: TD-RC-50",
+      "Last updated: Sep 5, 2026",
+    ]);
+    expect(rowNames(page)).toEqual(["about", "how-we-know", "technical"]);
   });
 
-  it("still has an About section when the facts are all the record says about the product", () => {
+  it("has a row for a fact even when it is all the record says about the product", () => {
     const bare: AssetDto = {
       tokenId: RECORD_NUMBER,
       stateCode: STATE.ACTIVATED,
       name: "Renewal Cream",
       facts: { ingredients: FACTS.ingredients },
     };
-    const section = about(tapPage({ kind: "record", dto: bare }));
-    expect(section).toContain(FACTS.ingredients);
+    const page = tapPage({ kind: "record", dto: bare });
+    expect(row(page, "ingredients")).toEqual(["## Ingredients", FACTS.ingredients]);
+    // …and no empty "About this product" row beside it
+    expect(rowNames(page)).not.toContain("about");
   });
 });
 
@@ -217,9 +243,9 @@ describe("every state that shows a product shows its facts", () => {
     ["reported", STATE.FLAGGED, false],
     ["retired", STATE.RECYCLED, false],
   ] as const)("%s", (_name, state, listed) => {
-    const section = about(tapPage(recordWithFacts(state, listed), state));
-    expect(section).toContain("Batch: L2406A");
-    expect(section).toContain("### Warnings");
+    const page = tapPage(recordWithFacts(state, listed), state);
+    expect(about(page)).toContain("Batch: L2406A");
+    expect(row(page, "warnings")).toEqual(["## Warnings", FACTS.warnings]);
   });
 
   it("a private item shows none", () => {
@@ -235,12 +261,11 @@ describe("every state that shows a product shows its facts", () => {
 describe("the record page (/asset/…)", () => {
   it("shows the same facts as the tap page", () => {
     const html = recordPage(recordWithFacts(STATE.ACTIVATED, true));
-    const section = about(html);
-    expect(section).toContain("Size: 50 ml");
-    expect(section).toContain("Batch: L2406A");
-    expect(section).toContain("Best before: Jun 1, 2028");
-    expect(section).toContain("### How to use");
-    expect(section).toContain(FACTS.ingredients);
+    const tap = tapPage(recordWithFacts(STATE.ACTIVATED, true));
+    for (const name of ["about", "how-to-use", "warnings", "ingredients"]) {
+      expect(row(html, name), name).toEqual(row(tap, name));
+    }
+    expect(about(html)).toContain("Batch: L2406A");
     expect(readable(html)).toContain("TAG IT Demo · 50 ml · Made in South Korea");
   });
 

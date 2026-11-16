@@ -7,8 +7,7 @@ import { baseSepolia } from "viem/chains";
 import { COPY } from "@/lib/consumer-copy";
 import { ratingMessage, reviewDigestBrowser } from "@/lib/ratings-shared";
 
-const PRIMARY =
-  "flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-brand px-4 text-[17px] font-semibold leading-6 text-white hover:bg-brand-strong disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+import { PRIMARY_BUTTON as PRIMARY } from "./shared";
 
 /** Sign-in context + the review form (lazy chunk, see rate-widget.tsx). */
 export default function RateCheckout({
@@ -96,7 +95,7 @@ function RateForm({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line p-4">
+    <div className="flex flex-col gap-3 border-t border-line pt-3">
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 text-[15px] font-semibold leading-[22px]">
           {COPY.reviews.formTitle(productName)}

@@ -6,6 +6,8 @@ import { encodeFunctionData, type Hex } from "viem";
 import { COPY, isFailureAfterPayment, purchaseFailure, supportMailto } from "@/lib/consumer-copy";
 import { isPurchasable, type CanonicalPrice } from "@/lib/price";
 
+import { PRIMARY_BUTTON } from "./shared";
+
 // Base Sepolia test USDC (6 decimals).
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
 const BASE_SEPOLIA = 84532;
@@ -159,8 +161,7 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
     }
   }, [buyerWallet, tokenId, refetchPrice, sendTransaction]);
 
-  const primaryBtn =
-    "flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-brand px-4 text-[17px] font-semibold leading-6 text-white hover:bg-brand-strong disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+  const primaryBtn = PRIMARY_BUTTON;
   const note = "text-center text-[13px] leading-[18px] text-muted";
 
   // Success — the buyer is now the registered owner.
