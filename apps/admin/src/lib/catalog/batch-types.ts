@@ -7,6 +7,8 @@
  * strings; timestamps arrive as ISO strings after JSON.
  */
 
+import type { BatchFacts } from "./product-facts";
+
 /** batches.state — see services batch.ts state machine. */
 export type BatchState = "validated" | "minting" | "minted" | "mint_failed";
 
@@ -22,6 +24,8 @@ export interface BatchDto {
   tokenStart: string | null;
   tokenEnd: string | null;
   actor: string;
+  /** Lot, made-on and best-before shared by every item (TAP-T09); null when unset. */
+  facts?: BatchFacts | null;
   createdAt: string;
   updatedAt: string;
 }

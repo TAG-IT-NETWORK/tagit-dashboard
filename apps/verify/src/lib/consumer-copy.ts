@@ -279,8 +279,13 @@ export const COPY = {
     facts: {
       brand: "Brand",
       model: "Model",
+      size: "Size",
       madeIn: "Made in",
       code: "Product code",
+      batch: "Batch",
+      madeOn: "Made on",
+      bestBefore: "Best before",
+      useWithin: "Use within",
       /**
        * The date the record carries is the day the item last changed (tag
        * attached, released, bought, reported, retired or handed to a new
@@ -288,6 +293,13 @@ export const COPY = {
        */
       updated: "Last updated",
     },
+    /** "12 months of opening", after the "Use within" label. */
+    useWithinValue: (months: number) =>
+      months === 1 ? "1 month of opening" : `${months} months of opening`,
+    /** The brand's own longer texts (TAP-T09). Shown as plain text. */
+    howToUse: "How to use",
+    warnings: "Warnings",
+    ingredients: "Ingredients",
   },
 
   /** Copy deck: the three trust points. */

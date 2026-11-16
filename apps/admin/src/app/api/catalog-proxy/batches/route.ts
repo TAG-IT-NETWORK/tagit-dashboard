@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getActorRole } from "@/lib/actor-role";
 import { MAX_BATCH_SIZE } from "@/lib/catalog/batch-logic";
+import { parseBatchFactsBody } from "@/lib/catalog/product-facts";
 import { TEMPLATE_ID_RE, canMutateCatalog } from "@/lib/catalog/template-logic";
 import { batchesUpstream } from "@/lib/server/batches-upstream";
 
@@ -19,6 +20,9 @@ import { batchesUpstream } from "@/lib/server/batches-upstream";
  * translates onto the two upstream shapes (batch-router.ts):
  *   { templateId, quantity }  → JSON POST /api/v1/admin/batches
  *   { templateId, csv }       → text/csv POST /api/v1/admin/batches?templateId=…
+ * Either may carry `facts: { lot, madeOn, bestBefore }` (TAP-T09) — what every
+ * item of the batch shares. It rides in the JSON body on the quantity path and
+ * in the query string (?lot=&madeOn=&bestBefore=) on the CSV path.
  *
  * Responses pass through: 201 {ok, batch, rows, errors:[]} on success; the
  * CSV row-error preview comes back as 400 {ok:false, rows, errors} WITHOUT
@@ -70,7 +74,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "viewer role is read-only" }, { status: 403 });
   }
 
-  let body: { templateId?: unknown; quantity?: unknown; csv?: unknown };
+  let body: { templateId?: unknown; quantity?: unknown; csv?: unknown; facts?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -91,9 +95,20 @@ export async function POST(req: Request) {
     );
   }
 
+  // The proxy's own read of the facts: known keys, text values, real dates.
+  // Services checks again and also refuses them for a non-cosmetics template.
+  const parsedFacts = parseBatchFactsBody(body.facts);
+  if (!parsedFacts.ok) {
+    return NextResponse.json({ ok: false, error: parsedFacts.error }, { status: 400 });
+  }
+  const facts = parsedFacts.facts;
+
   if (body.csv !== undefined) {
     if (typeof body.csv !== "string" || body.csv.length === 0) {
-      return NextResponse.json({ ok: false, error: "csv must be a non-empty string" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "csv must be a non-empty string" },
+        { status: 400 },
+      );
     }
     if (body.csv.length > MAX_CSV_BYTES) {
       return NextResponse.json(
@@ -101,10 +116,14 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const res = await batchesUpstream(
-      `/api/v1/admin/batches?templateId=${encodeURIComponent(templateId)}`,
-      { method: "POST", csv: body.csv },
-    );
+    const query = new URLSearchParams({ templateId });
+    for (const [key, value] of Object.entries(facts ?? {})) {
+      if (typeof value === "string") query.set(key, value);
+    }
+    const res = await batchesUpstream(`/api/v1/admin/batches?${query.toString()}`, {
+      method: "POST",
+      csv: body.csv,
+    });
     return NextResponse.json(res.body, { status: res.status });
   }
 
@@ -121,7 +140,7 @@ export async function POST(req: Request) {
   }
   const res = await batchesUpstream("/api/v1/admin/batches", {
     method: "POST",
-    json: { templateId, quantity: body.quantity },
+    json: { templateId, quantity: body.quantity, ...(facts ? { facts } : {}) },
   });
   return NextResponse.json(res.body, { status: res.status });
 }

@@ -37,6 +37,7 @@ import {
   type RecentBatch,
   type WizardStep,
 } from "@/lib/catalog/batch-logic";
+import { factsSupported, mintCategory, takesProductFacts } from "@/lib/catalog/product-facts";
 import { canMutateCatalog, type CatalogRole } from "@/lib/catalog/template-logic";
 import type { BatchDto, BatchProgress, BatchStatusResponse } from "@/lib/catalog/batch-types";
 
@@ -63,6 +64,10 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
   const [statusError, setStatusError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(initialBatchId !== null);
   const [templateName, setTemplateName] = useState<string | null>(null);
+  // Whether a new batch may carry lot / made-on / best-before (TAP-T09):
+  // the API must know facts, and the category the items will be minted with
+  // must be cosmetics. False until the template has loaded.
+  const [batchFactsAvailable, setBatchFactsAvailable] = useState(false);
   const [recent, setRecent] = useState<RecentBatch[]>([]);
   const [recentSource, setRecentSource] = useState<"server" | "local">("local");
   const [pollNonce, setPollNonce] = useState(0);
@@ -123,10 +128,18 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/catalog-proxy/templates/${templateId}`, { cache: "no-store" });
+        const res = await fetch(`/api/catalog-proxy/templates/${templateId}`, {
+          cache: "no-store",
+        });
         const data = await res.json();
         if (!cancelled && res.ok && data.ok && data.template?.name) {
           setTemplateName(data.template.name as string);
+          setBatchFactsAvailable(
+            factsSupported(data.template) &&
+              takesProductFacts(
+                mintCategory(data.template, Array.isArray(data.versions) ? data.versions : []),
+              ),
+          );
         }
       } catch {
         // header degrades to the raw id
@@ -282,6 +295,7 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
             <StepCreate
               templateId={templateId}
               canCreate={canMutateCatalog(role)}
+              factsAvailable={batchFactsAvailable}
               onCreated={onCreated}
             />
           ) : batch !== null && step === "mint" ? (
@@ -327,7 +341,8 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
                   >
                     <span className="block truncate font-mono">{b.id}</span>
                     <span className="text-muted-foreground">
-                      {b.size} item{b.size === 1 ? "" : "s"} · {b.id === batch?.id ? batch.state : b.state}
+                      {b.size} item{b.size === 1 ? "" : "s"} ·{" "}
+                      {b.id === batch?.id ? batch.state : b.state}
                     </span>
                   </button>
                 </li>

@@ -89,6 +89,7 @@ const TEMPLATE_BODY_KEYS = [
   "origin",
   "description",
   "attributes",
+  "facts",
   "priceUsdc6",
   "msrp",
 ] as const;

@@ -161,6 +161,10 @@ export function workingCopySnapshot(t: TemplateDto): Record<string, unknown> {
     msrpAmount: t.msrpAmount,
     msrpCurrency: t.msrpCurrency,
     slug: t.slug,
+    // Facts join the snapshot only when the template has some (TAP-T09), so
+    // a template without facts still compares equal to a snapshot published
+    // before facts existed.
+    ...(t.facts !== null && t.facts !== undefined ? { facts: t.facts } : {}),
   };
 }
 
@@ -271,9 +275,7 @@ export function readTemplateItemsPage(
   if (typeof body !== "object" || body === null) return null;
   const env = body as { ok?: unknown; items?: unknown; nextCursor?: unknown };
   if (env.ok !== true || !Array.isArray(env.items)) return null;
-  const rows = env.items
-    .map(readTemplateItemRow)
-    .filter((r): r is TemplateItemRow => r !== null);
+  const rows = env.items.map(readTemplateItemRow).filter((r): r is TemplateItemRow => r !== null);
   return {
     rows,
     nextCursor: typeof env.nextCursor === "string" ? env.nextCursor : null,
@@ -290,9 +292,7 @@ export function itemsBehindLatest(
   latestVersion: number,
 ): TemplateItemRow[] {
   if (latestVersion <= 0) return [];
-  return rows.filter(
-    (r) => r.templateVersion !== null && r.templateVersion < latestVersion,
-  );
+  return rows.filter((r) => r.templateVersion !== null && r.templateVersion < latestVersion);
 }
 
 // ──────────────────────────────────────────────
@@ -506,9 +506,7 @@ export function mergeMediaIntoAttributes(
     }
   }
   const kept = (attributes ?? []).filter((a) => !isMediaAttribute(a));
-  const heroFirst = [...media].sort((a, b) =>
-    a.role === b.role ? 0 : a.role === "hero" ? -1 : 1,
-  );
+  const heroFirst = [...media].sort((a, b) => (a.role === b.role ? 0 : a.role === "hero" ? -1 : 1));
   const next = [
     ...kept,
     ...heroFirst.map((m) => ({ trait_type: `${MEDIA_ATTR_PREFIX}${m.role}`, value: m.url })),
@@ -520,7 +518,9 @@ export function mergeMediaIntoAttributes(
 }
 
 /** Thumb for the /catalog table: first media:hero, else first media:*. */
-export function templateThumbUrl(attributes: TemplateAttribute[] | null | undefined): string | null {
+export function templateThumbUrl(
+  attributes: TemplateAttribute[] | null | undefined,
+): string | null {
   const media = mediaListFromAttributes(attributes);
   return media.find((m) => m.role === "hero")?.url ?? media[0]?.url ?? null;
 }

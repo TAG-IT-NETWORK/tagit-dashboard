@@ -115,6 +115,32 @@ export function recordDto(stateCode: number, listed = false): AssetDto {
   };
 }
 
+/**
+ * The facts a brand can write for a cosmetics item (TAP-T09), as the item
+ * record carries them. Kept out of recordDto on purpose: the twelve state
+ * snapshots describe an item without them.
+ */
+export const FACTS: NonNullable<AssetDto["facts"]> = {
+  size: "50 ml",
+  ingredients: "Aqua, Glycerin, Sodium DNA, Niacinamide, Panthenol",
+  howToUse: "Apply a small amount to clean skin, morning and evening.",
+  warnings: "For external use only. Avoid contact with eyes.",
+  useWithinMonths: 12,
+  lot: "L2406A",
+  madeOn: "2026-06-01",
+  bestBefore: "2028-06-01",
+};
+
+/** Item 58 with the brand's facts on its record. */
+export const recordWithFacts = (
+  stateCode: number,
+  listed = false,
+  facts: AssetDto["facts"] = FACTS,
+): AssetLookup => ({
+  kind: "record",
+  dto: { ...recordDto(stateCode, listed), facts },
+});
+
 export const record = (stateCode: number, listed = false): AssetLookup => ({
   kind: "record",
   dto: recordDto(stateCode, listed),

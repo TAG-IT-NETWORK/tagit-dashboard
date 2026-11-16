@@ -436,6 +436,38 @@ export function Facts({ rows }: { rows: ReadonlyArray<readonly [string, string]>
   );
 }
 
+/**
+ * A short piece of the brand's own text under a small heading, shown in full.
+ * `children` is a string and is rendered as a text node: whatever it contains
+ * is read as text, never as markup (REQ-S-10).
+ */
+export function TextBlock({ title, children }: { title: string; children: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <h3 className="text-[15px] font-semibold leading-[22px]">{title}</h3>
+      <p className="break-words text-[15px] leading-[22px] text-body">{children}</p>
+    </div>
+  );
+}
+
+/**
+ * A closed drawer for a long piece of the brand's own text (an ingredients
+ * list). A plain <details>: it opens without any script, and the text is in
+ * the page either way, so it is found by a search of the page. Text node
+ * only, as in <TextBlock>.
+ */
+export function TextDrawer({ title, children }: { title: string; children: string }) {
+  return (
+    <details className="rounded-2xl border border-line" data-text-drawer>
+      <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 text-[15px] font-semibold leading-[22px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+        {title}
+        <Chevron className="details-chevron text-muted" />
+      </summary>
+      <p className="break-words px-4 pb-3.5 text-sm leading-5 text-body">{children}</p>
+    </details>
+  );
+}
+
 /** A quiet box for a side note. */
 export function Note({ icon, children }: { icon?: IconName; children: ReactNode }) {
   return (

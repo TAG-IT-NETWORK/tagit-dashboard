@@ -12,6 +12,7 @@
 import { COPY, type RecordStateKey, type TapStateKey } from "./consumer-copy";
 import { formatFxApprox, type FxApproxRender } from "./fx";
 import { isAllowedImageUrl } from "./media";
+import { productFactsViewOf, type ProductFactsView } from "./product-facts";
 import type { TapResolution } from "./resolve";
 import type { AssetDto, AssetLookup, AssetMediaEntry } from "./services";
 
@@ -244,6 +245,11 @@ export interface ProductView {
   updatedOn?: string;
   /** A photo on an allowed image host, if the record has one. */
   photo?: { url: string; lqip?: string };
+  /**
+   * What the brand wrote for shoppers: size, batch, dates, how to use,
+   * warnings, ingredients (TAP-T09). Absent when the record has none.
+   */
+  facts?: ProductFactsView;
 }
 
 const text = (value: string | undefined | null): string | undefined => {
@@ -279,6 +285,7 @@ export function productViewOf(lookup: AssetLookup | null | undefined): ProductVi
   const fx = listed ? formatFxApprox(dto.price?.fx) : null;
   const model = text(dto.product?.model);
   const photo = photoOf(dto);
+  const facts = productFactsViewOf(dto.facts);
 
   return {
     name: name ?? COPY.product.fallbackName,
@@ -293,7 +300,20 @@ export function productViewOf(lookup: AssetLookup | null | undefined): ProductVi
     ...(fx ? { fx } : {}),
     ...(formatDay(dto.timestamp) ? { updatedOn: formatDay(dto.timestamp) } : {}),
     ...(photo ? { photo } : {}),
+    ...(facts ? { facts } : {}),
   };
+}
+
+/**
+ * The one line under the product's name: brand, size, where it was made.
+ * Each part only when the record has it.
+ */
+export function productBasics(product: ProductView): string[] {
+  return [
+    ...(product.brand ? [product.brand] : []),
+    ...(product.facts?.size ? [product.facts.size] : []),
+    ...(product.madeIn ? [COPY.product.madeIn(product.madeIn)] : []),
+  ];
 }
 
 /**

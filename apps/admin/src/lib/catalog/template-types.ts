@@ -8,6 +8,8 @@
  * strings after JSON.
  */
 
+import type { TemplateFacts } from "./product-facts";
+
 export type TemplateStatus = "draft" | "published" | "archived";
 
 export interface TemplateAttribute {
@@ -30,6 +32,11 @@ export interface TemplateDto {
   origin: string | null;
   description: string | null;
   attributes: TemplateAttribute[] | null;
+  /**
+   * Product facts for shoppers (TAP-T09) — null when unset. The key is ABSENT
+   * on a services build older than the `facts` column; see factsSupported().
+   */
+  facts?: TemplateFacts | null;
   /** usdc-6 minor units as a decimal string, e.g. "22500000". */
   priceUsdc6: string | null;
   msrpAmount: number | null;
