@@ -47,7 +47,6 @@ function page(state: RecordStateKey, lookup = CASES[state].lookup): string {
   const model = recordPageModel(lookup, id);
   expect(model.state).toBe(state); // the data really leads to this state
   const { product } = model;
-  const reviewable = model.stateCode === STATE.ACTIVATED || model.stateCode === STATE.CLAIMED;
   return renderToStaticMarkup(
     <RecordResult
       state={model.state}
@@ -67,7 +66,8 @@ function page(state: RecordStateKey, lookup = CASES[state].lookup): string {
               buy: product.price ? (
                 <button type="button">{COPY.buy.button(product.price)}</button>
               ) : undefined,
-              reviews: reviewable ? <ReviewsSection view={RATINGS} /> : undefined,
+              // handed to every state, as the route does; the page decides
+              reviews: <ReviewsSection view={RATINGS} />,
               history: <p>(product history loads here)</p>,
             }
           : undefined
@@ -205,6 +205,16 @@ describe("the parts each record state does and does not get", () => {
       expect(readable(html)).not.toContain(COPY.buy.buttonNoPrice);
       expect(html).not.toContain("$23.33");
       expect(readable(html)).not.toContain(COPY.chips.forSale);
+    }
+  });
+
+  it("shows owner reviews only for an item that is on sale or owned", () => {
+    expect(has("registered", `## ${COPY.reviews.title}`)).toBe(true);
+    expect(readable(page("registered", record(STATE.CLAIMED)))).toContain(
+      `## ${COPY.reviews.title}`,
+    );
+    for (const state of STATES.filter((s) => s !== "registered")) {
+      expect(has(state, COPY.reviews.title)).toBe(false);
     }
   });
 

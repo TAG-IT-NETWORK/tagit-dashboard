@@ -436,6 +436,40 @@ describe("the page frame", () => {
   });
 });
 
+describe("with scripts turned off", () => {
+  /** Opening tags of the elements that are left out while scripts are off. */
+  const leftOut = (html: string) => html.match(/<[a-z0-9]+\b[^>]*\bdata-needs-script[^>]*>/g) ?? [];
+
+  it.each(STATES)("%s carries the rule that leaves script-only parts out", (state) => {
+    expect(page(state)).toContain(
+      "<noscript><style>[data-needs-script]{display:none!important}</style></noscript>",
+    );
+  });
+
+  it.each(STATES)("%s keeps the verdict, the product and Technical details", (state) => {
+    for (const tag of leftOut(page(state))) {
+      // only whole sections are left out — never the page, the verdict or the drawer
+      expect(tag.startsWith("<section")).toBe(true);
+      expect(tag).not.toMatch(/role="status"|data-verdict|data-technical|aria-label/);
+    }
+  });
+
+  it("leaves out the history, which the browser has to load", () => {
+    const tags = leftOut(body("owned"));
+    expect(tags).toHaveLength(1);
+    expect(body("owned")).toMatch(
+      new RegExp(`<section[^>]*data-needs-script[^>]*><h2[^>]*>${COPY.history.title}</h2>`),
+    );
+  });
+
+  it("leaves out reviews that arrive after the page, and keeps reviews that are part of it", () => {
+    const late = renderToStaticMarkup(<ReviewsSection view={RATINGS} late />);
+    expect(leftOut(late)).toHaveLength(1);
+    expect(late).toMatch(/^<section[^>]*data-needs-script/);
+    expect(leftOut(renderToStaticMarkup(<ReviewsSection view={RATINGS} />))).toHaveLength(0);
+  });
+});
+
 describe("the frame that resolves into the verdict", () => {
   it("carries the same headline and tone as the page under it", () => {
     for (const state of STATES.filter((s) => CASES[s])) {

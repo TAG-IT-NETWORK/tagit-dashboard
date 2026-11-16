@@ -1,10 +1,15 @@
 /**
- * Turn a rendered page into what a person reads, top to bottom (TAP-T08).
+ * Turn a rendered page into what is read out, top to bottom (TAP-T08).
  *
  * The state snapshots store this instead of raw markup: it shows the words,
  * their order and what sits inside the closed drawer, and it does not change
  * when a class name does. Headings are marked, links show where they go, and
  * the drawer's contents are fenced so it is obvious they are not on show.
+ *
+ * It follows what a screen reader would say: decoration marked aria-hidden is
+ * left out and text written only for listeners is kept. In the few places
+ * where the two differ (a drawn rating, "≈ €21.11"), the snapshot holds the
+ * spoken wording; tests that care about the drawn one look at the markup.
  */
 const ENTITIES: Record<string, string> = {
   "&amp;": "&",
@@ -19,7 +24,7 @@ const ENTITIES: Record<string, string> = {
 export function readable(html: string): string {
   return (
     html
-      // not for readers: scripts, styles, icons, and anything hidden from everyone
+      // not read out: scripts, styles, icons, and anything marked as decoration
       .replace(/<(script|style|svg|noscript)\b[\s\S]*?<\/\1>/g, "")
       .replace(/<([a-z0-9]+)\b[^>]*\baria-hidden="true"[^>]*>[\s\S]*?<\/\1>/g, "")
       .replace(/<!--[\s\S]*?-->/g, "")

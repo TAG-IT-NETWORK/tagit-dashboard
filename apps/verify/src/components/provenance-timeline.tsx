@@ -30,6 +30,7 @@ import { useEffect, useState } from "react";
 
 import { COPY } from "@/lib/consumer-copy";
 import type { ProvenanceWire, ProvenanceWireEvent } from "@/lib/provenance-wire";
+import type { HistoryStatus } from "@/lib/tap-view";
 
 /** One wire event in the shopper's words, or null when it adds nothing. */
 export function historyLabel(event: ProvenanceWireEvent, brand?: string): string | null {
@@ -61,12 +62,68 @@ export function historyLabel(event: ProvenanceWireEvent, brand?: string): string
   }
 }
 
-/** The steps to show, in order, without a step repeating itself back to back. */
-export function historySteps(events: ProvenanceWireEvent[], brand?: string): string[] {
+/** The state an event leaves the item in, as the wire names it. */
+function reachedBy(event: ProvenanceWireEvent): string | undefined {
+  switch (event.type) {
+    case "AssetMinted":
+      return "MINTED";
+    case "TagBound":
+      return "BOUND";
+    case "AssetResold":
+      return "CLAIMED";
+    case "StateChanged":
+      return event.to_state;
+  }
+}
+
+/** An item's ordinary life, in order: made, tag attached, released, bought. */
+const MAIN_LINE = ["MINTED", "BOUND", "ACTIVATED", "CLAIMED"];
+const MAIN_LINE_STEP: Record<string, string> = {
+  BOUND: COPY.history.tagAttached,
+  ACTIVATED: COPY.history.released,
+  CLAIMED: COPY.history.bought,
+};
+
+/**
+ * The steps to show, in order, without a step repeating itself back to back.
+ *
+ * `status` is where the item stands NOW, as the page itself just read it. The
+ * recorded history can stop short of that: the list of events may not hold the
+ * latest step yet. When it does, the missing steps are added, so the history
+ * never ends earlier than the status shown at the top of the same page (an
+ * item marked "Owned" whose history stops at "Released for sale").
+ *
+ * Only steps that MUST have happened are added, and only forwards:
+ *   - an item that is released or owned has passed every step before that;
+ *   - a reported or retired item got its report or retirement last.
+ * Nothing is added to an empty history, nothing is ever removed, and a status
+ * that is behind the history (a page a moment out of date) changes nothing.
+ */
+export function historySteps(
+  events: ProvenanceWireEvent[],
+  brand?: string,
+  status?: HistoryStatus,
+): string[] {
   const steps: string[] = [];
-  for (const event of events) {
-    const label = historyLabel(event, brand);
+  const add = (label: string | null | undefined) => {
     if (label && steps[steps.length - 1] !== label) steps.push(label);
+  };
+
+  let last: string | undefined;
+  for (const event of events) {
+    add(historyLabel(event, brand));
+    last = reachedBy(event) ?? last;
+  }
+  if (steps.length === 0 || !status) return steps;
+
+  if (status === "released" || status === "owned") {
+    const from = last ? MAIN_LINE.indexOf(last) : -1;
+    const to = MAIN_LINE.indexOf(status === "owned" ? "CLAIMED" : "ACTIVATED");
+    if (from >= 0) for (let i = from + 1; i <= to; i++) add(MAIN_LINE_STEP[MAIN_LINE[i]!]);
+  } else if (status === "reported" && last !== "FLAGGED") {
+    add(COPY.history.reported);
+  } else if (status === "retired" && last !== "RECYCLED") {
+    add(COPY.history.retired);
   }
   return steps;
 }
@@ -99,7 +156,16 @@ type TimelineState =
   | { phase: "unavailable" }
   | { phase: "ready"; wire: Extract<ProvenanceWire, { available: true }> };
 
-export function ProvenanceTimeline({ tokenId, brand }: { tokenId: string; brand?: string }) {
+export function ProvenanceTimeline({
+  tokenId,
+  brand,
+  status,
+}: {
+  tokenId: string;
+  brand?: string;
+  /** Where the item stands now, as the page read it (see historySteps). */
+  status?: HistoryStatus;
+}) {
   const [state, setState] = useState<TimelineState>({ phase: "loading" });
 
   useEffect(() => {
@@ -139,7 +205,7 @@ export function ProvenanceTimeline({ tokenId, brand }: { tokenId: string; brand?
     );
   }
 
-  const steps = historySteps(state.wire.events, brand);
+  const steps = historySteps(state.wire.events, brand, status);
 
   if (steps.length === 0) {
     return (

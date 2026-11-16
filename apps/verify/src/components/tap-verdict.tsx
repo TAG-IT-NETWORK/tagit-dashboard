@@ -19,6 +19,7 @@ import type { RatingsView } from "@/lib/ratings";
 import type { AssetLookup } from "@/lib/services";
 import { startTapLookups, type TapLookups } from "@/lib/tap-lookups";
 import { tapPageModel, type TechLink, type TechRow } from "@/lib/tap-page";
+import { historyStatusOf } from "@/lib/tap-view";
 import type { TapRun } from "@/lib/tap-run";
 import { logTap } from "@/lib/tap-timing";
 
@@ -43,6 +44,7 @@ async function Reviews({
     <ReviewsSection
       view={await ratings}
       write={<RateWidget tokenId={tokenId} productName={productName} />}
+      late
     />
   );
 }
@@ -123,7 +125,11 @@ export async function TapVerdict({
                   </Suspense>
                 ) : undefined,
               history: model.show.history ? (
-                <ProvenanceTimeline tokenId={tokenId} brand={product.brand} />
+                <ProvenanceTimeline
+                  tokenId={tokenId}
+                  brand={product.brand}
+                  status={historyStatusOf(model.state)}
+                />
               ) : undefined,
             }
           : undefined

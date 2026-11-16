@@ -143,9 +143,16 @@ export function RecordResult({
 
       {(state === "registered" || state === "privateItem") && <HowItWorksSection />}
 
-      {slots.reviews}
+      {/* Reviews sit with a product that is on sale or owned, as on the tap page;
+          not under a warning and not before the item is released. */}
+      {state === "registered" && slots.reviews}
 
-      {slots.history && <Section title={COPY.history.title}>{slots.history}</Section>}
+      {/* The list is loaded by the browser, so it is left out while scripts are off. */}
+      {slots.history && (
+        <Section title={COPY.history.title} needsScript>
+          {slots.history}
+        </Section>
+      )}
 
       <HelpSection subject={`Help with a product record${reference}`} />
 

@@ -12,6 +12,8 @@ const BASE_SEPOLIA = 84532;
 // When set, the buyer pays USDC (verified on-chain) before claiming. Off by
 // default so the gasless demo keeps working until we flip this on.
 const PAYMENT_ENABLED = process.env.NEXT_PUBLIC_SALE_REQUIRE_PAYMENT === "true";
+// Where a demo buyer gets free test funds for the demo checkout.
+const TEST_FUNDS_URL = "https://faucet.circle.com";
 
 const erc20TransferAbi = [
   {
@@ -39,9 +41,11 @@ const erc20TransferAbi = [
  * auto-delists) surfaces as "just sold or taken off sale" and triggers a
  * price refetch, which hides the widget.
  *
- * WORDS (TAP-T08): everything the shopper reads comes from @/lib/consumer-copy.
- * No wallet address is shown — not the seller's and not the buyer's own — and
- * a failure never repeats the upstream error text.
+ * WORDS (TAP-T08): everything the shopper reads comes from @/lib/consumer-copy,
+ * and a failure never repeats the upstream error text. The seller's address is
+ * never shown. The buyer's own demo account is shown in one place only: inside
+ * a closed "How to add test funds" note, to the signed-in buyer, when a demo
+ * payment failed for lack of test funds — they need it to add some.
  */
 
 type Phase = "idle" | "paying" | "settling" | "done" | "error";
@@ -210,9 +214,34 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       )}
 
       {phase === "error" && error ? (
-        <p role="alert" className="text-center text-sm leading-5 text-bad">
-          {error}
-        </p>
+        <>
+          <p role="alert" className="text-center text-sm leading-5 text-bad">
+            {error}
+          </p>
+          {error === COPY.buy.noFunds && buyerWallet && (
+            <details className="rounded-2xl border border-line">
+              <summary className="flex min-h-[48px] cursor-pointer list-none items-center px-4 text-sm font-semibold leading-5 text-brand-link underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+                {COPY.buy.addFundsTitle}
+              </summary>
+              <div className="flex flex-col gap-2 px-4 pb-3.5 text-[13px] leading-[18px] text-body">
+                <p>{COPY.buy.addFundsBody}</p>
+                <p>
+                  <span className="text-muted">{COPY.buy.addFundsAccount}</span>
+                  <br />
+                  <span className="font-mono [overflow-wrap:anywhere]">{buyerWallet}</span>
+                </p>
+                <a
+                  href={TEST_FUNDS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[44px] items-center self-start font-semibold text-brand-link underline underline-offset-2"
+                >
+                  {COPY.buy.addFundsLink}
+                </a>
+              </div>
+            </details>
+          )}
+        </>
       ) : (
         <p className={note}>
           {ready && !authenticated ? `${COPY.buy.signInNote} ` : ""}

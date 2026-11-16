@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { COPY } from "@/lib/consumer-copy";
 
+import { NEEDS_SCRIPT } from "./consumer";
+
 /**
  * "Own it? Write a review" — the sign-in stack (Privy) loads only when the
  * visitor asks to review, so the tap page stays light. The actual proof is
@@ -25,6 +27,7 @@ export function RateWidget({ tokenId, productName }: { tokenId: string; productN
   ) : (
     <button
       type="button"
+      {...NEEDS_SCRIPT}
       onClick={() => setOpen(true)}
       className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] border border-line-strong bg-white px-4 text-[15px] font-semibold leading-[22px] text-ink hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
     >

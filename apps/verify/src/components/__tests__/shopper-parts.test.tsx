@@ -91,6 +91,73 @@ describe("product history", () => {
   });
 });
 
+describe("product history and where the item stands now", () => {
+  // The event list of a real owned item, in the order the service sends it:
+  // the state change of a step can come before the step's own event.
+  const RECORDED_UP_TO_PURCHASE = [
+    event("AssetMinted"),
+    event("StateChanged", "NONE", "MINTED"),
+    event("StateChanged", "MINTED", "BOUND"),
+    event("TagBound"),
+    event("StateChanged", "BOUND", "ACTIVATED"),
+    event("StateChanged", "ACTIVATED", "CLAIMED"),
+  ];
+  // Another real owned item: its list stops at "released", the purchase is
+  // not in it.
+  const PURCHASE_NOT_RECORDED = RECORDED_UP_TO_PURCHASE.slice(0, 5);
+
+  const FULL = ["Made and registered", "Tag attached", "Released for sale", COPY.history.bought];
+
+  it("shows a recorded purchase", () => {
+    expect(historySteps(RECORDED_UP_TO_PURCHASE)).toEqual(FULL);
+    expect(historySteps(RECORDED_UP_TO_PURCHASE, undefined, "owned")).toEqual(FULL);
+  });
+
+  it("shows the purchase of an owned item even when the list stops before it", () => {
+    expect(historySteps(PURCHASE_NOT_RECORDED, undefined, "owned")).toEqual(FULL);
+  });
+
+  it("adds nothing when it is not told where the item stands", () => {
+    expect(historySteps(PURCHASE_NOT_RECORDED)).toEqual(FULL.slice(0, 3));
+  });
+
+  it("fills in every step an owned or released item must have passed, in order", () => {
+    const madeOnly = [event("AssetMinted"), event("StateChanged", "NONE", "MINTED")];
+    expect(historySteps(madeOnly, undefined, "owned")).toEqual(FULL);
+    expect(historySteps(madeOnly, undefined, "released")).toEqual(FULL.slice(0, 3));
+  });
+
+  it("ends a reported or retired item's history with its report or retirement", () => {
+    expect(historySteps(RECORDED_UP_TO_PURCHASE, undefined, "reported")).toEqual([
+      ...FULL,
+      COPY.history.reported,
+    ]);
+    expect(historySteps(RECORDED_UP_TO_PURCHASE, undefined, "retired")).toEqual([
+      ...FULL,
+      COPY.history.retired,
+    ]);
+    // already recorded: not said twice
+    const reported = [...RECORDED_UP_TO_PURCHASE, event("StateChanged", "CLAIMED", "FLAGGED")];
+    expect(historySteps(reported, undefined, "reported")).toEqual([...FULL, COPY.history.reported]);
+  });
+
+  it("never goes backwards: a status behind the history changes nothing", () => {
+    // the page says "released", the history already has the purchase
+    expect(historySteps(RECORDED_UP_TO_PURCHASE, undefined, "released")).toEqual(FULL);
+    // the page says "owned", the history ends with a report: no guess about how it ended
+    const reported = [...RECORDED_UP_TO_PURCHASE, event("StateChanged", "CLAIMED", "FLAGGED")];
+    expect(historySteps(reported, undefined, "owned")).toEqual([...FULL, COPY.history.reported]);
+    const retired = [...RECORDED_UP_TO_PURCHASE, event("StateChanged", "CLAIMED", "RECYCLED")];
+    expect(historySteps(retired, undefined, "owned")).toEqual([...FULL, COPY.history.retired]);
+  });
+
+  it("never makes a history out of nothing", () => {
+    for (const status of ["released", "owned", "reported", "retired"] as const) {
+      expect(historySteps([], undefined, status)).toEqual([]);
+    }
+  });
+});
+
 describe("stars", () => {
   const row = (value: number) => [1, 2, 3, 4, 5].map((i) => starFill(value, i)).join(" ");
 

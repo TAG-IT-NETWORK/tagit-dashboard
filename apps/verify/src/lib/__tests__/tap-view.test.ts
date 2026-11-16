@@ -9,12 +9,15 @@ import {
   detailsCheckOf,
   formatDay,
   hasProductToShow,
+  historyStatusOf,
   isAuthenticTapState,
   placeName,
   productViewOf,
   recordChips,
   recordFactsOf,
+  recordHistoryStatus,
   recordStateFor,
+  shownTagId,
   tapStateFor,
 } from "../tap-view";
 import {
@@ -188,6 +191,29 @@ describe("placeName", () => {
   });
 });
 
+describe("shownTagId", () => {
+  it("writes a tag ID from a link in pairs", () => {
+    expect(shownTagId("04A1B2C3D4E5F6")).toBe("04:A1:B2:C3:D4:E5:F6");
+    expect(shownTagId("04:a1:b2:c3:d4:e5:f6")).toBe("04:A1:B2:C3:D4:E5:F6");
+    expect(shownTagId("04-a1-b2-c3")).toBe("04:A1:B2:C3");
+  });
+
+  it("shows nothing back that is not shaped like a tag ID", () => {
+    for (const text of [
+      "hello-world",
+      "<script>alert(1)</script>",
+      "04A1B2C", // half a byte
+      "04A1B2", // too short
+      "04".repeat(11), // too long
+      "",
+      "0x04A1B2C3D4E5F6",
+      "javascript:alert(1)",
+    ]) {
+      expect(shownTagId(text)).toBeNull();
+    }
+  });
+});
+
 describe("formatDay", () => {
   it("writes a day in UTC", () => {
     expect(formatDay(1_788_600_600)).toBe("Sep 5, 2026");
@@ -315,6 +341,39 @@ describe("hasProductToShow", () => {
     expect(hasProductToShow(productViewOf(RESTRICTED))).toBe(false);
     expect(hasProductToShow(productViewOf({ kind: "unavailable" }))).toBe(false);
     expect(hasProductToShow(undefined)).toBe(false);
+  });
+});
+
+describe("where an item stands, for its history", () => {
+  it("after a tap: the state the tap just read", () => {
+    expect(historyStatusOf("newForSale")).toBe("released");
+    expect(historyStatusOf("newNotForSale")).toBe("released");
+    expect(historyStatusOf("owned")).toBe("owned");
+    expect(historyStatusOf("reported")).toBe("reported");
+    expect(historyStatusOf("retired")).toBe("retired");
+    // not released yet covers two steps, and the other states have no history
+    for (const state of [
+      "notReleased",
+      "privateItem",
+      "checkFailed",
+      "linkUsed",
+      "noProduct",
+      "ourSide",
+      "linkIncomplete",
+    ] as const) {
+      expect(historyStatusOf(state)).toBeUndefined();
+    }
+  });
+
+  it("on the record page: only what cannot have been undone since the page was made", () => {
+    expect(recordHistoryStatus(STATE.ACTIVATED)).toBe("released");
+    expect(recordHistoryStatus(STATE.CLAIMED)).toBe("owned");
+    expect(recordHistoryStatus(STATE.RECYCLED)).toBe("retired");
+    // a report can be closed again, so it is left to the history itself
+    expect(recordHistoryStatus(STATE.FLAGGED)).toBeUndefined();
+    for (const code of [0, STATE.MINTED, STATE.BOUND, 9, undefined]) {
+      expect(recordHistoryStatus(code)).toBeUndefined();
+    }
   });
 });
 

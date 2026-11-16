@@ -125,10 +125,23 @@ export function RatingSummary({ view }: { view: RatingsView | null }) {
  * (the read failed, or the owner keeps the item private) — never an empty
  * heading.
  */
-export function ReviewsSection({ view, write }: { view: RatingsView | null; write?: ReactNode }) {
+export function ReviewsSection({
+  view,
+  write,
+  late = false,
+}: {
+  view: RatingsView | null;
+  write?: ReactNode;
+  /**
+   * True when the section is sent after the rest of the page. A browser with
+   * scripts off cannot move it into place — it would sit below the footer —
+   * so there it is left out instead.
+   */
+  late?: boolean;
+}) {
   if (!view || view.restricted) return null;
   return (
-    <Section title={COPY.reviews.title}>
+    <Section title={COPY.reviews.title} needsScript={late}>
       <RatingSummary view={view} />
       {write}
     </Section>

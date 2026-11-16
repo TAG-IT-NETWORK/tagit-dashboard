@@ -40,9 +40,6 @@ export function AssetClientIsland({
 
   if (!showBuy) return null;
 
-  return (
-    <div className="mb-5">
-      <BuyWidget tokenId={tokenId} productName={productName} />
-    </div>
-  );
+  // No wrapper: when the widget hides itself, nothing is left in the layout.
+  return <BuyWidget tokenId={tokenId} productName={productName} />;
 }

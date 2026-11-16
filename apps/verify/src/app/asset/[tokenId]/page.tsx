@@ -45,6 +45,7 @@ import { fetchAsset, type AssetLookup } from "@/lib/services";
 import { COPY } from "@/lib/consumer-copy";
 import { STATES } from "@/lib/states";
 import { recordPageModel } from "@/lib/tap-page";
+import { recordHistoryStatus } from "@/lib/tap-view";
 import { HeroImage } from "@/components/hero-image";
 import { ReviewsSection } from "@/components/rating-summary";
 import { RateWidget } from "@/components/rate-widget";
@@ -178,7 +179,9 @@ export default async function AssetVerifyPage({ params }: PageProps) {
     );
   }
 
-  const ratings = await fetchRatings(tokenId);
+  // Reviews are shown for an item that is on sale or owned (see <RecordResult>),
+  // so they are only read for one.
+  const ratings = model.state === "registered" ? await fetchRatings(tokenId) : null;
 
   return (
     <RecordResult
@@ -216,7 +219,13 @@ export default async function AssetVerifyPage({ params }: PageProps) {
         // SSG/ISR, so the static HTML carries only the skeleton and the island
         // fetches /api/asset/[tokenId]/provenance — zero history work in this
         // render.
-        history: <ProvenanceTimeline tokenId={tokenId} brand={product.brand} />,
+        history: (
+          <ProvenanceTimeline
+            tokenId={tokenId}
+            brand={product.brand}
+            status={recordHistoryStatus(model.stateCode)}
+          />
+        ),
       }}
     />
   );

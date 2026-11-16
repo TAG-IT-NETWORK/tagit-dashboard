@@ -121,6 +121,49 @@ export function recordChips(stateCode: number | undefined, listed: boolean): str
   }
 }
 
+/**
+ * Where an item stands now, for its history list (see historySteps in
+ * @/components/provenance-timeline). Plain words on purpose: this value is
+ * handed to a browser component, so it is not a state code.
+ */
+export type HistoryStatus = "released" | "owned" | "reported" | "retired";
+
+/** The history status a finished tap implies. The tap read the item just now. */
+export function historyStatusOf(state: TapStateKey): HistoryStatus | undefined {
+  switch (state) {
+    case "newForSale":
+    case "newNotForSale":
+      return "released";
+    case "owned":
+      return "owned";
+    case "reported":
+      return "reported";
+    case "retired":
+      return "retired";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The history status the record page implies. That page may be up to a minute
+ * old, so it only passes on what cannot have been undone in the meantime: an
+ * item does not go back from released or owned, and retired is final. A report
+ * can be closed again, so "reported" is left to the history itself.
+ */
+export function recordHistoryStatus(stateCode: number | undefined): HistoryStatus | undefined {
+  switch (stateCode) {
+    case STATE.ACTIVATED:
+      return "released";
+    case STATE.CLAIMED:
+      return "owned";
+    case STATE.RECYCLED:
+      return "retired";
+    default:
+      return undefined;
+  }
+}
+
 /** True when the page may say the product itself checked out. */
 export function isAuthenticTapState(state: TapStateKey): boolean {
   return (
@@ -149,6 +192,18 @@ export function placeName(origin: string | undefined | null): string | undefined
     }
   }
   return value;
+}
+
+/**
+ * A tag ID taken from a link, written 04:A1:…, or null when the text is not
+ * shaped like one (4 to 10 bytes of hex, with or without separators). Used
+ * where a page shows back part of its own address: it never echoes arbitrary
+ * text from a link.
+ */
+export function shownTagId(fromLink: string): string | null {
+  const clean = fromLink.replace(/[:\-\s]/g, "").toUpperCase();
+  if (!/^(?:[0-9A-F]{2}){4,10}$/.test(clean)) return null;
+  return (clean.match(/.{2}/g) ?? []).join(":");
 }
 
 /** "Sep 5, 2026", in UTC so every reader of a record sees the same day. */

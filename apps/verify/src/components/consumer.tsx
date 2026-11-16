@@ -126,6 +126,14 @@ function Chevron({ className }: { className?: string }) {
 
 // ── Page frame ───────────────────────────────────────────────────────────────
 
+/**
+ * Spread onto an element that is of no use while scripts are off: a button
+ * that opens a form, a list that is loaded by the browser, a section that
+ * arrives late and would land below the footer. <ConsumerPage> hides these in
+ * that case; with scripts on, the attribute does nothing.
+ */
+export const NEEDS_SCRIPT = { "data-needs-script": "" } as const;
+
 /** The small header on every page: the TAG IT mark and what this page is. */
 export function PageHeader() {
   return (
@@ -151,6 +159,14 @@ export function PageHeader() {
 export function ConsumerPage({ children, timing }: { children: ReactNode; timing?: string }) {
   return (
     <div className="flex min-h-screen flex-col bg-white text-ink">
+      {/* With scripts off, the parts that only work with scripts are left out
+          rather than shown dead (see NEEDS_SCRIPT). The verdict, the product
+          and Technical details need no script at all. */}
+      <noscript>
+        <style
+          dangerouslySetInnerHTML={{ __html: "[data-needs-script]{display:none!important}" }}
+        />
+      </noscript>
       <PageHeader />
       <main
         className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-4 px-4 pb-6"
@@ -305,14 +321,21 @@ export function ProductCard({
 export function Section({
   id,
   title,
+  needsScript = false,
   children,
 }: {
   id?: string;
   title: string;
+  /** Left out while scripts are off (see NEEDS_SCRIPT). */
+  needsScript?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="flex scroll-mt-4 flex-col gap-3 pt-4">
+    <section
+      id={id}
+      className="flex scroll-mt-4 flex-col gap-3 pt-4"
+      {...(needsScript ? NEEDS_SCRIPT : {})}
+    >
       <h2 className="text-lg font-bold leading-6">{title}</h2>
       {children}
     </section>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ConsumerPage, Icon, PRIMARY_BUTTON } from "@/components/consumer";
+import { ConsumerPage, Icon, NEEDS_SCRIPT, PRIMARY_BUTTON } from "@/components/consumer";
 import { COPY } from "@/lib/consumer-copy";
 
 /**
@@ -38,7 +38,12 @@ export default function VerifyHome() {
         <p className="text-[13px] leading-[18px] text-muted">{COPY.checking.reassurance}</p>
       </div>
 
-      <form onSubmit={handleLookup} className="flex flex-col gap-3 pt-4" noValidate>
+      <form
+        onSubmit={handleLookup}
+        className="flex flex-col gap-3 pt-4"
+        noValidate
+        {...NEEDS_SCRIPT}
+      >
         <label htmlFor="record-number" className="text-[15px] font-semibold leading-[22px]">
           {COPY.home.lookupLabel}
         </label>

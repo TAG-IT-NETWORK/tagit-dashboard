@@ -348,7 +348,12 @@ export function TapResult({
 
       {slots.reviews}
 
-      {slots.history && <Section title={COPY.history.title}>{slots.history}</Section>}
+      {/* The list is loaded by the browser, so it is left out while scripts are off. */}
+      {slots.history && (
+        <Section title={COPY.history.title} needsScript>
+          {slots.history}
+        </Section>
+      )}
 
       {/* A failed check already has "Report a problem" as its main action. */}
       {state !== "checkFailed" && <HelpSection subject={`Help with a product check${reference}`} />}

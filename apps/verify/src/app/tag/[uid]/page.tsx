@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { TapResult } from "@/components/tap-result";
 import { COPY } from "@/lib/consumer-copy";
+import { shownTagId } from "@/lib/tap-view";
 
 /**
  * NFC fallback route — /tag/{uid}
@@ -67,23 +68,13 @@ function parseTokenId(raw: string): string | null {
   return BigInt(clean).toString(); // normalises leading zeros: "050" -> "50"
 }
 
-/**
- * The tag ID from the address, written 04:A1:…, or null when the address does
- * not hold one. Only something shaped like a tag ID (4 to 10 bytes of hex) is
- * ever shown back: this page does not echo arbitrary text from a link.
- */
-function tagIdFrom(uid: string): string | null {
-  const clean = uid.replace(/[:\-\s]/g, "").toUpperCase();
-  if (!/^(?:[0-9A-F]{2}){4,10}$/.test(clean)) return null;
-  return (clean.match(/.{2}/g) ?? []).join(":");
-}
-
 export default async function TagVerifyPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = await params;
   const tokenId = parseTokenId(uid);
   if (tokenId !== null) redirect(`/asset/${tokenId}`);
 
-  const tagId = tagIdFrom(uid);
+  // Only something shaped like a tag ID is shown back, and only in the drawer.
+  const tagId = shownTagId(uid);
   return (
     <TapResult
       state="linkIncomplete"

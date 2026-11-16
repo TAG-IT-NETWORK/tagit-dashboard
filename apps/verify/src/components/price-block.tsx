@@ -14,7 +14,7 @@
  *
  * The fx line renders exactly what @/lib/fx returns: the server's
  * pre-formatted approx string as-is (never toFixed), an explicit "≈" +
- * "approx." marker, and an aria-label spelling the approximation out for
+ * "approx." marker, and the same approximation spelled out in words for
  * assistive tech. A malformed fx block renders nothing rather than a wrong
  * price.
  */
@@ -25,7 +25,10 @@ import { formatFxApprox, type FxApproxRender } from "@/lib/fx";
 export function PriceApprox({ fx }: { fx: FxApproxRender }) {
   return (
     <p className="text-[13px] leading-[18px] text-muted" data-price-approx>
-      <span aria-label={fx.ariaLabel}>{fx.text}</span> <span aria-hidden="true">(approx.)</span>
+      {/* What is drawn, and what is read out: a label on a plain <span> is not
+          reliably announced, so the spoken wording is real (hidden) text. */}
+      <span aria-hidden="true">{fx.text} (approx.)</span>
+      <span className="sr-only">{fx.ariaLabel}</span>
     </p>
   );
 }

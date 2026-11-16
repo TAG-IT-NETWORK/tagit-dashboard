@@ -417,6 +417,12 @@ export const COPY = {
     paymentFailed: "Payment didn't go through. You haven't been charged. Try again.",
     noFunds:
       "There are no test funds in your demo account yet, so the payment didn't go through. You haven't been charged.",
+    /** A closed note under that message: how to put test funds in the demo account. */
+    addFundsTitle: "How to add test funds",
+    addFundsBody:
+      "This checkout is a demo. Get free test funds for your demo account, then try again.",
+    addFundsAccount: "Your demo account",
+    addFundsLink: "Get free test funds",
     justSold: "Sorry, this item was just sold or taken off sale. You haven't been charged.",
     notReady: "Still getting things ready. Try again in a moment.",
     failed: "We couldn't finish the purchase. You haven't been charged. Try again.",
