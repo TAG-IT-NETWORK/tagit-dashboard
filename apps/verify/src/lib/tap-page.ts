@@ -258,7 +258,7 @@ export function recordPageModel(
         networkRow,
         { label: COPY.technical.recordState, value: `${stateLabel(stateCode)} (${stateCode})` },
         ...(dto.timestamp
-          ? [{ label: COPY.technical.registered, value: formatUtc(dto.timestamp) }]
+          ? [{ label: COPY.technical.updated, value: formatUtc(dto.timestamp) }]
           : []),
         {
           label: COPY.technical.productDetails,

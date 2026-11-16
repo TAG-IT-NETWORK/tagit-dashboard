@@ -234,8 +234,14 @@ export interface ProductView {
   price?: string;
   /** Approximate price in the display currency, when the server sent one. */
   fx?: FxApproxRender;
-  /** The day the item was registered, e.g. "Sep 5, 2026". */
-  registeredOn?: string;
+  /**
+   * The day the item last changed, e.g. "Sep 5, 2026". The record's timestamp
+   * is rewritten by the registry on every change (tag attached, released for
+   * sale, bought, reported, resolved, retired, handed to a new owner), so for
+   * an owned item this is the day it was bought, not the day it was made or
+   * first registered. It must never be labelled as a registration date.
+   */
+  updatedOn?: string;
   /** A photo on an allowed image host, if the record has one. */
   photo?: { url: string; lqip?: string };
 }
@@ -285,7 +291,7 @@ export function productViewOf(lookup: AssetLookup | null | undefined): ProductVi
     ...(text(dto.description) ? { description: text(dto.description) } : {}),
     ...(price ? { price } : {}),
     ...(fx ? { fx } : {}),
-    ...(formatDay(dto.timestamp) ? { registeredOn: formatDay(dto.timestamp) } : {}),
+    ...(formatDay(dto.timestamp) ? { updatedOn: formatDay(dto.timestamp) } : {}),
     ...(photo ? { photo } : {}),
   };
 }

@@ -281,7 +281,12 @@ export const COPY = {
       model: "Model",
       madeIn: "Made in",
       code: "Product code",
-      registered: "Registered on",
+      /**
+       * The date the record carries is the day the item last changed (tag
+       * attached, released, bought, reported, retired or handed to a new
+       * owner), not the day it was first registered.
+       */
+      updated: "Last updated",
     },
   },
 
@@ -401,7 +406,8 @@ export const COPY = {
     networkValue: "Base Sepolia (test network)",
     tagId: "Tag ID",
     recordState: "Record state",
-    registered: "Registered",
+    /** Same date as about.facts.updated, with the time. */
+    updated: "Last updated",
     productDetails: "Product details",
     detailsMatch: "Match the brand's public record",
     detailsPending: "Not on the public record yet",

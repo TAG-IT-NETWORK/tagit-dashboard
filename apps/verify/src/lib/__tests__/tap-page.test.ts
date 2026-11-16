@@ -307,7 +307,7 @@ describe("recordPageModel", () => {
       [COPY.technical.recordNumber]: RECORD_NUMBER,
       [COPY.technical.network]: COPY.technical.networkValue,
       [COPY.technical.recordState]: "CLAIMED (4)",
-      [COPY.technical.registered]: "2026-09-05 09:30:00 UTC",
+      [COPY.technical.updated]: "2026-09-05 09:30:00 UTC",
       [COPY.technical.productDetails]: COPY.technical.detailsMatch,
     });
     const { technical: _technical, jsonLd: _jsonLd, ...visible } = model;

@@ -106,9 +106,7 @@ function aboutFacts(product: ProductView): [string, string][] {
     ...(product.model ? ([[facts.model, product.model]] as [string, string][]) : []),
     ...(product.madeIn ? ([[facts.madeIn, product.madeIn]] as [string, string][]) : []),
     ...(product.code ? ([[facts.code, product.code]] as [string, string][]) : []),
-    ...(product.registeredOn
-      ? ([[facts.registered, product.registeredOn]] as [string, string][])
-      : []),
+    ...(product.updatedOn ? ([[facts.updated, product.updatedOn]] as [string, string][]) : []),
   ];
 }
 

@@ -254,9 +254,21 @@ describe("productViewOf", () => {
       description: "A light daily face cream for dry skin. 50 ml jar.",
       price: "$23.33",
       fx: { text: "≈ €21.11", ariaLabel: expect.any(String) },
-      registeredOn: "Sep 5, 2026",
+      updatedOn: "Sep 5, 2026",
       photo: { url: "https://media.tagit.network/i/abc123/lg.webp" },
     });
+  });
+
+  it("calls the record's date the last update, not a registration date", () => {
+    // The registry rewrites the timestamp on every change. For an owned item
+    // it is the day it was bought: here the item was bought on Oct 8, weeks
+    // after it was made and registered.
+    const bought = Date.UTC(2026, 9, 8, 17, 47) / 1000;
+    const owned = record(STATE.CLAIMED);
+    if (owned.kind !== "record") throw new Error("fixture");
+    const view = productViewOf({ kind: "record", dto: { ...owned.dto, timestamp: bought } });
+    expect(view.updatedOn).toBe("Oct 8, 2026");
+    expect(view).not.toHaveProperty("registeredOn");
   });
 
   it("has no field that could hold the owner or the seller", () => {

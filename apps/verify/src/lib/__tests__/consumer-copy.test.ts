@@ -193,3 +193,23 @@ describe("supportMailto", () => {
     expect(href.split("?")).toHaveLength(2);
   });
 });
+
+describe("the date a record carries", () => {
+  // The registry stores the time of the item's LAST change (tag attached,
+  // released, bought, reported, retired, handed on). It is not the day the
+  // item was registered, and the page must not say so.
+  it("is labelled as the last update, on the page and in Technical details", () => {
+    expect(COPY.about.facts.updated).toBe("Last updated");
+    expect(COPY.technical.updated).toBe("Last updated");
+  });
+
+  it("is nowhere labelled as a registration date", () => {
+    const values: unknown[] = [
+      ...Object.values(COPY.about.facts),
+      ...Object.values(COPY.technical),
+    ];
+    const labels = values.filter((value): value is string => typeof value === "string");
+    expect(labels.length).toBeGreaterThan(10);
+    for (const label of labels) expect(label, label).not.toMatch(/^Registered( on)?$/i);
+  });
+});
