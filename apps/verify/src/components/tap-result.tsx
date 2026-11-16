@@ -20,6 +20,7 @@ import {
   chipsFor,
   hasProductToShow,
   isAuthenticTapState,
+  productBasics,
   type DetailsCheck,
   type ProductView,
 } from "@/lib/tap-view";
@@ -38,6 +39,8 @@ import {
   Section,
   Steps,
   TechnicalDetails,
+  TextBlock,
+  TextDrawer,
   VerdictBanner,
   type TechLink,
   type TechRow,
@@ -99,25 +102,55 @@ export interface TapResultProps {
   };
 }
 
+/**
+ * The short facts, label and value, in the order a shopper asks: what it is,
+ * where it is from, which batch, how long it keeps, when its record last changed.
+ * The brand's own facts (TAP-T09: size, batch, dates, use within) sit among
+ * the ones the record always had.
+ */
 function aboutFacts(product: ProductView): [string, string][] {
-  const { facts } = COPY.about;
+  const labels = COPY.about.facts;
+  const brandFacts = product.facts;
+  const row = (label: string, value: string | undefined): [string, string][] =>
+    value ? [[label, value]] : [];
   return [
-    ...(product.brand ? ([[facts.brand, product.brand]] as [string, string][]) : []),
-    ...(product.model ? ([[facts.model, product.model]] as [string, string][]) : []),
-    ...(product.madeIn ? ([[facts.madeIn, product.madeIn]] as [string, string][]) : []),
-    ...(product.code ? ([[facts.code, product.code]] as [string, string][]) : []),
-    ...(product.updatedOn ? ([[facts.updated, product.updatedOn]] as [string, string][]) : []),
+    ...row(labels.brand, product.brand),
+    ...row(labels.model, product.model),
+    ...row(labels.size, brandFacts?.size),
+    ...row(labels.madeIn, product.madeIn),
+    ...row(labels.code, product.code),
+    ...row(labels.batch, brandFacts?.batch),
+    ...row(labels.madeOn, brandFacts?.madeOn),
+    ...row(labels.bestBefore, brandFacts?.bestBefore),
+    ...row(labels.useWithin, brandFacts?.useWithin),
+    ...row(labels.updated, product.updatedOn),
   ];
 }
 
 /** True when "About this product" has anything to say. */
 function hasAbout(product: ProductView): boolean {
-  return !!product.description || aboutFacts(product).length > 0;
+  const brandFacts = product.facts;
+  return (
+    !!product.description ||
+    aboutFacts(product).length > 0 ||
+    !!brandFacts?.howToUse ||
+    !!brandFacts?.warnings ||
+    !!brandFacts?.ingredients
+  );
 }
 
-/** "About this product": the brand's own words and the few facts we hold. */
+/**
+ * "About this product": the brand's own words and the facts we hold.
+ *
+ * The longer texts a brand can write (TAP-T09) follow the table: how to use
+ * and warnings in full, because a shopper should not have to open anything to
+ * read them, and the ingredients list in a closed drawer, because it is long
+ * and looked up rather than read. All of it is brand-written and shown as
+ * plain text (REQ-S-10): text nodes only, nothing parsed, nothing linked.
+ */
 export function AboutSection({ product }: { product: ProductView }) {
   const facts = aboutFacts(product);
+  const brandFacts = product.facts;
   if (!hasAbout(product)) return null;
   return (
     <Section id="about" title={COPY.about.title}>
@@ -127,6 +160,15 @@ export function AboutSection({ product }: { product: ProductView }) {
         </p>
       )}
       <Facts rows={facts} />
+      {brandFacts?.howToUse && (
+        <TextBlock title={COPY.about.howToUse}>{brandFacts.howToUse}</TextBlock>
+      )}
+      {brandFacts?.warnings && (
+        <TextBlock title={COPY.about.warnings}>{brandFacts.warnings}</TextBlock>
+      )}
+      {brandFacts?.ingredients && (
+        <TextDrawer title={COPY.about.ingredients}>{brandFacts.ingredients}</TextDrawer>
+      )}
     </Section>
   );
 }
@@ -209,10 +251,7 @@ export function TapResult({
           priceNote={
             state === "newForSale" && product.fx ? <PriceApprox fx={product.fx} /> : undefined
           }
-          basics={[
-            ...(product.brand ? [product.brand] : []),
-            ...(product.madeIn ? [COPY.product.madeIn(product.madeIn)] : []),
-          ]}
+          basics={productBasics(product)}
           chips={chipsFor(state)}
           photo={slots.photo}
         />

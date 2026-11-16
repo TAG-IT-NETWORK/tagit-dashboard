@@ -12,7 +12,12 @@
 import type { ReactNode } from "react";
 
 import { COPY, RECORD_STATES, type RecordStateKey } from "@/lib/consumer-copy";
-import { hasProductToShow, type DetailsCheck, type ProductView } from "@/lib/tap-view";
+import {
+  hasProductToShow,
+  productBasics,
+  type DetailsCheck,
+  type ProductView,
+} from "@/lib/tap-view";
 
 import {
   ActionLink,
@@ -111,10 +116,7 @@ export function RecordResult({
           priceNote={
             state === "registered" && product.fx ? <PriceApprox fx={product.fx} /> : undefined
           }
-          basics={[
-            ...(product.brand ? [product.brand] : []),
-            ...(product.madeIn ? [COPY.product.madeIn(product.madeIn)] : []),
-          ]}
+          basics={productBasics(product)}
           chips={chips}
           photo={slots.photo}
         />

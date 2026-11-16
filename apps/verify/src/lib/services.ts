@@ -41,6 +41,26 @@ export interface AssetProductBlock {
   gtin?: string;
 }
 
+/**
+ * Product facts a brand wrote for shoppers (TAP-T09) — the `facts` block of
+ * tagit-services' item record (src/catalog/product-facts.ts, PublicFacts).
+ * Present only for a cosmetics item with at least one fact; only the filled
+ * keys are sent. Dates are YYYY-MM-DD. Every string is brand-written plain
+ * text: show it as text, never as markup (REQ-S-10).
+ */
+export interface AssetFactsBlock {
+  size?: string;
+  ingredients?: string;
+  howToUse?: string;
+  warnings?: string;
+  /** Whole months the product keeps once opened. */
+  useWithinMonths?: number;
+  /** The batch (lot) the item came from. */
+  lot?: string;
+  madeOn?: string;
+  bestBefore?: string;
+}
+
 export interface AssetVerificationBlock {
   anchoredVersion: number | null;
   latestVersion: number | null;
@@ -116,6 +136,7 @@ export interface AssetDto {
   attributes?: Array<{ trait_type: string; value: string | number }>;
   restricted?: boolean;
   product?: AssetProductBlock;
+  facts?: AssetFactsBlock;
   media?: AssetMediaEntry[];
   price?: AssetPrice;
   verification?: AssetVerificationBlock;
