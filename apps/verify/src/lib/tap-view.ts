@@ -300,7 +300,14 @@ export function hasProductToShow(product: ProductView | undefined): product is P
   return product !== undefined && (product.named || !!product.brand || !!product.photo);
 }
 
-/** What a finished tap needs from the item record to pick its state. */
+/**
+ * What a finished tap needs from the item record to pick its state.
+ *
+ * `listed` is true only when a loaded record reports a live listing. A record
+ * that did not load says nothing either way; the page words that case the same
+ * as "not listed" (both headlines are "Authentic") and leaves the offer to buy
+ * to the pricing service — see `show.buy` in ./tap-page.
+ */
 export function recordFactsOf(lookup: AssetLookup | null | undefined): RecordFacts {
   return {
     restricted: lookup?.kind === "restricted",

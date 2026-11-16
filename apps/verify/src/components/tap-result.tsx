@@ -234,7 +234,11 @@ export function TapResult({
 
       {/* ── What its status means, and the one main action ─────────────────── */}
 
-      {state === "newForSale" && slots.buy}
+      {/* Offered for an item that is for sale, and for a new item whose record
+          did not load (its listing is not known; the widget asks for itself). */}
+      {(state === "newForSale" ||
+        (state === "newNotForSale" && missingDetails === "unavailable")) &&
+        slots.buy}
 
       {(state === "newForSale" || state === "newNotForSale") && (
         <Card>

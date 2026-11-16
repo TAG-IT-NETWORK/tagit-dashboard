@@ -124,11 +124,25 @@ describe("tapPageModel", () => {
     }
   });
 
-  it("offers to buy only an item that is new and listed", () => {
+  it("offers to buy a new item that is listed, or whose listing is not known", () => {
     const buyable = EVERY_TAP.filter(([, res, lookup]) => tap(res, lookup).show.buy).map(
       ([n]) => n,
     );
-    expect(buyable).toEqual(["new, for sale"]);
+    // The widget asks the pricing service itself and shows only for a live
+    // listing. A record that did not load says nothing about the listing, so
+    // the widget is still offered there; a record that says "not listed" is
+    // an answer, and so is an owner, a report, a retirement or privacy.
+    expect(buyable).toEqual(["new, for sale", "record service down", "no record on file"]);
+  });
+
+  it("does not offer to buy an owned, reported or retired item whose record did not load", () => {
+    for (const state of [STATE.CLAIMED, STATE.FLAGGED, STATE.RECYCLED, STATE.BOUND, STATE.MINTED]) {
+      for (const lookup of [{ kind: "unavailable" }, { kind: "none" }, null] as const) {
+        expect(tap(resolvedTap(state), lookup).show.buy).toBe(false);
+      }
+    }
+    // and never for a private item, loaded or not
+    expect(tap(resolvedTap(STATE.ACTIVATED), RESTRICTED).show.buy).toBe(false);
   });
 
   it("shows reviews and history only where the page has a product to show", () => {
@@ -142,8 +156,8 @@ describe("tapPageModel", () => {
     expect(show("retired")).toEqual({ buy: false, reviews: false, history: true });
     expect(show("private")).toEqual({ buy: false, reviews: false, history: false });
     // no record came back: nothing to hang reviews or a history on
-    expect(show("record service down")).toEqual({ buy: false, reviews: false, history: false });
-    expect(show("no record on file")).toEqual({ buy: false, reviews: false, history: false });
+    expect(show("record service down")).toMatchObject({ reviews: false, history: false });
+    expect(show("no record on file")).toMatchObject({ reviews: false, history: false });
   });
 
   it("says why an item's details are missing, and only then", () => {

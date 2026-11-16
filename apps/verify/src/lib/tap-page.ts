@@ -181,10 +181,14 @@ export function tapPageModel({
             lookup?.kind === "restricted" ? ("private" as const) : ("unavailable" as const),
         }),
     progress,
-    // Reviews and history belong to a product the page can show; without its
-    // record there is nothing to hang them on.
     show: {
-      buy: state === "newForSale",
+      // The buy widget asks the pricing service itself and shows only for a
+      // live listing. It is offered where the record says the item is listed,
+      // and also where the record did not load: then the listing is simply
+      // not known, and a failed lookup must not take a purchase away.
+      buy: state === "newForSale" || (state === "newNotForSale" && record === null),
+      // Reviews and history belong to a product the page can show; without
+      // its record there is nothing to hang them on.
       reviews: record !== null && WITH_REVIEWS.has(state),
       history: record !== null && WITH_HISTORY.has(state),
     },

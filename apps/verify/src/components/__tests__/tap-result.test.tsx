@@ -94,7 +94,9 @@ function render(
                 <img src={product.photo.url} alt={COPY.product.photoAlt(product.name)} />
               ) : undefined,
               buy: model.show.buy ? (
-                <button type="button">{COPY.buy.button(product.price ?? "")}</button>
+                <button type="button">
+                  {product.price ? COPY.buy.button(product.price) : COPY.buy.buttonNoPrice}
+                </button>
               ) : undefined,
               reviews: model.show.reviews ? (
                 <ReviewsSection
@@ -406,6 +408,28 @@ describe("when the tap led to an item whose details are not on the page", () => 
     expect(visible).not.toMatch(/\b(NONE|MINTED|BOUND|ACTIVATED|CLAIMED|FLAGGED|RECYCLED)\b/);
     expect(page.match(/<h1\b/g)).toHaveLength(1);
     expect(page).toContain(COPY.honestStatus);
+  });
+
+  it("still lets a new item be bought when its record did not load: the listing is not known", () => {
+    const slots = { buy: <button type="button">BUY-SLOT</button> };
+    const shown = (state: TapStateKey, missingDetails?: "private" | "unavailable") =>
+      renderToStaticMarkup(
+        <TapResult state={state} missingDetails={missingDetails} slots={slots} />,
+      ).includes("BUY-SLOT");
+
+    expect(shown("newNotForSale", "unavailable")).toBe(true);
+    // the record loaded and says "not listed": that is an answer
+    expect(shown("newNotForSale")).toBe(false);
+    // an owner, a report or a retirement rules a purchase out, record or no record
+    for (const state of ["owned", "reported", "retired", "notReleased", "privateItem"] as const) {
+      expect(shown(state, "unavailable")).toBe(false);
+      expect(shown(state, "private")).toBe(false);
+    }
+    // through the model: the page offers the widget, and still says details are missing
+    const text = readable(html("new, record did not load"));
+    expect(text).toContain(`[button: ${COPY.buy.buttonNoPrice}]`);
+    expect(text).toContain(COPY.status.detailsUnavailable);
+    expect(readable(html("owned, no record on file"))).not.toContain(COPY.buy.buttonNoPrice);
   });
 
   it("does not say details are missing when they are there, or say it twice", () => {

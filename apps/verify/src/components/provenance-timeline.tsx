@@ -42,6 +42,12 @@ export function historyLabel(event: ProvenanceWireEvent, brand?: string): string
     case "AssetResold":
       return COPY.history.resold;
     case "StateChanged":
+      // Closing a report puts the item back exactly where it was before, which
+      // can be any step — so this comes first, or the closing would read as a
+      // second "released" or "bought", or be dropped with the steps below.
+      if (event.from_state === "FLAGGED" && event.to_state !== "RECYCLED") {
+        return COPY.history.reportClosed;
+      }
       switch (event.to_state) {
         // Minting and binding have their own events; the state change that
         // comes with each would only repeat the line.
@@ -51,7 +57,7 @@ export function historyLabel(event: ProvenanceWireEvent, brand?: string): string
         case "ACTIVATED":
           return COPY.history.released;
         case "CLAIMED":
-          return event.from_state === "FLAGGED" ? COPY.history.reportClosed : COPY.history.bought;
+          return COPY.history.bought;
         case "FLAGGED":
           return COPY.history.reported;
         case "RECYCLED":

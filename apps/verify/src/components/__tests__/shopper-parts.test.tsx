@@ -70,6 +70,57 @@ describe("product history", () => {
     expect(historyLabel(event("StateChanged", "CLAIMED", "RECYCLED"))).toBe(COPY.history.retired);
   });
 
+  it("says a report was closed wherever the item goes back to", () => {
+    // Closing a report restores the step the item was at, which can be any.
+    for (const back of ["MINTED", "BOUND", "ACTIVATED", "CLAIMED"]) {
+      expect(historyLabel(event("StateChanged", "FLAGGED", back))).toBe(COPY.history.reportClosed);
+    }
+    // a tagged item that was reported, then cleared: the history must not end on the report
+    expect(
+      historySteps([
+        event("AssetMinted"),
+        event("StateChanged", "NONE", "MINTED"),
+        event("TagBound"),
+        event("StateChanged", "MINTED", "BOUND"),
+        event("StateChanged", "BOUND", "FLAGGED"),
+        event("StateChanged", "FLAGGED", "BOUND"),
+      ]),
+    ).toEqual([
+      COPY.history.made,
+      COPY.history.tagAttached,
+      COPY.history.reported,
+      COPY.history.reportClosed,
+    ]);
+    // a released item that was reported, then cleared: not "released" a second time
+    expect(
+      historySteps([
+        event("StateChanged", "BOUND", "ACTIVATED"),
+        event("StateChanged", "ACTIVATED", "FLAGGED"),
+        event("StateChanged", "FLAGGED", "ACTIVATED"),
+      ]),
+    ).toEqual([COPY.history.released, COPY.history.reported, COPY.history.reportClosed]);
+    // a reported item that is retired ends as retired
+    expect(historyLabel(event("StateChanged", "FLAGGED", "RECYCLED"))).toBe(COPY.history.retired);
+  });
+
+  it("goes on from where a closed report left the item", () => {
+    const cleared = [
+      event("AssetMinted"),
+      event("TagBound"),
+      event("StateChanged", "BOUND", "FLAGGED"),
+      event("StateChanged", "FLAGGED", "BOUND"),
+    ];
+    // the page says the item is owned now: released and bought came after the report
+    expect(historySteps(cleared, undefined, "owned")).toEqual([
+      COPY.history.made,
+      COPY.history.tagAttached,
+      COPY.history.reported,
+      COPY.history.reportClosed,
+      COPY.history.released,
+      COPY.history.bought,
+    ]);
+  });
+
   it("does not repeat the making or the attaching through their state changes", () => {
     expect(historyLabel(event("StateChanged", "NONE", "MINTED"))).toBeNull();
     expect(historyLabel(event("StateChanged", "MINTED", "BOUND"))).toBeNull();
