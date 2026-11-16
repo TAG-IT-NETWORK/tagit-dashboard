@@ -84,7 +84,6 @@ export function RecordResult({
 }: RecordResultProps) {
   const copy = RECORD_STATES[state];
   const withProduct = HAS_PRODUCT.has(state) && hasProductToShow(product);
-  const reference = recordNumber ? ` (record ${recordNumber})` : "";
 
   return (
     <ConsumerPage>
@@ -154,7 +153,7 @@ export function RecordResult({
         </Section>
       )}
 
-      <HelpSection subject={`Help with a product record${reference}`} />
+      <HelpSection subject={COPY.mail.recordHelp(recordNumber)} />
 
       {technical && <TechnicalDetails rows={technical.rows} links={technical.links} />}
     </ConsumerPage>

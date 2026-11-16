@@ -155,6 +155,11 @@ export const RECORD_STATES: Record<RecordStateKey, StateCopy> = {
   },
 };
 
+/** "Subject" or "Subject (record 58)". */
+function withRecord(subject: string, record?: string): string {
+  return record ? `${subject} (record ${record})` : subject;
+}
+
 export const COPY = {
   /** Shown in the header of every page. */
   pageLabel: "Product check",
@@ -374,6 +379,19 @@ export const COPY = {
     reportProblem: "Report a problem",
   },
 
+  /**
+   * Subject lines of the emails "Report a problem" opens, so support can see
+   * what a message is about. The record number is added when the page has one.
+   */
+  mail: {
+    tapHelp: (record?: string) => withRecord("Help with a product check", record),
+    recordHelp: (record?: string) => withRecord("Help with a product record", record),
+    sighting: (record?: string) => withRecord("I saw a reported product", record),
+    checkFailed: "A product check did not pass",
+    paymentNotFinished: (record?: string) =>
+      withRecord("A demo payment was sent but the purchase did not finish", record),
+  },
+
   /** Copy deck: the closed drawer at the bottom. */
   technical: {
     title: "Technical details",
@@ -426,6 +444,15 @@ export const COPY = {
     justSold: "Sorry, this item was just sold or taken off sale. You haven't been charged.",
     notReady: "Still getting things ready. Try again in a moment.",
     failed: "We couldn't finish the purchase. You haven't been charged. Try again.",
+    /**
+     * The same two failures when the demo payment had already been sent. They
+     * must not say "you haven't been charged", and must not invite a second
+     * payment.
+     */
+    justSoldAfterPayment:
+      "This item was just sold or taken off sale, after your demo payment was sent. Please don't pay again. Report a problem and we'll put it right.",
+    failedAfterPayment:
+      "Your demo payment was sent, but we couldn't finish registering the item to you. Please don't pay again. Report a problem and we'll put it right.",
   },
 
   /** Read out while the record page loads. */
@@ -440,6 +467,21 @@ export const COPY = {
     notANumber: "Enter the record number as digits, like 58.",
   },
 } as const;
+
+/**
+ * What to say when the last step of a purchase fails. `paid` is whether this
+ * attempt had already sent its payment: only when it had not may the message
+ * say "you haven't been charged", and only then does it invite another try.
+ */
+export function purchaseFailure(kind: "justSold" | "failed", paid: boolean): string {
+  if (kind === "justSold") return paid ? COPY.buy.justSoldAfterPayment : COPY.buy.justSold;
+  return paid ? COPY.buy.failedAfterPayment : COPY.buy.failed;
+}
+
+/** True for a failure that happened after the payment was sent. */
+export function isFailureAfterPayment(message: string | null): boolean {
+  return message === COPY.buy.justSoldAfterPayment || message === COPY.buy.failedAfterPayment;
+}
 
 /** Where "Report a problem" goes. Already the public contact on pro.tagit.network. */
 export const SUPPORT_EMAIL = "info@tagit.network";

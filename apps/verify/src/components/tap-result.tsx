@@ -190,7 +190,6 @@ export function TapResult({
   const productState = HAS_PRODUCT.has(state);
   const withProduct = productState && hasProductToShow(product);
   const authentic = isAuthenticTapState(state);
-  const reference = recordNumber ? ` (record ${recordNumber})` : "";
 
   return (
     <ConsumerPage timing={timing}>
@@ -272,7 +271,7 @@ export function TapResult({
           <Section title={COPY.reported.doTitle}>
             <Steps items={COPY.reported.steps.map((body) => ({ body }))} />
           </Section>
-          <ActionLink kind="dark" href={supportMailto(`I saw a reported product${reference}`)}>
+          <ActionLink kind="dark" href={supportMailto(COPY.mail.sighting(recordNumber))}>
             {COPY.actions.reportSighting}
           </ActionLink>
         </>
@@ -284,7 +283,7 @@ export function TapResult({
             <Steps items={COPY.checkFailed.steps} />
           </Section>
           <Note icon="tag">{COPY.checkFailed.why}</Note>
-          <ActionLink kind="dark" href={supportMailto("A product check did not pass")}>
+          <ActionLink kind="dark" href={supportMailto(COPY.mail.checkFailed)}>
             {COPY.actions.reportProblem}
           </ActionLink>
         </>
@@ -356,7 +355,7 @@ export function TapResult({
       )}
 
       {/* A failed check already has "Report a problem" as its main action. */}
-      {state !== "checkFailed" && <HelpSection subject={`Help with a product check${reference}`} />}
+      {state !== "checkFailed" && <HelpSection subject={COPY.mail.tapHelp(recordNumber)} />}
 
       {technical && <TechnicalDetails rows={technical.rows} links={technical.links} />}
     </ConsumerPage>

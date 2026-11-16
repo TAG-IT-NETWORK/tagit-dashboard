@@ -5,6 +5,8 @@ import {
   RECORD_STATES,
   SUPPORT_EMAIL,
   TAP_STATES,
+  isFailureAfterPayment,
+  purchaseFailure,
   supportMailto,
   type TapStateKey,
 } from "../consumer-copy";
@@ -140,6 +142,40 @@ describe("the honest-status sentence", () => {
     expect(COPY.honestStatus).toMatch(/pilot/i);
     expect(COPY.honestStatus).toMatch(/test network/i);
     expect(COPY.honestStatus).toMatch(/not completed an external security audit/i);
+  });
+});
+
+describe("when a purchase fails", () => {
+  const NOT_CHARGED = /haven't been charged/i;
+
+  it("says 'you haven't been charged' only if no payment was sent", () => {
+    for (const kind of ["justSold", "failed"] as const) {
+      expect(purchaseFailure(kind, false)).toMatch(NOT_CHARGED);
+      expect(purchaseFailure(kind, true)).not.toMatch(NOT_CHARGED);
+    }
+    // failures that can only happen before or instead of a payment
+    for (const message of [COPY.buy.paymentFailed, COPY.buy.noFunds]) {
+      expect(message).toMatch(NOT_CHARGED);
+    }
+  });
+
+  it("after a payment was sent: says so, asks not to pay again, and does not say 'try again'", () => {
+    for (const kind of ["justSold", "failed"] as const) {
+      const message = purchaseFailure(kind, true);
+      expect(message).toMatch(/payment was sent/i);
+      expect(message).toMatch(/don't pay again/i);
+      expect(message).not.toMatch(/try again/i);
+      expect(isFailureAfterPayment(message)).toBe(true);
+      expect(isFailureAfterPayment(purchaseFailure(kind, false))).toBe(false);
+    }
+    expect(isFailureAfterPayment(null)).toBe(false);
+    expect(isFailureAfterPayment(COPY.buy.noFunds)).toBe(false);
+  });
+
+  it("keeps the two kinds of failure apart", () => {
+    expect(purchaseFailure("justSold", false)).toBe(COPY.buy.justSold);
+    expect(purchaseFailure("failed", false)).toBe(COPY.buy.failed);
+    expect(purchaseFailure("justSold", true)).not.toBe(purchaseFailure("failed", true));
   });
 });
 

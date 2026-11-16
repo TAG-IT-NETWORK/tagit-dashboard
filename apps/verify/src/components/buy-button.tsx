@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { encodeFunctionData, type Hex } from "viem";
-import { COPY } from "@/lib/consumer-copy";
+import { COPY, isFailureAfterPayment, purchaseFailure, supportMailto } from "@/lib/consumer-copy";
 import { isPurchasable, type CanonicalPrice } from "@/lib/price";
 
 // Base Sepolia test USDC (6 decimals).
@@ -86,6 +86,9 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       return;
     }
     setError(null);
+    // Whether this attempt already sent a payment. It only chooses the words
+    // of a later failure: "you haven't been charged" is said only when true.
+    let paid = false;
     try {
       // 0. Re-read the canonical price IMMEDIATELY before payment. The page
       //    may be minutes old; the charge must reflect the listing right now.
@@ -112,6 +115,7 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
             { address: buyerWallet, sponsor: true },
           );
           paymentTxHash = hash;
+          paid = true;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           // Most common cause: the fresh demo wallet has no test funds yet.
@@ -137,20 +141,20 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       });
       const data = await res.json();
       if (res.status === 409 || data?.code === "LISTING_STALE") {
-        setError(COPY.buy.justSold);
+        setError(purchaseFailure("justSold", paid));
         setPhase("error");
         void refetchPrice(); // widget hides itself once the delist lands
         return;
       }
       if (!res.ok || !data.ok) {
-        setError(COPY.buy.failed);
+        setError(purchaseFailure("failed", paid));
         setPhase("error");
         return;
       }
       setResult({ explorerUrl: data.explorerUrl });
       setPhase("done");
     } catch {
-      setError(COPY.buy.failed);
+      setError(purchaseFailure("failed", paid));
       setPhase("error");
     }
   }, [buyerWallet, tokenId, refetchPrice, sendTransaction]);
@@ -218,6 +222,14 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
           <p role="alert" className="text-center text-sm leading-5 text-bad">
             {error}
           </p>
+          {isFailureAfterPayment(error) && (
+            <a
+              href={supportMailto(COPY.mail.paymentNotFinished(tokenId))}
+              className="inline-flex min-h-[44px] items-center self-center text-sm font-semibold leading-5 text-brand-link underline underline-offset-2"
+            >
+              {COPY.actions.reportProblem}
+            </a>
+          )}
           {error === COPY.buy.noFunds && buyerWallet && (
             <details className="rounded-2xl border border-line">
               <summary className="flex min-h-[48px] cursor-pointer list-none items-center px-4 text-sm font-semibold leading-5 text-brand-link underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
