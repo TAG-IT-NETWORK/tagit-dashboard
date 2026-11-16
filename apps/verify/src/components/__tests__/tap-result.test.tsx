@@ -158,7 +158,7 @@ describe("what must never be on a shopper page", () => {
 
   it.each(STATES)("%s never says why a check failed or names a setting", (state) => {
     const html = page(state);
-    for (const leak of [
+    for (const internal of [
       FAIL_REASON,
       LOOKUP_ERROR,
       "SDM_MASTER_KEY",
@@ -166,7 +166,7 @@ describe("what must never be on a shopper page", () => {
       "decrypt",
       "mismatch",
     ]) {
-      expect(html).not.toContain(leak);
+      expect(html).not.toContain(internal);
     }
   });
 
