@@ -33,15 +33,46 @@ export function hasRole(role: Role | null, required: Role): boolean {
 // ── Path classification ──────────────────────────────────────────────────────
 
 /**
- * Paths that bypass the session gate entirely. These either ARE the sign-in
- * surface or carry their own authentication and are called by non-browser
- * clients that can never hold a session cookie:
- * - /api/auth            NextAuth handlers + default sign-in pages
- * - /api/a2a             external A2A agents (A2A_API_KEY auth of its own)
+ * Paths that bypass the session gate entirely. Only two things qualify: the
+ * sign-in surface itself, and a public document that holds no key and reads
+ * nothing private.
+ * - /api/auth                NextAuth handlers + default sign-in pages
  * - /api/farcaster-manifest  public manifest fetched by crawlers
- * - /api/ipfs            pre-T32 public pin passthrough (unchanged posture)
+ *
+ * A route that attaches a server-side key to a request must NEVER be listed
+ * here (TAP-T02): whoever can reach it borrows that key.
  */
-const PUBLIC_PREFIXES = ["/api/auth", "/api/a2a", "/api/farcaster-manifest", "/api/ipfs"] as const;
+const PUBLIC_PREFIXES = ["/api/auth", "/api/farcaster-manifest"] as const;
+
+/**
+ * Everything a BRAND session may reach (TAP-T02). A brand user is a roster
+ * user with a business id; they get the operations surface for their own
+ * business and nothing else. This is an allow-list on purpose: a page or
+ * proxy added later is closed to brand sessions until someone lists it here.
+ * The role rules below still apply on top, and the proxies still send the
+ * brand to tagit-services, which scopes the data.
+ */
+const TENANT_PREFIXES = [
+  // pages (the brand menu — see visibleNavGroups in components/sidebar.tsx)
+  "/dashboard",
+  "/station",
+  "/verify",
+  "/chip-tools",
+  "/catalog",
+  "/assets",
+  "/team",
+  "/agents/catalog",
+  // the proxies those pages call
+  "/api/catalog-proxy",
+  "/api/media-proxy",
+  "/api/mint-proxy",
+  "/api/team-proxy",
+  "/api/dashboard-stats",
+  "/api/a2a",
+] as const;
+
+/** Where a brand session lands when it asks for the root. */
+export const TENANT_HOME = "/dashboard";
 
 /**
  * Signed-in but role-EXEMPT paths. /403 must render for a user whose email is
@@ -146,6 +177,11 @@ export function isSessionOnlyPath(pathname: string): boolean {
   return SESSION_ONLY_PATHS.some((p) => matchesPrefix(pathname, p));
 }
 
+/** True when a brand session may reach this path (before the role rules). */
+export function isTenantPath(pathname: string): boolean {
+  return TENANT_PREFIXES.some((p) => matchesPrefix(pathname, p));
+}
+
 export function isApiPath(pathname: string): boolean {
   return matchesPrefix(pathname, "/api");
 }
@@ -171,26 +207,35 @@ export function requiredRoleFor(pathname: string, method?: string): Role {
 
 // ── Middleware decision table ────────────────────────────────────────────────
 
-export type AccessDecision = "allow" | "signin" | "forbidden";
+export type AccessDecision = "allow" | "signin" | "forbidden" | "home";
 
 /**
  * The complete middleware decision, as a pure function:
- * - public path                → allow
- * - no session                 → signin   (redirect / 401 for APIs)
- * - /403 itself                → allow    (any signed-in user, even role-less)
- * - role below the path's need → forbidden (redirect to /403 / 403 for APIs)
+ * - public path                    → allow
+ * - no session                     → signin   (redirect / 401 for APIs)
+ * - /403 itself                    → allow    (any signed-in user, even role-less)
+ * - brand session, the root        → home     (redirect to TENANT_HOME)
+ * - brand session, not its surface → forbidden
+ * - role below the path's need     → forbidden (redirect to /403 / 403 for APIs)
+ *
+ * `tenant` is the session's business id: a non-empty string for a brand
+ * user, null/undefined for a platform user (TAP-T02).
  *
  * `method` feeds the WB-06 method-scoped entries; omitting it treats every
  * method-scoped entry as applicable (fail closed).
  */
 export function evaluateAccess(
   pathname: string,
-  session: { authenticated: boolean; role: Role | null },
+  session: { authenticated: boolean; role: Role | null; tenant?: string | null },
   method?: string,
 ): AccessDecision {
   if (isPublicPath(pathname)) return "allow";
   if (!session.authenticated) return "signin";
   if (isSessionOnlyPath(pathname)) return "allow";
+  if (session.tenant) {
+    if (pathname === "/") return "home";
+    if (!isTenantPath(pathname)) return "forbidden";
+  }
   return hasRole(session.role, requiredRoleFor(pathname, method)) ? "allow" : "forbidden";
 }
 

@@ -171,3 +171,77 @@ describe("/api/team-proxy", () => {
     }
   });
 });
+
+// ── TAP-T02: a brand admin's roster requests stay inside the brand ───────────
+
+describe("/api/team-proxy — brand sessions", () => {
+  const originalEnv = { ...process.env };
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const BRAND_ADMIN = { user: { email: "boss@brand.example", role: "admin", businessId: "biz-a" } };
+
+  beforeEach(() => {
+    process.env.SERVICES_API_KEY = TEST_KEY;
+    process.env.SERVICES_URL = "https://services.test";
+    authState.session = BRAND_ADMIN;
+    fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...originalEnv };
+  });
+
+  const put = async (body: unknown) => {
+    const { PUT } = await loadRoutes();
+    return PUT(jsonRequest("PUT", body), { params: { email: "ops@brand.example" } } as never);
+  };
+
+  it.each([
+    ["clearing the business", { businessId: null }],
+    ["clearing it while promoting", { businessId: null, role: "admin" }],
+    ["naming another business", { businessId: "biz-b" }],
+    ["an empty business id", { businessId: "" }],
+  ])("refuses %s without calling services", async (_name, body) => {
+    const res = await put(body);
+
+    expect(res.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to enroll a user into another business or onto the platform", async () => {
+    const { POST } = await loadRoutes();
+
+    const other = await POST(
+      jsonRequest("POST", { email: "x@y.example", role: "viewer", businessId: "biz-b" }),
+    );
+    const platform = await POST(
+      jsonRequest("POST", { email: "x@y.example", role: "viewer", businessId: null }),
+    );
+
+    expect([other.status, platform.status]).toEqual([403, 403]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards a change inside the brand, scoped to the brand", async () => {
+    const res = await put({ role: "operator", businessId: "biz-a" });
+
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["x-business-id"]).toBe("biz-a");
+    expect(headers["x-actor"]).toBe("boss@brand.example");
+    expect(JSON.parse(String(init.body))).toEqual({ role: "operator", businessId: "biz-a" });
+  });
+
+  it("a platform admin can still move a user to the platform (unchanged)", async () => {
+    authState.session = ADMIN_SESSION;
+
+    const res = await put({ businessId: null });
+
+    expect(res.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["x-business-id"]).toBeUndefined();
+    expect(JSON.parse(String(init.body))).toEqual({ businessId: null });
+  });
+});

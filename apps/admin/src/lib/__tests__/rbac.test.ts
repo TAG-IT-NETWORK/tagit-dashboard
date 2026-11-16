@@ -25,12 +25,9 @@ describe("parseRole", () => {
     for (const role of ROLES) expect(parseRole(role)).toBe(role);
   });
 
-  it.each([undefined, null, "", "Admin", "superuser", 1, {}, ["admin"]])(
-    "rejects %p",
-    (value) => {
-      expect(parseRole(value)).toBeNull();
-    },
-  );
+  it.each([undefined, null, "", "Admin", "superuser", 1, {}, ["admin"]])("rejects %p", (value) => {
+    expect(parseRole(value)).toBeNull();
+  });
 });
 
 describe("hasRole (viewer < operator < admin)", () => {
@@ -148,20 +145,23 @@ describe("requiredRoleFor — the per-path role map", () => {
 });
 
 describe("path classes", () => {
-  it("public: the auth surface and externally-authed APIs", () => {
-    for (const p of [
-      "/api/auth/signin",
-      "/api/auth/callback/google",
-      "/api/a2a",
-      "/api/farcaster-manifest",
-      "/api/ipfs",
-    ]) {
+  it("public: only the sign-in surface and the crawler manifest", () => {
+    for (const p of ["/api/auth/signin", "/api/auth/callback/google", "/api/farcaster-manifest"]) {
       expect(isPublicPath(p)).toBe(true);
     }
   });
 
-  it("NOT public: pages and the key-holding proxies", () => {
-    for (const p of ["/dashboard", "/team", "/api/media-proxy", "/api/mint-proxy", "/api/team-proxy"]) {
+  it("NOT public: pages and every route that holds a server-side key", () => {
+    for (const p of [
+      "/dashboard",
+      "/team",
+      "/api/media-proxy",
+      "/api/mint-proxy",
+      "/api/team-proxy",
+      // TAP-T02: these two answered without a session.
+      "/api/a2a",
+      "/api/ipfs",
+    ]) {
       expect(isPublicPath(p)).toBe(false);
     }
   });
@@ -186,7 +186,13 @@ describe("evaluateAccess — the middleware decision table", () => {
 
   it("public paths are open to everyone, even unauthenticated", () => {
     expect(evaluateAccess("/api/auth/signin", anon)).toBe("allow");
-    expect(evaluateAccess("/api/a2a", anon)).toBe("allow");
+    expect(evaluateAccess("/api/farcaster-manifest", anon)).toBe("allow");
+  });
+
+  it("TAP-T02: the agent relay and the pin passthrough need a session", () => {
+    expect(evaluateAccess("/api/a2a", anon, "POST")).toBe("signin");
+    expect(evaluateAccess("/api/ipfs", anon, "POST")).toBe("signin");
+    expect(evaluateAccess("/api/a2a", viewer, "POST")).toBe("allow");
   });
 
   it("unauthenticated → signin everywhere else", () => {
@@ -297,5 +303,90 @@ describe("matcher mirror (MUST stay in sync with src/middleware.ts config.matche
     // Non-/api static assets stay excluded.
     expect(isGatedByMatcher("/apidocs.png")).toBe(false);
     expect(isGatedByMatcher("/logo.webp")).toBe(false);
+  });
+});
+
+// ── TAP-T02: brand (tenant) sessions ─────────────────────────────────────────
+
+describe("evaluateAccess — brand sessions are denied by default outside the brand surface", () => {
+  const brand = (role: Role) => ({ authenticated: true, role, tenant: "biz-a" });
+  const platform = (role: Role) => ({ authenticated: true, role, tenant: null });
+
+  const PLATFORM_ONLY_PAGES = [
+    "/lifecycle",
+    "/assembly-line",
+    "/users",
+    "/users/0xabc",
+    "/badges",
+    "/capabilities",
+    "/governance",
+    "/governance/new",
+    "/treasury",
+    "/treasury/spend",
+    "/tokenomics",
+    "/resolve",
+    "/resolve/7",
+    "/agents",
+    "/agents/register",
+    "/agents/12",
+    "/adagent",
+    "/influencer",
+    "/demo",
+    "/test/console",
+    "/test/lifecycle",
+  ];
+
+  it.each(PLATFORM_ONLY_PAGES)("a brand admin is refused %s", (path) => {
+    expect(evaluateAccess(path, brand("admin"))).toBe("forbidden");
+  });
+
+  it.each(PLATFORM_ONLY_PAGES)("a platform admin still reaches %s", (path) => {
+    expect(evaluateAccess(path, platform("admin"))).toBe("allow");
+  });
+
+  it("a page or API nobody listed is refused for a brand session (default deny)", () => {
+    expect(evaluateAccess("/some-new-platform-page", brand("admin"))).toBe("forbidden");
+    expect(evaluateAccess("/api/some-new-proxy", brand("admin"), "POST")).toBe("forbidden");
+    expect(evaluateAccess("/agents/catalogue-admin", brand("admin"))).toBe("forbidden");
+  });
+
+  it("the brand surface stays open, with the usual role rules on top", () => {
+    for (const path of [
+      "/dashboard",
+      "/station",
+      "/verify",
+      "/chip-tools",
+      "/catalog",
+      "/catalog/tpl_1/batch/bind",
+      "/assets",
+      "/assets/55",
+      "/agents/catalog",
+      "/api/dashboard-stats",
+      "/api/catalog-proxy/templates",
+      "/api/catalog-proxy/batches/bat_1",
+    ]) {
+      expect(evaluateAccess(path, brand("viewer"), "GET")).toBe("allow");
+    }
+    // role rules still apply inside the brand surface
+    expect(evaluateAccess("/team", brand("viewer"))).toBe("forbidden");
+    expect(evaluateAccess("/team", brand("admin"))).toBe("allow");
+    expect(evaluateAccess("/api/team-proxy", brand("admin"), "PUT")).toBe("allow");
+    expect(evaluateAccess("/api/media-proxy", brand("viewer"), "POST")).toBe("forbidden");
+    expect(evaluateAccess("/api/media-proxy", brand("operator"), "POST")).toBe("allow");
+    expect(evaluateAccess("/api/mint-proxy", brand("operator"), "POST")).toBe("allow");
+    expect(evaluateAccess("/api/a2a", brand("viewer"), "POST")).toBe("allow");
+  });
+
+  it("the root sends a brand session to its own home instead of a platform page", () => {
+    expect(evaluateAccess("/", brand("viewer"))).toBe("home");
+    expect(evaluateAccess("/", platform("viewer"))).toBe("allow");
+  });
+
+  it("the 403 page still renders for a brand session (no redirect loop)", () => {
+    expect(evaluateAccess("/403", brand("viewer"))).toBe("allow");
+  });
+
+  it("a session with no tenant field behaves as a platform session (unchanged callers)", () => {
+    expect(evaluateAccess("/governance", { authenticated: true, role: "admin" })).toBe("allow");
   });
 });
