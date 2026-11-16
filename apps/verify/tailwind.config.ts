@@ -32,6 +32,14 @@ const config: Config = {
         bad: { DEFAULT: "#a3231b", bg: "#fdeeee", line: "#f3c2bf" },
         warn: { DEFAULT: "#7a4b00", bg: "#fff4d6", line: "#f0d48a" },
       },
+      boxShadow: {
+        // A card that sits just above the page.
+        card: "0 1px 2px rgba(11, 15, 23, 0.04), 0 10px 24px -16px rgba(11, 15, 23, 0.22)",
+        // The main action: a line of light along its top edge, and a shadow in
+        // its own colour under it.
+        action:
+          "inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 14px 26px -14px rgba(11, 114, 217, 0.85)",
+      },
     },
   },
   plugins: [],

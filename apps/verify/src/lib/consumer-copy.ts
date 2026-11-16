@@ -197,7 +197,6 @@ export const COPY = {
   /** What each state adds under the product. */
   status: {
     newTitle: "New. No one has registered it yet.",
-    howWeKnowLink: "How we know it's authentic",
     secondHandTitle: "Buying it second-hand?",
     /** Copy deck. */
     secondHandBody:
@@ -217,7 +216,6 @@ export const COPY = {
   },
 
   actions: {
-    seeDetails: "See product details",
     tryAgain: "Try again",
     reportProblem: "Report a problem",
     reportSighting: "Report where you saw it",
@@ -353,6 +351,10 @@ export const COPY = {
     onlyOwners:
       "Only people who own this product can review it, so every review is from a real buyer.",
     verifiedOwner: "Verified owner",
+    /** Inside the reviews row, while the reviews are on their way. */
+    loadingList: "Loading the reviews…",
+    /** Inside the reviews row, when they could not be read. Not "no reviews": we do not know. */
+    unavailable: "We couldn't load the reviews right now.",
     write: "Own it? Write a review",
     loading: "Opening the review form…",
     formTitle: (name: string) => `Review ${name}`,

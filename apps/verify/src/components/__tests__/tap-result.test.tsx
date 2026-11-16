@@ -25,9 +25,22 @@ import {
   record,
   resolvedTap,
 } from "@/test-support/shopper-fixtures";
-import { insideDrawer, outsideDrawer, readable } from "@/test-support/readable";
+import {
+  insideDrawer,
+  onShow,
+  outsideDrawer,
+  readable,
+  rowNames,
+  rowOf,
+} from "@/test-support/readable";
 
-import { ReviewsSection } from "../rating-summary";
+import {
+  RatingLine,
+  ReviewsContent,
+  ReviewsLoading,
+  ReviewsRow,
+  ReviewsSection,
+} from "../rating-summary";
 import { TapResult } from "../tap-result";
 
 /**
@@ -98,11 +111,17 @@ function render(
                   {product.price ? COPY.buy.button(product.price) : COPY.buy.buttonNoPrice}
                 </button>
               ) : undefined,
+              // As <TapVerdict> builds them: the rating line and the contents of
+              // the reviews row are sent after the page; the row itself is not.
+              rating: model.show.reviews ? <RatingLine view={RATINGS} late /> : undefined,
               reviews: model.show.reviews ? (
-                <ReviewsSection
-                  view={RATINGS}
-                  write={<button type="button">{COPY.reviews.write}</button>}
-                />
+                <ReviewsRow needsScript>
+                  <ReviewsContent
+                    view={RATINGS}
+                    write={<button type="button">{COPY.reviews.write}</button>}
+                    late
+                  />
+                </ReviewsRow>
               ) : undefined,
               history: model.show.history ? <p>(product history loads here)</p> : undefined,
             }
@@ -226,11 +245,19 @@ describe("Technical details", () => {
   });
 
   it("is a plain <details>: it opens without any script", () => {
-    expect(page("owned")).toMatch(/<details[^>]*><summary/);
+    expect(page("owned")).toMatch(/<details[^>]*\bdata-technical\b[^>]*><summary/);
+  });
+
+  it("is the last row of the page", () => {
+    for (const state of STATES) {
+      const names = rowNames(body(state));
+      if (names.includes("technical")) expect(names.at(-1), state).toBe("technical");
+    }
   });
 
   it("has nothing at all for a failed check or a broken link", () => {
-    expect(page("checkFailed")).not.toContain("<details");
+    expect(page("checkFailed")).not.toContain("data-technical");
+    expect(page("linkIncomplete")).not.toContain("data-technical");
     expect(page("linkIncomplete")).not.toContain("<details");
   });
 
@@ -305,6 +332,16 @@ describe("the parts each state does and does not get", () => {
     for (const state of STATES) {
       const authentic = TAP_STATES[state].headline === "Authentic";
       expect(has(state, `## ${COPY.trust.title}`)).toBe(authentic);
+      expect(rowNames(body(state)).includes("how-we-know")).toBe(authentic);
+    }
+  });
+
+  it("explains how a check works, in general terms, only where nothing was confirmed", () => {
+    for (const state of STATES) {
+      const general = state === "checkFailed" || state === "linkUsed";
+      expect(rowNames(body(state)).includes("how-it-works"), state).toBe(general);
+      // …and that explanation never says this item passed
+      if (general) expect(readable(rowOf(body(state), "how-it-works"))).not.toMatch(/\bthis\b/i);
     }
   });
 
@@ -450,13 +487,254 @@ describe("the page frame", () => {
     );
   });
 
-  it("links the page's own sections only where they exist", () => {
+  it("has no link to a place further down the same page", () => {
+    // A row that is closed cannot be jumped to: the reader would land on a
+    // closed row. Everything further down is reached by opening its row.
+    for (const state of STATES) expect(body(state), state).not.toMatch(/href="#/);
+  });
+
+  it("is coloured to match its verdict", () => {
     for (const state of STATES) {
-      const html = body(state);
-      for (const [, id] of html.matchAll(/href="#([^"]+)"/g)) {
-        expect(html, `${state} links to #${id}`).toContain(`id="${id}"`);
-      }
+      const tone = TAP_STATES[state].tone;
+      // the page's outermost element, and the verdict inside it
+      expect(body(state).includes(`min-h-screen`), state).toBe(true);
+      expect(
+        /<div class="[^"]*min-h-screen[^"]*" data-tone="(\w+)"/.exec(body(state))?.[1],
+        state,
+      ).toBe(tone);
+      expect(body(state).includes(`<div role="status" data-verdict="${tone}"`), state).toBe(true);
     }
+  });
+});
+
+describe("the order a shopper reads in", () => {
+  /** Where each of these first appears in the page as it is read out. */
+  const order = (state: TapStateKey, marks: string[]) => {
+    const text = readable(body(state));
+    return marks.map((mark) => {
+      const at = text.indexOf(mark);
+      expect(at, `${state}: "${mark}" is on the page`).toBeGreaterThan(-1);
+      return at;
+    });
+  };
+  const rising = (positions: number[]) =>
+    positions.every((at, i) => i === 0 || at > positions[i - 1]!);
+
+  it("for sale: verdict, name, rating, price, the buy button, then the rows", () => {
+    expect(
+      rising(
+        order("newForSale", [
+          "# Authentic",
+          "## Renewal Cream",
+          "2 verified owner reviews",
+          "$23.33",
+          `[button: ${COPY.buy.button("$23.33")}]`,
+          COPY.status.newTitle,
+          `## ${COPY.reviews.title}`,
+          `## ${COPY.about.title}`,
+          `## ${COPY.history.title}`,
+          `## ${COPY.trust.title}`,
+          `## ${COPY.technical.title}`,
+          COPY.help.title,
+          COPY.honestStatus,
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("owned: verdict, name, rating, the second-hand tip, then the rows", () => {
+    expect(
+      rising(
+        order("owned", [
+          "# Authentic",
+          "## Renewal Cream",
+          "2 verified owner reviews",
+          COPY.status.secondHandTitle,
+          `## ${COPY.reviews.title}`,
+          `## ${COPY.about.title}`,
+          `## ${COPY.technical.title}`,
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("reported: the warning, the product, what it means and what to do, then the rows", () => {
+    expect(
+      rising(
+        order("reported", [
+          `# ${TAP_STATES.reported.headline}`,
+          "## Renewal Cream",
+          COPY.status.tagIsRealNote,
+          `## ${COPY.reported.meaningTitle}`,
+          `## ${COPY.reported.doTitle}`,
+          COPY.actions.reportSighting,
+          `## ${COPY.about.title}`,
+          `## ${COPY.technical.title}`,
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("puts the reviews row first among the rows, wherever there are reviews", () => {
+    for (const state of ["newForSale", "newNotForSale", "owned"] as const) {
+      expect(rowNames(body(state))[0], state).toBe("reviews");
+    }
+  });
+
+  it("gives each state exactly these rows", () => {
+    const product = ["reviews", "about", "history", "how-we-know", "technical"];
+    expect(Object.fromEntries(STATES.map((state) => [state, rowNames(body(state))]))).toEqual({
+      newForSale: product,
+      newNotForSale: product,
+      owned: product,
+      notReleased: ["about", "history", "technical"],
+      reported: ["about", "history", "technical"],
+      retired: ["about", "history", "technical"],
+      checkFailed: ["how-it-works"],
+      linkUsed: ["how-it-works"],
+      noProduct: ["technical"],
+      ourSide: ["technical"],
+      linkIncomplete: [],
+      privateItem: ["how-we-know", "technical"],
+    });
+  });
+});
+
+describe("rows that open", () => {
+  const rows = (state: TapStateKey) =>
+    rowNames(body(state)).map((name) => rowOf(body(state), name));
+
+  it.each(STATES)("%s: every row is a closed <details> with its name as a heading", (state) => {
+    for (const row of rows(state)) {
+      expect(row).not.toMatch(/^<details[^>]*\bopen\b/);
+      // The summary holds one heading and nothing else, which is what a
+      // <summary> may hold; the heading names the row.
+      expect(row).toMatch(/^<details[^>]*><summary[^>]*><h2[^>]*>[\s\S]*?<\/h2><\/summary>/);
+      expect(readable(row).split("\n")[1]).toMatch(/^## \S/);
+    }
+  });
+
+  it.each(STATES)("%s: a row's text is in the page whether or not it is open", (state) => {
+    for (const row of rows(state)) {
+      // Nothing but the browser's own closed state keeps it out of sight.
+      expect(row).not.toMatch(
+        /\shidden[\s=>]|display:\s*none|aria-hidden="true"[^>]*class="[^"]*panel/,
+      );
+      expect(readable(row).split("\n").length).toBeGreaterThan(3);
+    }
+  });
+
+  it("holds the product's details, the history and the explanation, not the verdict", () => {
+    const shown = readable(onShow(body("owned")));
+    expect(shown).toContain("# Authentic");
+    expect(shown).toContain("Renewal Cream");
+    expect(shown).not.toContain("Product code");
+    expect(shown).not.toContain(COPY.trust.points[0].title);
+    expect(readable(rowOf(body("owned"), "about"))).toContain("Product code: TD-RC-50");
+    expect(readable(rowOf(body("owned"), "how-we-know"))).toContain(COPY.trust.points[0].title);
+  });
+});
+
+describe("what stays on show without opening anything", () => {
+  const shown = (state: TapStateKey) => readable(onShow(body(state)));
+
+  it.each(STATES)("%s: the verdict, its line and the honest-status sentence", (state) => {
+    const text = shown(state);
+    expect(text).toContain(`# ${TAP_STATES[state].headline}`);
+    expect(text).toContain(`${TAP_STATES[state].line}.`);
+    expect(text).toContain(COPY.honestStatus);
+  });
+
+  it("a warning and what to do about it are never inside a row", () => {
+    const reported = shown("reported");
+    for (const line of [
+      COPY.status.tagIsRealNote,
+      ...COPY.reported.meaning,
+      ...COPY.reported.steps,
+      COPY.actions.reportSighting,
+    ]) {
+      expect(reported).toContain(line);
+    }
+    const failed = shown("checkFailed");
+    for (const step of COPY.checkFailed.steps) {
+      expect(failed).toContain(step.title);
+      expect(failed).toContain(step.body);
+    }
+    expect(failed).toContain(COPY.checkFailed.why);
+    expect(shown("linkUsed")).toContain(COPY.linkUsed.againTitle);
+    expect(shown("ourSide")).toContain(COPY.actions.tryAgain);
+    expect(shown("notReleased")).toContain(COPY.status.notReleasedTip);
+  });
+
+  it("the notes about missing or unconfirmed details are never inside a row", () => {
+    const lookup = record(STATE.ACTIVATED, true);
+    if (lookup.kind !== "record") throw new Error("fixture");
+    lookup.dto.verification = { ...lookup.dto.verification!, verified: false };
+    const model = tapPageModel({
+      res: resolvedTap(STATE.ACTIVATED),
+      lookup,
+      stepsSeen: 1,
+      tookMs: 250,
+    });
+    const html = renderToStaticMarkup(
+      <TapResult
+        state={model.state}
+        product={model.product}
+        technical={model.technical}
+        detailsCheck={model.detailsCheck}
+      />,
+    );
+    expect(readable(onShow(html))).toContain(COPY.status.detailsNotConfirmed);
+  });
+
+  it("the name, the price and the buy button of an item for sale", () => {
+    const text = shown("newForSale");
+    for (const mark of [
+      "## Renewal Cream",
+      "$23.33",
+      COPY.buy.button("$23.33"),
+      "2 verified owner reviews",
+    ]) {
+      expect(text).toContain(mark);
+    }
+  });
+});
+
+describe("the rating under the product's name", () => {
+  const line = (html: string) => /<p[^>]*\bdata-rating\b[^>]*>[\s\S]*?<\/p>/.exec(html)?.[0] ?? "";
+
+  it("says the average and how many owners reviewed it, where reviews are shown", () => {
+    for (const state of ["newForSale", "newNotForSale", "owned"] as const) {
+      const text = readable(line(body(state)));
+      expect(text, state).toContain("(4.5 out of 5 stars)");
+      expect(text, state).toContain("2 verified owner reviews");
+    }
+  });
+
+  it("sits in the product block, after the name and before the price", () => {
+    const html = body("newForSale");
+    const product = /<section aria-label="Product"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+    expect(product).toContain("data-rating");
+    expect(product.indexOf("<h2")).toBeLessThan(product.indexOf("data-rating"));
+    expect(product.indexOf("data-rating")).toBeLessThan(product.indexOf("data-price"));
+  });
+
+  it("is absent where reviews are not shown, and when there are none yet", () => {
+    for (const state of STATES.filter(
+      (s) => !["newForSale", "newNotForSale", "owned"].includes(s),
+    )) {
+      expect(body(state), state).not.toContain("data-rating");
+    }
+    const none = { ...RATINGS, product: null, reviews: [] };
+    expect(renderToStaticMarkup(<RatingLine view={none} />)).toBe("");
+    expect(renderToStaticMarkup(<RatingLine view={null} />)).toBe("");
+    expect(renderToStaticMarkup(<RatingLine view={{ ...RATINGS, restricted: true }} />)).toBe("");
+  });
+
+  it("names nobody", () => {
+    const html = line(body("owned"));
+    expect(html).not.toContain(REVIEWER);
+    expect(html).not.toMatch(/0x/);
   });
 });
 
@@ -471,36 +749,131 @@ describe("with scripts turned off", () => {
   });
 
   it.each(STATES)("%s keeps the verdict, the product and Technical details", (state) => {
-    for (const tag of leftOut(page(state))) {
-      // only whole sections are left out — never the page, the verdict or the drawer
-      expect(tag.startsWith("<section")).toBe(true);
+    const html = page(state);
+    const reviews = rowOf(html, "reviews");
+    for (const tag of leftOut(html)) {
+      // Only a row that cannot work without scripts, or a part that is sent
+      // late — never the page, the verdict or Technical details.
+      const aLateRow = /^<details\b[^>]*data-row="(history|reviews)"/.test(tag);
+      const theRatingLine = /^<p\b[^>]*data-rating/.test(tag);
+      const insideTheReviewsRow = tag.startsWith("<div") && reviews.includes(tag);
+      expect(aLateRow || theRatingLine || insideTheReviewsRow, tag.slice(0, 80)).toBe(true);
       expect(tag).not.toMatch(/role="status"|data-verdict|data-technical|aria-label/);
     }
   });
 
-  it("leaves out the history, which the browser has to load", () => {
-    const tags = leftOut(body("owned"));
-    expect(tags).toHaveLength(1);
-    expect(body("owned")).toMatch(
-      new RegExp(`<section[^>]*data-needs-script[^>]*><h2[^>]*>${COPY.history.title}</h2>`),
-    );
+  it("leaves out the history, which the browser has to load, and the reviews, which are sent late", () => {
+    const html = body("owned");
+    const rows = leftOut(html)
+      .map((tag) => /data-row="([^"]+)"/.exec(tag)?.[1])
+      .filter(Boolean);
+    expect(rows.sort()).toEqual(["history", "reviews"]);
+    expect(readable(rowOf(html, "history"))).toContain(`## ${COPY.history.title}`);
+    // a state without reviews leaves out the history only
+    expect(leftOut(body("reported")).map((tag) => /data-row="([^"]+)"/.exec(tag)?.[1])).toEqual([
+      "history",
+    ]);
   });
 
-  it("leaves out reviews that arrive after the page, and keeps reviews that are part of it", () => {
-    const late = renderToStaticMarkup(<ReviewsSection view={RATINGS} late />);
-    expect(leftOut(late)).toHaveLength(1);
-    expect(late).toMatch(/^<section[^>]*data-needs-script/);
+  it("leaves out everything that is sent after the page, and keeps reviews that are part of it", () => {
+    // Sent late, none of these can be moved into place without a script: it
+    // would sit under the footer.
+    const lateRow = renderToStaticMarkup(
+      <ReviewsRow needsScript>
+        <ReviewsContent view={RATINGS} late />
+      </ReviewsRow>,
+    );
+    expect(lateRow).toMatch(/^<details[^>]*data-needs-script/);
+    expect(leftOut(renderToStaticMarkup(<ReviewsContent view={RATINGS} late />))).toHaveLength(1);
+    expect(leftOut(renderToStaticMarkup(<RatingLine view={RATINGS} late />))).toHaveLength(1);
+    expect(leftOut(renderToStaticMarkup(<ReviewsLoading />))).toHaveLength(1);
+    // the record page reads the reviews first: nothing of theirs is late
     expect(leftOut(renderToStaticMarkup(<ReviewsSection view={RATINGS} />))).toHaveLength(0);
+    expect(leftOut(renderToStaticMarkup(<RatingLine view={RATINGS} />))).toHaveLength(0);
   });
 });
 
-describe("the frame that resolves into the verdict", () => {
-  it("carries the same headline and tone as the page under it", () => {
-    for (const state of STATES.filter((s) => CASES[s])) {
-      const frame = /<div[^>]*data-tap-frame="resolved"[^>]*>/.exec(page(state))?.[0] ?? "";
-      expect(frame).toContain(`data-tone="${TAP_STATES[state].tone}"`);
+describe("the reviews row on a tap page", () => {
+  it("is part of the page from the first moment, whatever becomes of the reviews", () => {
+    // The row does not wait for the reviews: it is there, closed, and only
+    // what is inside it arrives later. So nothing under it moves when they do.
+    const shell = renderToStaticMarkup(
+      <ReviewsRow needsScript>
+        <ReviewsLoading />
+      </ReviewsRow>,
+    );
+    expect(readable(shell)).toContain(`## ${COPY.reviews.title}`);
+    expect(shell).toMatch(/^<details[^>]*data-row="reviews"/);
+    // while waiting: lines to look at, and words for a reader who cannot see them
+    expect(readable(shell)).toContain(COPY.reviews.loadingList);
+    expect(shell).toContain('aria-hidden="true"');
+  });
+
+  it("says so when the reviews could not be read, and does not call that 'no reviews'", () => {
+    for (const view of [null, { ...RATINGS, restricted: true }]) {
+      const text = readable(
+        renderToStaticMarkup(
+          <ReviewsContent view={view} write={<button type="button">WRITE</button>} late />,
+        ),
+      );
+      expect(text).toContain(COPY.reviews.unavailable);
+      expect(text).not.toContain(COPY.reviews.none);
+      expect(text).not.toContain("WRITE");
+      expect(text).not.toContain(COPY.reviews.verifiedOwner);
     }
-    expect(page("owned")).toMatch(/data-tap-frame="resolved"[\s\S]*?Authentic/);
+  });
+
+  it("says 'no reviews yet' only when the reviews were read and there are none", () => {
+    const none = { ...RATINGS, product: null, reviews: [] };
+    const text = readable(renderToStaticMarkup(<ReviewsContent view={none} late />));
+    expect(text).toContain(COPY.reviews.none);
+    expect(text).not.toContain(COPY.reviews.unavailable);
+  });
+});
+
+describe("how the page arrives after a tap", () => {
+  const main = (html: string) => /<main[^>]*>/.exec(html)?.[0] ?? "";
+  /** The checking frame replayed over the page, up to the verdict that follows it. */
+  const frame = (html: string) =>
+    /<div[^>]*data-tap-frame="resolved"[\s\S]*?(?=<div role="status")/.exec(html)?.[0] ?? "";
+
+  it("the frame draws no verdict: the page's one verdict arrives over it", () => {
+    for (const state of STATES.filter((s) => CASES[s])) {
+      const html = page(state);
+      expect(frame(html), state).not.toBe("");
+      expect(frame(html), state).not.toContain(TAP_STATES[state].headline);
+      // one headline in the whole page, frame included
+      expect(html.match(/<h1\b/g), state).toHaveLength(1);
+    }
+  });
+
+  it("says the product page is opening only for a check that passed", () => {
+    for (const state of STATES.filter((s) => CASES[s])) {
+      expect(frame(page(state)).includes(COPY.checking.opening), state).toBe(
+        TAP_STATES[state].tone === "ok",
+      );
+    }
+  });
+
+  it("the verdict settles into place after a check, and simply appears without one", () => {
+    expect(main(page("owned"))).toContain('data-entrance="settle"');
+    expect(main(body("owned"))).toContain('data-entrance="appear"');
+    expect(main(renderToStaticMarkup(<TapResult state="linkIncomplete" />))).toContain(
+      'data-entrance="appear"',
+    );
+  });
+
+  it("wraps up briskly when the check already kept the shopper waiting", () => {
+    const built = CASES.owned!;
+    const after = (tookMs: number) => {
+      const model = tapPageModel({ ...built, stepsSeen: 1, tookMs });
+      return main(
+        renderToStaticMarkup(<TapResult state={model.state} progress={model.progress} />),
+      );
+    };
+    expect(after(250)).toContain('data-pace="full"');
+    expect(after(2_000)).toContain('data-pace="brisk"');
+    expect(main(body("owned"))).not.toContain("data-pace");
   });
 
   it("is left out when no check ran", () => {

@@ -7,7 +7,10 @@ import { RATINGS, REVIEWER } from "@/test-support/shopper-fixtures";
 import { readable } from "@/test-support/readable";
 
 import { historyLabel, historySteps } from "../provenance-timeline";
-import { RatingSummary, ReviewsSection, Stars, reviewDay, starFill } from "../rating-summary";
+import { starFill } from "@/lib/ratings-shared";
+
+import { RatingSummary, ReviewsSection, reviewDay } from "../rating-summary";
+import { Stars } from "../stars";
 
 /** TAP-T08: product history and owner reviews, in the shopper's words. */
 

@@ -6,16 +6,17 @@
  *                       finished: the first arrives ticked, the second is
  *                       streamed in if the record is slow (see TICK_GRACE_MS
  *                       in @/lib/tap-run), the rest tick as the verdict lands.
- *   <CheckingResolved>  the same frame, laid over the finished page for under
- *                       a second: the remaining steps tick, the ring turns into
- *                       the verdict, and the frame fades to show the page. It
- *                       is why the check never just flashes past.
+ *   <CheckingResolved>  the same frame, laid over the finished page for about
+ *                       a second: the remaining steps tick, the page's verdict
+ *                       arrives where the ring was (see <Verdict> in
+ *                       ./consumer), and the frame fades away under it. It is
+ *                       why the check never just flashes past.
  *
  * Server components, CSS and inline SVG only — see checking.module.css. No
  * client JavaScript is involved, so the frame works before the page's scripts
  * load, and with scripts turned off the verdict still shows (see NoScript).
  */
-import { Suspense, type ReactNode } from "react";
+import { Suspense } from "react";
 
 import { COPY } from "@/lib/consumer-copy";
 
@@ -37,10 +38,15 @@ export const STILL_CHECKING_AFTER_MS = 4_000;
  */
 export const MIN_ON_SCREEN_MS = 600;
 
+/** How fast the frame wraps up once the verdict is in. */
+export type CheckPace = "full" | "brisk";
+
+/** A check that already kept the shopper waiting wraps up briskly. */
+export function paceOf(tookMs: number): CheckPace {
+  return tookMs >= MIN_ON_SCREEN_MS ? "brisk" : "full";
+}
+
 export type StepState = "waiting" | "active" | "done";
-export type CheckTone = "ok" | "warn" | "bad" | "neutral";
-/** The mark the ring turns into. */
-export type CheckGlyph = "check" | "alert" | "cross" | "info" | "clock";
 type StepNumber = 1 | 2 | 3;
 
 const STEP_STATUS: Record<StepState, string> = {
@@ -145,19 +151,6 @@ const RING_PENDING = (
     </svg>
   </div>
 );
-
-const DISC_GLYPH: Record<CheckGlyph, ReactNode> = {
-  check: <path d="M5 12.5 10 17.5 19 7" strokeLinejoin="round" />,
-  alert: <path d="M12 6v7.5M12 17.5v.5" />,
-  cross: <path d="M7 7l10 10M17 7 7 17" />,
-  info: <path d="M12 11v6M12 7v.5" />,
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="7" />
-      <path d="M12 8.5v4l2.5 1.5" strokeLinejoin="round" />
-    </>
-  ),
-};
 
 const FOOT = (
   <p className={styles.foot}>
@@ -279,21 +272,24 @@ export interface CheckProgress {
 }
 
 /**
- * The frame replayed over the finished page: the steps that finished tick, the
- * ring turns into the verdict, and the whole thing fades to show the page.
- * Decoration only — the page underneath carries the real heading — so it is
- * hidden from assistive technology, and skipped when motion is turned off.
+ * The frame replayed over the finished page: the steps that finished tick,
+ * the ring makes way for the page's verdict, and the frame fades away under
+ * it. The verdict is NOT drawn here: the page's own <Verdict> arrives above
+ * this frame, where the ring is (see stage.module.css), so the mark a shopper
+ * watches arrive is the one that stays on the page.
+ *
+ * Decoration only, so it is hidden from assistive technology, and skipped when
+ * motion is turned off. Its pace is set on the page (see <ConsumerPage>).
+ *
+ * `opening` adds "Opening the product page" under the verdict: for a check
+ * that passed and led to a product, and for nothing else.
  */
 export function CheckingResolved({
-  tone,
-  glyph,
-  title,
   progress,
+  opening = false,
 }: {
-  tone: CheckTone;
-  glyph: CheckGlyph;
-  title: string;
   progress: CheckProgress;
+  opening?: boolean;
 }) {
   // The check is over: a step that did not finish is not "in progress" any more.
   const stateOf = (step: StepNumber): StepState => (step <= progress.done ? "done" : "waiting");
@@ -302,8 +298,6 @@ export function CheckingResolved({
       className={styles.frame}
       data-tap-frame="resolved"
       data-phase="resolved"
-      data-tone={tone}
-      data-pace={progress.tookMs >= MIN_ON_SCREEN_MS ? "brisk" : "full"}
       aria-hidden="true"
     >
       <div className={styles.top}>
@@ -313,29 +307,15 @@ export function CheckingResolved({
         <div className={styles.ring}>
           {RING_TRACK}
           {RING_PENDING}
-          <div className={styles.disc}>
-            <svg
-              viewBox="0 0 24 24"
-              width="64"
-              height="64"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            >
-              {DISC_GLYPH[glyph]}
-            </svg>
-          </div>
         </div>
 
         <div className={styles.head}>
           <CheckingHead heading={false} late={progress.tookMs >= STILL_CHECKING_AFTER_MS} />
-          <div className={styles.verdictHead}>
-            <p className={styles.verdict}>{title}</p>
-            {tone === "ok" && progress.done === 3 && (
+          {opening && progress.done === 3 && (
+            <div className={styles.after}>
               <p className={styles.note}>{CHECKING_COPY.opening}</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <ol className={styles.steps}>

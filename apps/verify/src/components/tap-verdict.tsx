@@ -15,6 +15,7 @@ import "server-only";
 import { Suspense } from "react";
 
 import { COPY } from "@/lib/consumer-copy";
+import { withinDeadline } from "@/lib/deadline";
 import type { RatingsView } from "@/lib/ratings";
 import type { AssetLookup } from "@/lib/services";
 import { startTapLookups, type TapLookups } from "@/lib/tap-lookups";
@@ -27,10 +28,13 @@ import { BuyWidget } from "./buy-widget";
 import { HeroImage } from "./hero-image";
 import { ProvenanceTimeline } from "./provenance-timeline";
 import { RateWidget } from "./rate-widget";
-import { ReviewsSection } from "./rating-summary";
+import { RatingLine, ReviewsContent, ReviewsLoading, ReviewsRow } from "./rating-summary";
 import { TapResult } from "./tap-result";
 
-/** Reviews arrive after the verdict; the section streams in when they land. */
+/**
+ * Reviews arrive after the verdict. Their row is part of the page from the
+ * first moment (see <ReviewsRow>); this is what goes inside it when they land.
+ */
 async function Reviews({
   ratings,
   tokenId,
@@ -41,12 +45,27 @@ async function Reviews({
   productName: string;
 }) {
   return (
-    <ReviewsSection
+    <ReviewsContent
       view={await ratings}
       write={<RateWidget tokenId={tokenId} productName={productName} />}
       late
     />
   );
+}
+
+/**
+ * How long the one line under the product's name is waited for, counted from
+ * the moment the verdict is sent. The checking frame covers the page for
+ * about a second after that (see stage.module.css), so a line sent within
+ * this time lands unseen. A later one would push the price and the buy button
+ * down in front of the shopper, so it is left out; the rating is in the
+ * reviews row either way.
+ */
+export const RATING_LINE_DEADLINE_MS = 600;
+
+/** The same reviews, as the one line under the product's name — if they are quick. */
+async function Rating({ ratings }: { ratings: Promise<RatingsView | null> }) {
+  return <RatingLine view={await withinDeadline(ratings, RATING_LINE_DEADLINE_MS)} late />;
 }
 
 export async function TapVerdict({
@@ -118,11 +137,19 @@ export async function TapVerdict({
               buy: model.show.buy ? (
                 <BuyWidget tokenId={tokenId} productName={product.name} />
               ) : undefined,
-              reviews:
+              rating:
                 ratings && model.show.reviews ? (
                   <Suspense fallback={null}>
-                    <Reviews ratings={ratings} tokenId={tokenId} productName={product.name} />
+                    <Rating ratings={ratings} />
                   </Suspense>
+                ) : undefined,
+              reviews:
+                ratings && model.show.reviews ? (
+                  <ReviewsRow needsScript>
+                    <Suspense fallback={<ReviewsLoading />}>
+                      <Reviews ratings={ratings} tokenId={tokenId} productName={product.name} />
+                    </Suspense>
+                  </ReviewsRow>
                 ) : undefined,
               history: model.show.history ? (
                 <ProvenanceTimeline

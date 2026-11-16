@@ -16,9 +16,18 @@ import {
   record,
   recordDto,
 } from "@/test-support/shopper-fixtures";
-import { insideDrawer, outsideDrawer, readable } from "@/test-support/readable";
+import {
+  insideDrawer,
+  onShow,
+  outsideDrawer,
+  readable,
+  rowNames,
+  rowOf,
+} from "@/test-support/readable";
 
-import { ReviewsSection } from "../rating-summary";
+import Loading from "@/app/asset/[tokenId]/loading";
+
+import { RatingLine, ReviewsSection } from "../rating-summary";
 import { RecordResult } from "../record-result";
 
 /**
@@ -67,6 +76,7 @@ function page(state: RecordStateKey, lookup = CASES[state].lookup): string {
                 <button type="button">{COPY.buy.button(product.price)}</button>
               ) : undefined,
               // handed to every state, as the route does; the page decides
+              rating: <RatingLine view={RATINGS} />,
               reviews: <ReviewsSection view={RATINGS} />,
               history: <p>(product history loads here)</p>,
             }
@@ -218,6 +228,19 @@ describe("the parts each record state does and does not get", () => {
     }
   });
 
+  it("shows the owners' rating under the name, and only where reviews are shown", () => {
+    const html = page("registered");
+    const product = /<section aria-label="Product"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+    expect(readable(product)).toContain("(4.5 out of 5 stars)");
+    expect(readable(product)).toContain("2 verified owner reviews");
+    expect(product.indexOf("<h2")).toBeLessThan(product.indexOf("data-rating"));
+    expect(product.indexOf("data-rating")).toBeLessThan(product.indexOf("data-price"));
+    // never next to a warning, before release, or on a page with no product
+    for (const state of STATES.filter((s) => s !== "registered")) {
+      expect(page(state), state).not.toContain("data-rating");
+    }
+  });
+
   it("holds the record number and the state code in the drawer", () => {
     const drawer = insideDrawer(page("registered"));
     for (const value of [RECORD_NUMBER, "ACTIVATED (3)", COPY.technical.networkValue]) {
@@ -251,5 +274,102 @@ describe("the parts each record state does and does not get", () => {
     const html = page("registered", { kind: "record", dto });
     expect(readable(html)).toContain(COPY.status.detailsNotConfirmed);
     expect(has("registered", COPY.status.detailsNotConfirmed)).toBe(false);
+  });
+});
+
+describe("the order a reader reads in", () => {
+  it("registered: the record's headline, the name, the rating, the price, the buy button, then the rows", () => {
+    const text = readable(page("registered"));
+    const marks = [
+      `# ${RECORD_STATES.registered.headline}`,
+      "## Renewal Cream",
+      "2 verified owner reviews",
+      "$23.33",
+      `[button: ${COPY.buy.button("$23.33")}]`,
+      `## ${COPY.reviews.title}`,
+      `## ${COPY.about.title}`,
+      `## ${COPY.history.title}`,
+      `## ${COPY.howItWorks.title}`,
+      `## ${COPY.technical.title}`,
+      COPY.help.title,
+      COPY.honestStatus,
+    ];
+    const at = marks.map((mark) => text.indexOf(mark));
+    expect(
+      at.every((position) => position > -1),
+      JSON.stringify(at),
+    ).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  it("gives each state exactly these rows, with Technical details last", () => {
+    expect(Object.fromEntries(STATES.map((state) => [state, rowNames(page(state))]))).toEqual({
+      registered: ["reviews", "about", "history", "how-it-works", "technical"],
+      notReleased: ["about", "history", "technical"],
+      reported: ["about", "history", "technical"],
+      retired: ["about", "history", "technical"],
+      privateItem: ["how-it-works", "technical"],
+      noRecord: ["technical"],
+      notLoaded: ["technical"],
+      notANumber: [],
+    });
+  });
+
+  it.each(STATES)("%s: every row is a closed <details> with its name as a heading", (state) => {
+    for (const name of rowNames(page(state))) {
+      const row = rowOf(page(state), name);
+      expect(row, name).toMatch(/^<details[^>]*><summary[^>]*><h2[^>]*>[\s\S]*?<\/h2><\/summary>/);
+      expect(row, name).not.toMatch(/^<details[^>]*\bopen\b/);
+    }
+  });
+
+  it.each(STATES)(
+    "%s: the headline, its line and the honest-status sentence are on show",
+    (state) => {
+      const shown = readable(onShow(page(state)));
+      expect(shown).toContain(`# ${RECORD_STATES[state].headline}`);
+      expect(shown).toContain(`${RECORD_STATES[state].line}.`);
+      expect(shown).toContain(COPY.honestStatus);
+    },
+  );
+
+  it("has no link to a place further down the same page", () => {
+    for (const state of STATES) expect(page(state), state).not.toMatch(/href="#/);
+  });
+});
+
+describe("how the record page arrives", () => {
+  it.each(STATES)("%s: the headline simply appears, in the page's own colour", (state) => {
+    const html = page(state);
+    const tone = RECORD_STATES[state].tone;
+    expect(/<main[^>]*>/.exec(html)?.[0]).toContain('data-entrance="appear"');
+    expect(/<main[^>]*>/.exec(html)?.[0]).not.toContain("data-pace");
+    // nobody tapped anything: there is no check to replay
+    expect(html).not.toContain("data-tap-frame");
+    expect(/<div class="[^"]*min-h-screen[^"]*" data-tone="(\w+)"/.exec(html)?.[1]).toBe(tone);
+    expect(html).toContain(`<div role="status" data-verdict="${tone}"`);
+  });
+
+  it("is never in the colour of a passed check", () => {
+    for (const state of STATES) expect(page(state), state).not.toContain('data-tone="ok"');
+  });
+});
+
+describe("while the record loads", () => {
+  const html = renderToStaticMarkup(<Loading />);
+
+  it("shows a skeleton with no headline of its own, and says so to a screen reader", () => {
+    expect(html.match(/<h1\b/g)).toBeNull();
+    expect(readable(html)).toContain(COPY.recordLoading);
+    expect(html).toContain(COPY.honestStatus);
+  });
+
+  it("with scripts off, gives way to the page instead of covering it for good", () => {
+    // Nothing swaps the page in for the skeleton without a script: the page
+    // stays in the hidden block it is sent in. This rule shows it.
+    expect(html).toMatch(/^(<link[^>]*>)*<div data-record-loading="">/);
+    const rule = /<noscript><style>(.*?)<\/style><\/noscript>/.exec(html)?.[1] ?? "";
+    expect(rule).toContain("[data-record-loading]{display:none!important}");
+    expect(rule).toContain('div[hidden][id^="S:"]{display:block!important}');
   });
 });

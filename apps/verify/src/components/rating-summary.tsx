@@ -3,61 +3,10 @@ import type { ReactNode } from "react";
 import { COPY } from "@/lib/consumer-copy";
 import type { RatingsView } from "@/lib/ratings-shared";
 
-import { Section } from "./consumer";
-
-const STAR_PATH =
-  "m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.8L12 16.8l-5.3 2.8 1.1-5.8-4.3-4.1 5.9-.8L12 3.5Z";
-
-/** How much of star number `i` (1–5) is filled for a value: none, half or all. */
-export function starFill(value: number, i: number): "full" | "half" | "none" {
-  // To the nearest half, so 4.5 shows four and a half stars, not five.
-  const halves = Math.round(value * 2) / 2;
-  return halves >= i ? "full" : halves >= i - 0.5 ? "half" : "none";
-}
-
-/**
- * Stars. The value is also spelled out for assistive technology; the glyphs
- * themselves are decoration.
- */
-export function Stars({ value, size = 18 }: { value: number | null; size?: number }) {
-  const v = value ?? 0;
-  return (
-    <span
-      role="img"
-      aria-label={value === null ? COPY.reviews.none : COPY.reviews.starsLabel(value)}
-      className="inline-flex gap-0.5 align-middle"
-    >
-      {[1, 2, 3, 4, 5].map((i) => {
-        const fill = starFill(v, i);
-        return (
-          <span key={i} className="relative inline-flex" data-star={fill}>
-            <svg
-              viewBox="0 0 24 24"
-              width={size}
-              height={size}
-              aria-hidden="true"
-              className="text-line-strong"
-            >
-              <path fill="currentColor" d={STAR_PATH} />
-            </svg>
-            {fill !== "none" && (
-              <svg
-                viewBox="0 0 24 24"
-                width={size}
-                height={size}
-                aria-hidden="true"
-                className="absolute inset-0 text-[#b45309]"
-                style={fill === "half" ? { clipPath: "inset(0 50% 0 0)" } : undefined}
-              >
-                <path fill="currentColor" d={STAR_PATH} />
-              </svg>
-            )}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
+import { Row } from "./consumer";
+import { NEEDS_SCRIPT } from "./shared";
+import styles from "./stage.module.css";
+import { Stars } from "./stars";
 
 /** "2026-10-12T08:00:00Z" → "Oct 12, 2026". Anything else is left out. */
 export function reviewDay(iso: string): string | null {
@@ -71,6 +20,42 @@ export function reviewDay(iso: string): string | null {
   }).format(new Date(time));
 }
 
+/** The rating a page leads with: the product's when it has one, else this item's. */
+function ratingOf(view: RatingsView) {
+  return view.product && view.product.count > 0 ? view.product : view.item;
+}
+
+/**
+ * One line under the product's name: the stars, the average and how many
+ * owners reviewed it. It is what a shopper wants from reviews first, so it is
+ * on show without opening anything. Nothing at all while there are no reviews
+ * (or none to show): a product is not marked down for being new.
+ *
+ * `late` is for a line sent after the rest of the page (the tap page): with
+ * scripts off it cannot be moved into place, so there it is left out.
+ */
+export function RatingLine({ view, late = false }: { view: RatingsView | null; late?: boolean }) {
+  if (!view || view.restricted) return null;
+  const rating = ratingOf(view);
+  if (rating.count === 0 || rating.average === null) return null;
+  return (
+    <p
+      className={`flex flex-wrap items-center justify-center gap-x-2 pt-1 text-sm leading-5 text-muted${late ? ` ${styles.appear}` : ""}`}
+      data-rating
+      {...(late ? NEEDS_SCRIPT : {})}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        <Stars value={rating.average} size={16} />
+        {/* The stars already say the number to a screen reader. */}
+        <span className="font-semibold text-ink" aria-hidden="true">
+          {rating.average.toFixed(1)}
+        </span>
+      </span>
+      <span>{COPY.reviews.count(rating.count)}</span>
+    </p>
+  );
+}
+
 /**
  * Reviews from verified owners: the average, how many, and the latest few.
  * Server-rendered. A reviewer is shown only as "Verified owner" — never by
@@ -79,17 +64,17 @@ export function reviewDay(iso: string): string | null {
  */
 export function RatingSummary({ view }: { view: RatingsView | null }) {
   if (!view || view.restricted) return null;
-  const line = view.product && view.product.count > 0 ? view.product : view.item;
+  const rating = ratingOf(view);
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line p-4">
-      {line.count === 0 || line.average === null ? (
+    <div className="flex flex-col gap-3">
+      {rating.count === 0 || rating.average === null ? (
         <p className="text-[15px] leading-[22px] text-body">{COPY.reviews.none}</p>
       ) : (
         <div className="flex items-center gap-3">
-          <p className="text-[32px] font-bold leading-9">{line.average.toFixed(1)}</p>
+          <p className="text-[32px] font-bold leading-9">{rating.average.toFixed(1)}</p>
           <div className="flex flex-col gap-0.5">
-            <Stars value={line.average} />
-            <p className="text-sm leading-5 text-muted">{COPY.reviews.count(line.count)}</p>
+            <Stars value={rating.average} />
+            <p className="text-sm leading-5 text-muted">{COPY.reviews.count(rating.count)}</p>
           </div>
         </div>
       )}
@@ -120,30 +105,82 @@ export function RatingSummary({ view }: { view: RatingsView | null }) {
 }
 
 /**
- * The "Owner reviews" section: the summary, then the page's "write a review"
- * control. Absent as a whole when there are no ratings to show for this item
- * (the read failed, or the owner keeps the item private) — never an empty
- * heading.
+ * What the reviews row holds: the average, who can review, the latest reviews
+ * and the page's "write a review" control. When the reviews could not be read
+ * it says so, and says nothing about whether there are any.
+ *
+ * `late` is for contents sent after the rest of the page (the tap page). A
+ * browser with scripts off cannot move them into the row — they would sit
+ * under the footer — so there they are left out.
  */
-export function ReviewsSection({
+export function ReviewsContent({
   view,
   write,
   late = false,
 }: {
   view: RatingsView | null;
   write?: ReactNode;
-  /**
-   * True when the section is sent after the rest of the page. A browser with
-   * scripts off cannot move it into place — it would sit below the footer —
-   * so there it is left out instead.
-   */
   late?: boolean;
 }) {
+  return (
+    <div className="flex flex-col gap-3" {...(late ? NEEDS_SCRIPT : {})}>
+      {!view || view.restricted ? (
+        <p className="text-sm leading-5 text-muted">{COPY.reviews.unavailable}</p>
+      ) : (
+        <>
+          <RatingSummary view={view} />
+          {write}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Lines in the shape of what is coming, for a row opened before its reviews are in. */
+export function ReviewsLoading() {
+  return (
+    <div {...NEEDS_SCRIPT}>
+      <div className="flex flex-col gap-3 py-1" aria-hidden="true">
+        <div className="h-8 w-2/5 rounded bg-surface" />
+        <div className="h-3.5 w-full rounded bg-surface" />
+        <div className="h-3.5 w-3/4 rounded bg-surface" />
+      </div>
+      <p className="sr-only">{COPY.reviews.loadingList}</p>
+    </div>
+  );
+}
+
+/**
+ * The "Owner reviews" row. On the tap page the row is part of the page from
+ * the first moment and only its contents arrive later (see <TapVerdict>), so
+ * nothing on the page moves when they do. `needsScript` is for that case:
+ * with scripts off the contents can never arrive, so the row is left out.
+ */
+export function ReviewsRow({
+  needsScript = false,
+  children,
+}: {
+  needsScript?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Row name="reviews" icon="star" title={COPY.reviews.title} needsScript={needsScript}>
+      {children}
+    </Row>
+  );
+}
+
+/**
+ * The row with its contents, for a page that has read the reviews before it
+ * renders (the record page). Absent as a whole when there are no ratings to
+ * show for this item (the read failed, or the owner keeps the item private) —
+ * never an empty heading.
+ */
+export function ReviewsSection({ view, write }: { view: RatingsView | null; write?: ReactNode }) {
   if (!view || view.restricted) return null;
   return (
-    <Section title={COPY.reviews.title} needsScript={late}>
-      <RatingSummary view={view} />
-      {write}
-    </Section>
+    <ReviewsRow>
+      <ReviewsContent view={view} write={write} />
+    </ReviewsRow>
   );
 }

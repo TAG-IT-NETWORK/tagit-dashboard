@@ -70,3 +70,25 @@ export function outsideDrawer(html: string): string {
 export function insideDrawer(html: string): string {
   return (html.match(TECHNICAL_DRAWER) ?? []).join("\n");
 }
+
+/**
+ * The rows that open (see <Row> in @/components/consumer). Everything a row
+ * holds is in the page, closed; these helpers tell what is in a row from what
+ * a shopper sees without opening anything.
+ */
+const ANY_ROW = /<details\b[^>]*\bdata-row="([^"]+)"[^>]*>[\s\S]*?<\/details>/g;
+
+/** The names of the rows on a page, top to bottom. */
+export function rowNames(html: string): string[] {
+  return [...html.matchAll(ANY_ROW)].map((m) => m[1]!);
+}
+
+/** One row, markup and all, or "" when the page has no such row. */
+export function rowOf(html: string, name: string): string {
+  return [...html.matchAll(ANY_ROW)].find((m) => m[1] === name)?.[0] ?? "";
+}
+
+/** The page with every row cut out: what is on show before anything is opened. */
+export function onShow(html: string): string {
+  return html.replace(ANY_ROW, "");
+}

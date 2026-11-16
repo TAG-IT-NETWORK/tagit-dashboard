@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { COPY } from "@/lib/consumer-copy";
 import { fetchPriceFromProxy, isPurchasable, type CanonicalPrice } from "@/lib/price";
 
+import { PRIMARY_BUTTON } from "./shared";
+
 /**
  * Self-contained "tap to buy" widget: Privy embedded-wallet context scoped to
  * just the buy flow.
@@ -32,12 +34,7 @@ const BuyCheckout = dynamic(() => import("./buy-checkout"), {
 let placeholderDisplay = "";
 function BuyPlaceholder() {
   return (
-    <button
-      type="button"
-      disabled
-      aria-busy="true"
-      className="flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-brand px-4 text-[17px] font-semibold leading-6 text-white opacity-60"
-    >
+    <button type="button" disabled aria-busy="true" className={PRIMARY_BUTTON}>
       {placeholderDisplay ? COPY.buy.button(placeholderDisplay) : COPY.buy.buttonNoPrice}
     </button>
   );

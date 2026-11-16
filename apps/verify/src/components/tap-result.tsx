@@ -1,6 +1,8 @@
 /**
  * What a shopper sees after a tap (TAP-T08): one verdict, then the product,
- * its status and one main action — in that order, in plain words.
+ * its status and one main action — in that order, in plain words. Everything
+ * after that (reviews, product details, history, how the check works,
+ * technical details) is a row that opens when asked for.
  *
  * One component for all 12 approved states (see TAP_STATES in
  * @/lib/consumer-copy), shared by both tap routes (/sun and /01/…). It is
@@ -25,29 +27,31 @@ import {
   type ProductView,
 } from "@/lib/tap-view";
 
-import { CheckingResolved, type CheckGlyph, type CheckProgress } from "./checking";
+import { CheckingResolved, paceOf, type CheckProgress } from "./checking";
 import { PriceApprox } from "./price-block";
 import {
   ActionLink,
+  BrandText,
   Card,
   ConsumerPage,
   Facts,
+  Group,
   InfoRow,
-  LinkRow,
   Note,
   ProductCard,
+  Row,
   Section,
   Steps,
   TechnicalDetails,
-  TextBlock,
-  TextDrawer,
-  VerdictBanner,
+  Tip,
+  Verdict,
+  type IconName,
   type TechLink,
   type TechRow,
 } from "./consumer";
 
-/** The mark each state shows, on the banner and on the resolving frame. */
-const STATE_GLYPH: Record<TapStateKey, CheckGlyph> = {
+/** The mark each state's verdict carries. */
+const STATE_GLYPH: Record<TapStateKey, IconName> = {
   newForSale: "check",
   newNotForSale: "check",
   owned: "check",
@@ -95,7 +99,9 @@ export interface TapResultProps {
     photo?: ReactNode;
     /** The buy button. Offered by the page only for an item that is for sale. */
     buy?: ReactNode;
-    /** The whole "Owner reviews" section (see <ReviewsSection>). */
+    /** The owners' rating, as one line under the product's name (see <RatingLine>). */
+    rating?: ReactNode;
+    /** The whole "Owner reviews" row (see <ReviewsSection>). */
     reviews?: ReactNode;
     /** Product history. */
     history?: ReactNode;
@@ -127,58 +133,56 @@ function aboutFacts(product: ProductView): [string, string][] {
   ];
 }
 
-/** True when "About this product" has anything to say. */
-function hasAbout(product: ProductView): boolean {
-  const brandFacts = product.facts;
-  return (
-    !!product.description ||
-    aboutFacts(product).length > 0 ||
-    !!brandFacts?.howToUse ||
-    !!brandFacts?.warnings ||
-    !!brandFacts?.ingredients
-  );
-}
-
 /**
- * "About this product": the brand's own words and the facts we hold.
+ * What the record says about the product, as rows that open: "About this
+ * product" (the brand's description and the short facts), then one row for
+ * each longer text a brand can write (TAP-T09): how to use, warnings,
+ * ingredients. A row is there only when it has something in it.
  *
- * The longer texts a brand can write (TAP-T09) follow the table: how to use
- * and warnings in full, because a shopper should not have to open anything to
- * read them, and the ingredients list in a closed drawer, because it is long
- * and looked up rather than read. All of it is brand-written and shown as
- * plain text (REQ-S-10): text nodes only, nothing parsed, nothing linked.
+ * All of it is brand-written and shown as plain text (REQ-S-10): text nodes
+ * only, nothing parsed, nothing linked.
  */
-export function AboutSection({ product }: { product: ProductView }) {
+export function ProductRows({ product }: { product: ProductView }) {
   const facts = aboutFacts(product);
   const brandFacts = product.facts;
-  if (!hasAbout(product)) return null;
   return (
-    <Section id="about" title={COPY.about.title}>
-      {product.description && (
-        <p className="whitespace-pre-line text-[15px] leading-[22px] text-body">
-          {product.description}
-        </p>
+    <>
+      {(product.description || facts.length > 0) && (
+        <Row name="about" icon="list" title={COPY.about.title}>
+          {product.description && (
+            <p className="whitespace-pre-line break-words text-[15px] leading-[22px] text-body">
+              {product.description}
+            </p>
+          )}
+          <Facts rows={facts} />
+        </Row>
       )}
-      <Facts rows={facts} />
       {brandFacts?.howToUse && (
-        <TextBlock title={COPY.about.howToUse}>{brandFacts.howToUse}</TextBlock>
+        <Row name="how-to-use" icon="drop" title={COPY.about.howToUse}>
+          <BrandText>{brandFacts.howToUse}</BrandText>
+        </Row>
       )}
       {brandFacts?.warnings && (
-        <TextBlock title={COPY.about.warnings}>{brandFacts.warnings}</TextBlock>
+        <Row name="warnings" icon="warning" title={COPY.about.warnings}>
+          <BrandText>{brandFacts.warnings}</BrandText>
+        </Row>
       )}
       {brandFacts?.ingredients && (
-        <TextDrawer title={COPY.about.ingredients}>{brandFacts.ingredients}</TextDrawer>
+        <Row name="ingredients" icon="flask" title={COPY.about.ingredients}>
+          <BrandText>{brandFacts.ingredients}</BrandText>
+        </Row>
       )}
-    </Section>
+    </>
   );
 }
 
 /** "How we know it's authentic": the three trust points, for a product that checked out. */
-export function TrustSection({ brand }: { brand?: string }) {
+export function TrustRow({ brand }: { brand?: string }) {
   const [first, second, third] = COPY.trust.points;
   return (
-    <Section id="how-we-know" title={COPY.trust.title}>
+    <Row name="how-we-know" icon="shield" title={COPY.trust.title}>
       <Steps
+        bare
         tone="ok"
         items={[
           { title: first.title, body: first.body },
@@ -186,7 +190,7 @@ export function TrustSection({ brand }: { brand?: string }) {
           { title: third.title, body: third.body },
         ]}
       />
-    </Section>
+    </Row>
   );
 }
 
@@ -194,22 +198,35 @@ export function TrustSection({ brand }: { brand?: string }) {
  * "How the check works": the same ideas in general terms, for pages where
  * nothing was confirmed. It never says this item passed.
  */
-export function HowItWorksSection() {
+export function HowItWorksRow() {
   return (
-    <Section id="how-it-works" title={COPY.howItWorks.title}>
-      <Steps items={COPY.howItWorks.points} />
-    </Section>
+    <Row name="how-it-works" icon="shield" title={COPY.howItWorks.title}>
+      <Steps bare items={COPY.howItWorks.points} />
+    </Row>
+  );
+}
+
+/** "Product history": the list is loaded by the browser, so it is left out while scripts are off. */
+export function HistoryRow({ children }: { children: ReactNode }) {
+  return (
+    <Row name="history" icon="clock" title={COPY.history.title} needsScript>
+      {children}
+    </Row>
   );
 }
 
 /** "Need help?" — one way to reach a person. */
-export function HelpSection({ subject }: { subject: string }) {
+export function Help({ subject }: { subject: string }) {
   return (
-    <Section title={COPY.help.title}>
-      <Card>
-        <LinkRow href={supportMailto(subject)} label={COPY.help.reportProblem} />
-      </Card>
-    </Section>
+    <div className="flex flex-col items-center pt-2 text-center">
+      <h2 className="text-[15px] font-semibold leading-[22px]">{COPY.help.title}</h2>
+      <a
+        href={supportMailto(subject)}
+        className="inline-flex min-h-[44px] items-center px-3 text-[15px] font-semibold leading-[22px] text-brand-link underline underline-offset-2"
+      >
+        {COPY.help.reportProblem}
+      </a>
+    </div>
   );
 }
 
@@ -226,179 +243,172 @@ export function TapResult({
   slots = {},
 }: TapResultProps) {
   const copy = TAP_STATES[state];
-  const glyph = STATE_GLYPH[state];
   const productState = HAS_PRODUCT.has(state);
   const withProduct = productState && hasProductToShow(product);
   const authentic = isAuthenticTapState(state);
 
   return (
-    <ConsumerPage timing={timing}>
-      {progress && (
-        <CheckingResolved
-          tone={copy.tone}
-          glyph={glyph}
-          title={copy.headline}
-          progress={progress}
-        />
-      )}
+    <ConsumerPage
+      timing={timing}
+      tone={copy.tone}
+      entrance={progress ? "settle" : "appear"}
+      pace={progress ? paceOf(progress.tookMs) : undefined}
+    >
+      {progress && <CheckingResolved progress={progress} opening={copy.tone === "ok"} />}
 
-      <VerdictBanner tone={copy.tone} icon={glyph} headline={copy.headline} line={copy.line} />
+      <Verdict
+        tone={copy.tone}
+        icon={STATE_GLYPH[state]}
+        headline={copy.headline}
+        line={copy.line}
+      />
 
-      {withProduct && (
-        <ProductCard
-          name={product.name}
-          price={state === "newForSale" ? product.price : undefined}
-          priceNote={
-            state === "newForSale" && product.fx ? <PriceApprox fx={product.fx} /> : undefined
-          }
-          basics={productBasics(product)}
-          chips={chipsFor(state)}
-          photo={slots.photo}
-        />
-      )}
+      {/* ── What it is: photo, name, price ─────────────────────────────────── */}
+      <Group order={0}>
+        {withProduct && (
+          <ProductCard
+            name={product.name}
+            price={state === "newForSale" ? product.price : undefined}
+            priceNote={
+              state === "newForSale" && product.fx ? <PriceApprox fx={product.fx} /> : undefined
+            }
+            basics={productBasics(product)}
+            rating={slots.rating}
+            chips={chipsFor(state)}
+            photo={slots.photo}
+          />
+        )}
 
-      {withProduct && detailsCheck === "mismatch" && (
-        <Note icon="alert">{COPY.status.detailsNotConfirmed}</Note>
-      )}
+        {withProduct && detailsCheck === "mismatch" && (
+          <Note icon="alert">{COPY.status.detailsNotConfirmed}</Note>
+        )}
 
-      {/* The verdict stands on its own; say plainly why there is no product under it. */}
-      {productState && missingDetails === "unavailable" && (
-        <Note icon="about">{COPY.status.detailsUnavailable}</Note>
-      )}
-      {productState && missingDetails === "private" && (
-        <Note icon="lock">{COPY.status.detailsPrivate}</Note>
-      )}
+        {/* The verdict stands on its own; say plainly why there is no product under it. */}
+        {productState && missingDetails === "unavailable" && (
+          <Note icon="about">{COPY.status.detailsUnavailable}</Note>
+        )}
+        {productState && missingDetails === "private" && (
+          <Note icon="lock">{COPY.status.detailsPrivate}</Note>
+        )}
+      </Group>
 
       {/* ── What its status means, and the one main action ─────────────────── */}
+      <Group order={1}>
+        {/* Offered for an item that is for sale, and for a new item whose record
+            did not load (its listing is not known; the widget asks for itself). */}
+        {(state === "newForSale" ||
+          (state === "newNotForSale" && missingDetails === "unavailable")) &&
+          slots.buy}
 
-      {/* Offered for an item that is for sale, and for a new item whose record
-          did not load (its listing is not known; the widget asks for itself). */}
-      {(state === "newForSale" ||
-        (state === "newNotForSale" && missingDetails === "unavailable")) &&
-        slots.buy}
+        {(state === "newForSale" || state === "newNotForSale") && (
+          <Tip icon="shield" title={COPY.status.newTitle} />
+        )}
 
-      {(state === "newForSale" || state === "newNotForSale") && (
-        <Card>
-          <InfoRow icon="shield" title={COPY.status.newTitle} />
-          <LinkRow href="#how-we-know" icon="about" label={COPY.status.howWeKnowLink} />
-        </Card>
-      )}
-
-      {state === "owned" && (
-        <Card>
-          <InfoRow
+        {state === "owned" && (
+          <Tip
             icon="people"
             title={COPY.status.secondHandTitle}
             body={COPY.status.secondHandBody}
           />
-          <LinkRow href="#how-we-know" icon="about" label={COPY.status.howWeKnowLink} />
-        </Card>
-      )}
+        )}
 
-      {state === "notReleased" && <Note icon="about">{COPY.status.notReleasedTip}</Note>}
+        {state === "notReleased" && <Note icon="about">{COPY.status.notReleasedTip}</Note>}
 
-      {state === "noProduct" && <Note icon="about">{COPY.status.noProductTip}</Note>}
+        {state === "noProduct" && <Note icon="about">{COPY.status.noProductTip}</Note>}
 
-      {state === "reported" && (
-        <>
-          <Note icon="tag">{COPY.status.tagIsRealNote}</Note>
-          <Section title={COPY.reported.meaningTitle}>
-            <Card>
-              {COPY.reported.meaning.map((line) => (
-                <InfoRow key={line} icon="about" body={line} />
-              ))}
-            </Card>
-          </Section>
-          <Section title={COPY.reported.doTitle}>
-            <Steps items={COPY.reported.steps.map((body) => ({ body }))} />
-          </Section>
-          <ActionLink kind="dark" href={supportMailto(COPY.mail.sighting(recordNumber))}>
-            {COPY.actions.reportSighting}
-          </ActionLink>
-        </>
-      )}
-
-      {state === "checkFailed" && (
-        <>
-          <Section title={COPY.checkFailed.doTitle}>
-            <Steps items={COPY.checkFailed.steps} />
-          </Section>
-          <Note icon="tag">{COPY.checkFailed.why}</Note>
-          <ActionLink kind="dark" href={supportMailto(COPY.mail.checkFailed)}>
-            {COPY.actions.reportProblem}
-          </ActionLink>
-        </>
-      )}
-
-      {state === "linkUsed" && (
-        <>
-          <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-5 py-7 text-center">
-            <span className="text-ink">
-              <svg
-                viewBox="0 0 24 24"
-                width="48"
-                height="48"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M8 9c1.8 2 1.8 4 0 6" />
-                <path d="M11.5 6.5c3.3 3.6 3.3 7.4 0 11" />
-                <path d="M15 4c5 5.3 5 10.7 0 16" />
-              </svg>
-            </span>
-            <h2 className="text-xl font-bold leading-[26px]">{COPY.linkUsed.againTitle}</h2>
-            <p className="text-[15px] leading-[22px] text-body">{COPY.linkUsed.againBody}</p>
-          </div>
-          <Section title={COPY.linkUsed.whyTitle}>
-            <Card>
-              {COPY.linkUsed.why.map((line) => (
-                <InfoRow key={line} icon="lock" body={line} />
-              ))}
-            </Card>
-          </Section>
-        </>
-      )}
-
-      {state === "linkIncomplete" && <Note icon="tag">{COPY.linkIncomplete.tip}</Note>}
-
-      {state === "ourSide" && (
-        <>
-          {retryHref && (
-            <ActionLink kind="primary" href={retryHref}>
-              {COPY.actions.tryAgain}
+        {state === "reported" && (
+          <>
+            <Note icon="tag">{COPY.status.tagIsRealNote}</Note>
+            <Section title={COPY.reported.meaningTitle}>
+              <Card>
+                {COPY.reported.meaning.map((line) => (
+                  <InfoRow key={line} icon="about" body={line} />
+                ))}
+              </Card>
+            </Section>
+            <Section title={COPY.reported.doTitle}>
+              <Steps items={COPY.reported.steps.map((body) => ({ body }))} />
+            </Section>
+            <ActionLink kind="dark" href={supportMailto(COPY.mail.sighting(recordNumber))}>
+              {COPY.actions.reportSighting}
             </ActionLink>
-          )}
-          <Note icon="about">{COPY.ourSide.tip}</Note>
-        </>
-      )}
+          </>
+        )}
 
-      {(state === "newNotForSale" || state === "retired") && withProduct && hasAbout(product) && (
-        <ActionLink href="#about">{COPY.actions.seeDetails}</ActionLink>
-      )}
+        {state === "checkFailed" && (
+          <>
+            <Section title={COPY.checkFailed.doTitle}>
+              <Steps items={COPY.checkFailed.steps} />
+            </Section>
+            <Note icon="tag">{COPY.checkFailed.why}</Note>
+            <ActionLink kind="dark" href={supportMailto(COPY.mail.checkFailed)}>
+              {COPY.actions.reportProblem}
+            </ActionLink>
+          </>
+        )}
 
-      {/* ── The rest of the page ───────────────────────────────────────────── */}
+        {state === "linkUsed" && (
+          <>
+            <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-5 py-7 text-center">
+              <span className="text-ink">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="48"
+                  height="48"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 9c1.8 2 1.8 4 0 6" />
+                  <path d="M11.5 6.5c3.3 3.6 3.3 7.4 0 11" />
+                  <path d="M15 4c5 5.3 5 10.7 0 16" />
+                </svg>
+              </span>
+              <h2 className="text-xl font-bold leading-[26px]">{COPY.linkUsed.againTitle}</h2>
+              <p className="text-[15px] leading-[22px] text-body">{COPY.linkUsed.againBody}</p>
+            </div>
+            <Section title={COPY.linkUsed.whyTitle}>
+              <Card>
+                {COPY.linkUsed.why.map((line) => (
+                  <InfoRow key={line} icon="lock" body={line} />
+                ))}
+              </Card>
+            </Section>
+          </>
+        )}
 
-      {withProduct && <AboutSection product={product} />}
+        {state === "linkIncomplete" && <Note icon="tag">{COPY.linkIncomplete.tip}</Note>}
 
-      {authentic && <TrustSection brand={withProduct ? product.brand : undefined} />}
-      {(state === "checkFailed" || state === "linkUsed") && <HowItWorksSection />}
+        {state === "ourSide" && (
+          <>
+            {retryHref && (
+              <ActionLink kind="primary" href={retryHref}>
+                {COPY.actions.tryAgain}
+              </ActionLink>
+            )}
+            <Note icon="about">{COPY.ourSide.tip}</Note>
+          </>
+        )}
+      </Group>
 
-      {slots.reviews}
+      {/* ── More, when asked for: reviews first, then what the record holds ── */}
+      <Group order={2}>
+        {slots.reviews}
 
-      {/* The list is loaded by the browser, so it is left out while scripts are off. */}
-      {slots.history && (
-        <Section title={COPY.history.title} needsScript>
-          {slots.history}
-        </Section>
-      )}
+        {withProduct && <ProductRows product={product} />}
 
-      {/* A failed check already has "Report a problem" as its main action. */}
-      {state !== "checkFailed" && <HelpSection subject={COPY.mail.tapHelp(recordNumber)} />}
+        {slots.history && <HistoryRow>{slots.history}</HistoryRow>}
 
-      {technical && <TechnicalDetails rows={technical.rows} links={technical.links} />}
+        {authentic && <TrustRow brand={withProduct ? product.brand : undefined} />}
+        {(state === "checkFailed" || state === "linkUsed") && <HowItWorksRow />}
+
+        {technical && <TechnicalDetails rows={technical.rows} links={technical.links} />}
+
+        {/* A failed check already has "Report a problem" as its main action. */}
+        {state !== "checkFailed" && <Help subject={COPY.mail.tapHelp(recordNumber)} />}
+      </Group>
     </ConsumerPage>
   );
 }
