@@ -7,6 +7,7 @@
  *
  *   sdm      decode and check the tag's code (local CPU, no network)
  *   tag      chain read: tag → item number
+ *   link     the one-time link store on tagit-services (TAP-T10)
  *   chain    chain reads: item state + record hash (issued together)
  *   product  the item record from tagit-services (lean view)
  *   total    start to finish
@@ -20,7 +21,7 @@
  * Durations and the outcome only. Never the tag's code, a UID or an address.
  */
 
-export type TapSpan = "sdm" | "tag" | "chain" | "product" | "total";
+export type TapSpan = "sdm" | "tag" | "link" | "chain" | "product" | "total";
 
 export type TapSpans = Partial<Record<TapSpan, number>>;
 
@@ -35,7 +36,7 @@ export interface TapTimer {
   header(): string;
 }
 
-const SPAN_ORDER: readonly TapSpan[] = ["sdm", "tag", "chain", "product", "total"];
+const SPAN_ORDER: readonly TapSpan[] = ["sdm", "tag", "link", "chain", "product", "total"];
 
 /** Format spans as a Server-Timing header value, in a fixed order, one decimal. */
 export function formatServerTiming(spans: TapSpans): string {

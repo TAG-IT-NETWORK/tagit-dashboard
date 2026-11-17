@@ -6,6 +6,7 @@ import type { AssetLookup } from "@/lib/services";
 import type { TapResolution } from "@/lib/resolve";
 import { recordPageModel, tapPageModel } from "@/lib/tap-page";
 import {
+  AGAIN,
   BROKEN_LOOKUP_TAP,
   FAILED_TAP,
   FAIL_REASON,
@@ -18,7 +19,9 @@ import {
   REVIEWER,
   SELLER,
   STATE,
+  UNCHECKED_LINK_TAP,
   UNLINKED_TAP,
+  USED_LINK_TAP,
   record,
   recordWithFacts,
   resolvedTap,
@@ -121,6 +124,15 @@ const TAPS: Record<string, { res: TapResolution; lookup: AssetLookup | null }> =
   linkIncomplete: { res: { kind: "bad-params" }, lookup: null },
   privateItem: { res: resolvedTap(STATE.CLAIMED), lookup: RESTRICTED },
   recordDidNotLoad: { res: resolvedTap(STATE.ACTIVATED), lookup: { kind: "unavailable" } },
+  // TAP-T10: a link opened before, a link that could not be checked, and the
+  // same phone opening its own check again
+  linkUsed: { res: USED_LINK_TAP, lookup: null },
+  linkUnchecked: { res: UNCHECKED_LINK_TAP, lookup: null },
+  ownedAgain: { res: resolvedTap(STATE.CLAIMED, AGAIN), lookup: recordWithFacts(STATE.CLAIMED) },
+  newForSaleAgain: {
+    res: resolvedTap(STATE.ACTIVATED, AGAIN),
+    lookup: recordWithFacts(STATE.ACTIVATED, true),
+  },
 };
 
 /** A tap page as <TapVerdict> builds it, with the real rating line and reviews row. */
@@ -135,6 +147,7 @@ function tapPage(name: string): ReactElement {
       technical={model.technical}
       detailsCheck={model.detailsCheck}
       missingDetails={model.missingDetails}
+      repeat={model.repeat}
       retryHref="/sun?picc=AA&cmac=BB"
       progress={model.progress}
       timing="sdm;dur=0.2, total;dur=250.0"

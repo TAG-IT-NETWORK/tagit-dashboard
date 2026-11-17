@@ -99,6 +99,24 @@ export function isCacheableReadPath(pathname: string): boolean {
   return /^\/(api\/)?asset\/[^/]+\/?$/.test(pathname);
 }
 
+/**
+ * Path predicate for the TAP ROUTES (category 1 above): the four routes that
+ * check a tag's code. The middleware uses it for one thing only — giving
+ * those requests the device id that lets a phone reopen its own check (see
+ * @/lib/tap-device-cookie). It must never be used to cache or rate-limit
+ * them: both stay forbidden for the reasons at the top of this file.
+ *
+ * Matches:  /sun   /01/…   /api/verify   /api/dpp/…
+ */
+export function isTapPath(pathname: string): boolean {
+  return (
+    /^\/sun\/?$/.test(pathname) ||
+    /^\/01(\/|$)/.test(pathname) ||
+    /^\/api\/verify\/?$/.test(pathname) ||
+    /^\/api\/dpp(\/|$)/.test(pathname)
+  );
+}
+
 /** The MCP Streamable HTTP endpoint. One constant so the middleware matcher,
  *  this predicate and robots.txt cannot drift apart. */
 export const MCP_PATH = "/mcp";

@@ -213,3 +213,36 @@ describe("the date a record carries", () => {
     for (const label of labels) expect(label, label).not.toMatch(/^Registered( on)?$/i);
   });
 });
+
+describe("the same phone opening its check again (TAP-T10)", () => {
+  // Decision D6: the same phone may open its link again for ten minutes, and
+  // the result is then marked as an earlier check. These are the words that
+  // mark it. They are NEW WORDS, not yet in the PRD's copy deck: change them
+  // there first, then here.
+  it("says how long ago, in the shopper's words, and how to get a fresh check", () => {
+    expect(COPY.repeat.note(0)).toBe(
+      "You checked this a moment ago. Tap the tag again for a fresh check.",
+    );
+    expect(COPY.repeat.note(1)).toBe(
+      "You checked this 1 minute ago. Tap the tag again for a fresh check.",
+    );
+    expect(COPY.repeat.note(3)).toBe(
+      "You checked this 3 minutes ago. Tap the tag again for a fresh check.",
+    );
+    expect(COPY.repeat.note(10)).toBe(
+      "You checked this 10 minutes ago. Tap the tag again for a fresh check.",
+    );
+  });
+
+  it("replaces the 'checked just now' line with one that does not say when", () => {
+    expect(COPY.repeat.line).toBe("Checked with the brand's record");
+    expect(TAP_STATES.newForSale.line).toBe(`Checked just now with the brand's record`);
+  });
+
+  it("never says 'just now', whatever the number of minutes", () => {
+    for (let minutes = 0; minutes <= 15; minutes += 1) {
+      expect(COPY.repeat.note(minutes)).not.toMatch(/just now/i);
+    }
+    expect(COPY.repeat.line).not.toMatch(/just now/i);
+  });
+});

@@ -10,11 +10,13 @@
  * <TapVerdict>. New chips should be personalized with the GS1 carrier; see
  * DPP-001.
  */
+import { headers } from "next/headers";
 import { Suspense } from "react";
 
 import { Checking } from "@/components/checking";
 import { TapResult } from "@/components/tap-result";
 import { TapVerdict } from "@/components/tap-verdict";
+import { tapDeviceOf } from "@/lib/tap-device";
 import { startTapLookups } from "@/lib/tap-lookups";
 import { startTapRun } from "@/lib/tap-run";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
@@ -40,7 +42,10 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   // done. The item record only needs the item number, so it is requested the
   // moment the tag resolves — WHILE the item-state reads run, not after them.
   // Reviews follow the record (see @/lib/tap-lookups for why not side by side).
-  const run = startTapRun(picc, cmac, startTapLookups);
+  // The device id lets this phone open its own link again for a few minutes;
+  // the link itself is opened only once (TAP-T10, see @/lib/resolve).
+  const device = tapDeviceOf(await headers());
+  const run = startTapRun(picc, cmac, startTapLookups, { device });
   const again = `/sun?picc=${encodeURIComponent(picc)}&cmac=${encodeURIComponent(cmac)}`;
 
   return (

@@ -79,18 +79,27 @@ const defaultWait = (ms: number): Promise<void> =>
 /**
  * Start a tap. Returns at once; nothing here waits for the network.
  *
- * `onItem` is called the moment the tag resolves to an item — while the
- * item-state reads are still out — and starts the page's own lookup (the item
- * record). Whatever it returns is available later from `item()`.
+ * `onItem` is called once the tag has resolved to an item and its link may be
+ * shown — while the item-state reads are still out — and starts the page's
+ * own lookup (the item record). Whatever it returns is available later from
+ * `item()`. It is not called for a link that was already used.
+ *
+ * `device` is the requesting device (see @/lib/tap-device). It lets the same
+ * phone open its own link again for a few minutes; without it the link is
+ * still opened, once.
  */
 export function startTapRun<T>(
   picc: string,
   cmac: string,
   onItem: (tokenId: string, timer: TapTimer) => T,
-  clock: { now?: () => number; wait?: (ms: number) => Promise<void> } = {},
+  options: {
+    device?: string | null;
+    now?: () => number;
+    wait?: (ms: number) => Promise<void>;
+  } = {},
 ): TapRun<T> {
-  const now = clock.now ?? (() => performance.now());
-  const wait = clock.wait ?? defaultWait;
+  const now = options.now ?? (() => performance.now());
+  const wait = options.wait ?? defaultWait;
   const timer = createTapTimer(now);
   let tagRead = false;
   let item: T | undefined;
@@ -104,6 +113,7 @@ export function startTapRun<T>(
       item = onItem(tokenId.toString(), timer);
     },
     timer,
+    device: options.device ?? null,
   });
 
   const confirmed = resolution.then(

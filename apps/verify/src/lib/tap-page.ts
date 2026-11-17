@@ -98,6 +98,12 @@ export interface TapPageModel {
    * did not load. The verdict does not depend on either.
    */
   missingDetails?: "private" | "unavailable";
+  /**
+   * Set when the same phone opened this check again (TAP-T10): the whole
+   * minutes since it first opened it. The page then reads as an earlier
+   * check. Absent for a check opened for the first time.
+   */
+  repeat?: { minutesAgo: number };
   progress: Progress;
   /** Which optional parts the page shows for this state. */
   show: { buy: boolean; reviews: boolean; history: boolean };
@@ -180,6 +186,9 @@ export function tapPageModel({
           missingDetails:
             lookup?.kind === "restricted" ? ("private" as const) : ("unavailable" as const),
         }),
+    ...(res.link.kind === "again"
+      ? { repeat: { minutesAgo: Math.floor(res.link.secondsAgo / 60) } }
+      : {}),
     progress,
     show: {
       // The buy widget asks the pricing service itself and shows only for a

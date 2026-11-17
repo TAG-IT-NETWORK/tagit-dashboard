@@ -17,6 +17,7 @@
  *
  * Server component — the SDM master key + RPC stay on the Vercel Node runtime.
  */
+import { headers } from "next/headers";
 import { Suspense } from "react";
 
 import { Checking } from "@/components/checking";
@@ -25,6 +26,7 @@ import { TapResult } from "@/components/tap-result";
 import { TapVerdict } from "@/components/tap-verdict";
 import { COPY } from "@/lib/consumer-copy";
 import { parseGs1Path } from "@/lib/gs1";
+import { tapDeviceOf } from "@/lib/tap-device";
 import { startTapLookups } from "@/lib/tap-lookups";
 import { startTapRun } from "@/lib/tap-run";
 
@@ -56,14 +58,19 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   // straight away and the result streams into its place when the check is
   // done. The item record only needs the token id, so it is requested the
   // moment the tag resolves — while the item-state reads run, not after them.
-  const run = startTapRun(picc, cmac, startTapLookups);
+  // The device id lets this phone open its own link again for a few minutes;
+  // the link itself is opened only once (TAP-T10, see @/lib/resolve).
+  const device = tapDeviceOf(await headers());
+  const run = startTapRun(picc, cmac, startTapLookups, { device });
   const path = `/01/${segments.map(encodeURIComponent).join("/")}`;
   const query = new URLSearchParams({ picc, cmac }).toString();
   const again = `${path}?${query}`;
 
   // The machine-readable passport for this same tap (the live SUN params are
   // kept on the link). By product number when the link carries one, otherwise
-  // by record number once the tap has resolved to an item.
+  // by record number once the tap has resolved to an item. It is this same
+  // link opened a second time, so it answers only for the phone that opened
+  // this page, and only for a few minutes.
   const serialSeg = link.serial ? `/21/${encodeURIComponent(link.serial)}` : "";
   const passport = (recordNumber: string | null): TechLink[] => {
     const href = link.gtin

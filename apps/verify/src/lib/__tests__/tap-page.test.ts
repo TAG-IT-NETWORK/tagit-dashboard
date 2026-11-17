@@ -8,6 +8,7 @@ import type { AssetLookup } from "../services";
 import { siteUrl } from "../site";
 import { publicRecordUrl, recordPageModel, tapPageModel } from "../tap-page";
 import {
+  AGAIN,
   BROKEN_LOOKUP_TAP,
   FAILED_TAP,
   FAIL_REASON,
@@ -20,7 +21,9 @@ import {
   SELLER,
   STATE,
   TAG_ID_SHOWN,
+  UNCHECKED_LINK_TAP,
   UNLINKED_TAP,
+  USED_LINK_TAP,
   record,
   recordDto,
   resolvedTap,
@@ -54,6 +57,9 @@ const EVERY_TAP: [string, TapResolution, AssetLookup | null][] = [
   ["lookup failed", BROKEN_LOOKUP_TAP, null],
   ["not set up", { kind: "not-configured" }, null],
   ["incomplete link", { kind: "bad-params" }, null],
+  // TAP-T10: a real tag whose link was opened before, or could not be checked
+  ["link already used", USED_LINK_TAP, null],
+  ["link not checked", UNCHECKED_LINK_TAP, null],
 ];
 
 describe("tapPageModel", () => {
@@ -240,6 +246,84 @@ describe("publicRecordUrl", () => {
     expect(publicRecordUrl("58")).toBe(
       `https://sepolia.basescan.org/token/${CONTRACT_ADDRESS}?a=58`,
     );
+  });
+});
+
+describe("tapPageModel — one-time links (TAP-T10)", () => {
+  it("a used link: the expired state, the tag's own rows, and nothing about any item", () => {
+    const model = tap(USED_LINK_TAP);
+
+    expect(model.state).toBe("linkUsed");
+    expect(model.product).toBeUndefined();
+    expect(model.recordNumber).toBeUndefined();
+    expect(model.repeat).toBeUndefined();
+    expect(model.show).toEqual({ buy: false, reviews: false, history: false });
+    expect(model.progress).toEqual({ done: 1, seen: 1, tookMs: 250 });
+    expect(rowsOf(model)).toEqual({
+      [COPY.technical.timesChecked]: "42",
+      [COPY.technical.network]: COPY.technical.networkValue,
+      [COPY.technical.tagId]: TAG_ID_SHOWN,
+    });
+    expect(model.technical.links).toEqual([]);
+  });
+
+  it("a used link stays a used link whatever record comes with it", () => {
+    for (const lookup of [record(STATE.CLAIMED), record(STATE.ACTIVATED, true), RESTRICTED]) {
+      const model = tap(USED_LINK_TAP, lookup);
+      expect(model.state).toBe("linkUsed");
+      expect(model.product).toBeUndefined();
+      expect(model.show).toEqual({ buy: false, reviews: false, history: false });
+    }
+  });
+
+  it("a link that could not be checked: our side, and nothing about any item", () => {
+    const model = tap(UNCHECKED_LINK_TAP, record(STATE.CLAIMED));
+
+    expect(model.state).toBe("ourSide");
+    expect(model.product).toBeUndefined();
+    expect(model.recordNumber).toBeUndefined();
+    expect(model.show).toEqual({ buy: false, reviews: false, history: false });
+    expect(model.progress.done).toBe(1);
+  });
+
+  it("a first look carries no mark of an earlier check", () => {
+    for (const [, res, lookup] of EVERY_TAP) expect(tap(res, lookup)).not.toHaveProperty("repeat");
+  });
+
+  it.each([
+    [0, 0],
+    [59, 0],
+    [60, 1],
+    [119, 1],
+    [185, 3],
+    [599, 9],
+    [600, 10],
+  ])(
+    "the same phone coming back after %i seconds is marked %i whole minutes",
+    (seconds, minutes) => {
+      const model = tap(
+        resolvedTap(STATE.CLAIMED, { kind: "again", secondsAgo: seconds }),
+        record(STATE.CLAIMED),
+      );
+      expect(model.repeat).toEqual({ minutesAgo: minutes });
+    },
+  );
+
+  it.each([
+    ["new, for sale", STATE.ACTIVATED, record(STATE.ACTIVATED, true)],
+    ["owned", STATE.CLAIMED, record(STATE.CLAIMED)],
+    ["reported", STATE.FLAGGED, record(STATE.FLAGGED)],
+    ["private", STATE.CLAIMED, RESTRICTED],
+    ["record service down", STATE.ACTIVATED, { kind: "unavailable" } as AssetLookup],
+  ])("%s, opened again: the same page as the first look, plus the mark", (_name, state, lookup) => {
+    const first = tap(resolvedTap(state), lookup);
+    const again = tap(resolvedTap(state, AGAIN), lookup);
+
+    expect(again).toEqual({ ...first, repeat: { minutesAgo: 3 } });
+    const json = JSON.stringify(again);
+    for (const secret of [OWNER, OWNER_SHORT, OWNER.slice(0, 8), SELLER]) {
+      expect(json).not.toContain(secret);
+    }
   });
 });
 
