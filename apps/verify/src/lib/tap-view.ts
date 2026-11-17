@@ -41,8 +41,14 @@ export function tapStateFor(res: TapResolution, record: RecordFacts): TapStateKe
       return "checkFailed";
     case "authentic-unbound":
       return "noProduct";
+    // The tag is real, but the link was opened before: no result for it.
+    case "link-used":
+      return "linkUsed";
+    // "link-unchecked": the one-time store did not answer. Like any other
+    // failure on our side, it says nothing about the product.
     case "not-configured":
     case "lookup-failed":
+    case "link-unchecked":
       return "ourSide";
     case "resolved":
       break;

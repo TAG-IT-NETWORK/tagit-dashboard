@@ -8,6 +8,10 @@ const chain = vi.hoisted(() => ({
 }));
 vi.mock("../contract.server", () => chain);
 
+// The one-time link store. Unless a test says otherwise every link is fresh.
+const store = vi.hoisted(() => ({ openTapLink: vi.fn() }));
+vi.mock("../tap-link", () => store);
+
 import { mintSunUrl } from "../sdm";
 import { startTapRun, TICK_GRACE_MS, TICK_SEEN_AFTER_MS } from "../tap-run";
 
@@ -79,6 +83,7 @@ beforeEach(() => {
   chain.getTokenByTag.mockReset().mockResolvedValue(TOKEN_ID);
   chain.getAsset.mockReset().mockResolvedValue(ASSET);
   chain.getMetadataHash.mockReset().mockResolvedValue(null);
+  store.openTapLink.mockReset().mockResolvedValue({ kind: "fresh" });
 });
 
 afterEach(() => {
@@ -204,6 +209,71 @@ describe("startTapRun (TAP-T07)", () => {
     const run = startTapRun(picc, cmac, () => "lookup");
     await run.resolution;
 
-    expect(Object.keys(run.timer.spans()).sort()).toEqual(["chain", "sdm", "tag", "total"]);
+    expect(Object.keys(run.timer.spans()).sort()).toEqual(["chain", "link", "sdm", "tag", "total"]);
+  });
+});
+
+describe("startTapRun — one-time links (TAP-T10)", () => {
+  it("hands the requesting device to the check, and none when it is given none", async () => {
+    const { picc, cmac } = mintTap();
+
+    await startTapRun(picc, cmac, () => "lookup", { device: "d".repeat(64) }).resolution;
+    await startTapRun(picc, cmac, () => "lookup").resolution;
+
+    expect(store.openTapLink.mock.calls.map(([request]) => request.device)).toEqual([
+      "d".repeat(64),
+      null,
+    ]);
+  });
+
+  it("does not start the page's lookup before the link is known to be good", async () => {
+    const opening = deferred<{ kind: "fresh" }>();
+    store.openTapLink.mockReturnValue(opening.promise);
+    const onItem = vi.fn(() => "lookup");
+    const { picc, cmac } = mintTap();
+
+    const run = startTapRun(picc, cmac, onItem);
+    await settle();
+    expect(onItem).not.toHaveBeenCalled(); // the store has not answered yet
+
+    opening.resolve({ kind: "fresh" });
+    await run.resolution;
+    expect(onItem).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a used link", { kind: "used" }, "link-used"],
+    ["a link that could not be checked", { kind: "unavailable" }, "link-unchecked"],
+  ])("%s: no lookup, nothing confirmed, no second tick", async (_name, answer, kind) => {
+    store.openTapLink.mockResolvedValue(answer);
+    const hand = handClock();
+    const onItem = vi.fn(() => "lookup");
+    const { picc, cmac } = mintTap();
+
+    const run = startTapRun(picc, cmac, onItem, hand.clock);
+
+    expect(run.tagRead).toBe(true); // the tag itself is real
+    expect((await run.resolution).kind).toBe(kind);
+    expect(await run.confirmed).toBe(false);
+    expect(await run.secondTick).toBe(false);
+    expect(hand.waits).toHaveLength(0);
+    expect(onItem).not.toHaveBeenCalled();
+    expect(run.item()).toBeUndefined();
+    expect(run.stepsSeen()).toBe(1);
+  });
+
+  it("the same phone coming back runs like a first look", async () => {
+    store.openTapLink.mockResolvedValue({ kind: "again", secondsAgo: 40 });
+    const onItem = vi.fn(() => "lookup");
+    const { picc, cmac } = mintTap();
+
+    const run = startTapRun(picc, cmac, onItem);
+
+    expect(await run.resolution).toMatchObject({
+      kind: "resolved",
+      link: { kind: "again", secondsAgo: 40 },
+    });
+    expect(await run.confirmed).toBe(true);
+    expect(onItem).toHaveBeenCalledTimes(1);
   });
 });

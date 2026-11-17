@@ -99,7 +99,13 @@ export async function TapVerdict({
     // NOT awaited: reviews stream in below and never hold the verdict back.
     ratings = lookups.ratings;
   }
-  logTap(route, res.kind, timer);
+  // An earlier check opened again is logged as such, so the two can be told
+  // apart in the tap log.
+  logTap(
+    route,
+    res.kind === "resolved" && res.link.kind === "again" ? "resolved-again" : res.kind,
+    timer,
+  );
 
   const model = tapPageModel({
     res,
@@ -118,6 +124,7 @@ export async function TapVerdict({
       technical={model.technical}
       detailsCheck={model.detailsCheck}
       missingDetails={model.missingDetails}
+      repeat={model.repeat}
       retryHref={retryHref}
       progress={model.progress}
       timing={timer.header()}

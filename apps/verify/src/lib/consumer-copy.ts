@@ -264,6 +264,23 @@ export const COPY = {
     ],
   },
 
+  /**
+   * The same phone opened its check again within the ten minutes it may
+   * (TAP-T10, decision D6). The result is shown once more and says it is an
+   * earlier check: nothing on such a page may read as checked just now.
+   */
+  repeat: {
+    /** Takes the place of "Checked just now with the brand's record". */
+    line: "Checked with the brand's record",
+    /** Whole minutes since the check was first opened. */
+    note: (minutes: number) =>
+      minutes < 1
+        ? "You checked this a moment ago. Tap the tag again for a fresh check."
+        : minutes === 1
+          ? "You checked this 1 minute ago. Tap the tag again for a fresh check."
+          : `You checked this ${minutes} minutes ago. Tap the tag again for a fresh check.`,
+  },
+
   linkIncomplete: {
     tip: "Hold the top of your phone on the tag for a second.",
   },

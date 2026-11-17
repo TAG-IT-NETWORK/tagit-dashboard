@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SERVICES_URL } from "@/lib/services";
+import { tapLinkStoreState } from "@/lib/tap-link";
 import { warmTargets } from "@/lib/warm";
 
 /**
@@ -16,6 +17,14 @@ import { warmTargets } from "@/lib/warm";
  * was paying for both. The two tap probes use a syntactically valid but wrong
  * SUN payload, so they take the counterfeit branch — no chain read, no SUN
  * counter burned, nothing cached. The list itself lives in @/lib/warm.
+ *
+ * After the probes it asks one more thing (TAP-T10): can this server use the
+ * one-time link store? The answer is in the response as `tapLinks`. A tap
+ * whose link cannot be checked ends as "We couldn't finish the check", so
+ * `tapLinks.ready: false` here means every tap is failing that way right now.
+ * The question reads one row on tagit-services and writes nothing. It is
+ * asked after the probes, not beside them, so it never adds to the number of
+ * requests that reach tagit-services at the same moment.
  */
 
 export const dynamic = "force-dynamic";
@@ -52,8 +61,19 @@ export async function GET(req: Request) {
   }
   const targets = warmTargets({ self: SELF, services: SERVICES_URL, tokenId: PROBE_TOKEN });
   const results = await Promise.all(targets.map((url) => probe(url)));
+  const asked = Date.now();
+  const store = await tapLinkStoreState();
+  const tapLinks = { ...store, ms: Date.now() - asked };
+  // One line in the log when taps cannot be checked: the place to look first.
+  if (!store.ready)
+    console.error(JSON.stringify({ evt: "tap-link", ready: false, status: store.status }));
   return NextResponse.json(
-    { ok: results.every((r) => r.status !== null), at: new Date().toISOString(), results },
+    {
+      ok: results.every((r) => r.status !== null),
+      at: new Date().toISOString(),
+      results,
+      tapLinks,
+    },
     { headers: { "cache-control": "no-store" } },
   );
 }

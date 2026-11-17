@@ -6,6 +6,7 @@ import type { AssetLookup } from "@/lib/services";
 import type { TapResolution } from "@/lib/resolve";
 import { tapPageModel } from "@/lib/tap-page";
 import {
+  AGAIN,
   BROKEN_LOOKUP_TAP,
   FAILED_TAP,
   FAIL_REASON,
@@ -21,7 +22,9 @@ import {
   STATE,
   TAG_ID_SHOWN,
   TAG_UID,
+  UNCHECKED_LINK_TAP,
   UNLINKED_TAP,
+  USED_LINK_TAP,
   record,
   resolvedTap,
 } from "@/test-support/shopper-fixtures";
@@ -51,7 +54,7 @@ import { TapResult } from "../tap-result";
  * and for what it must not show.
  */
 
-/** How each state comes about. "linkUsed" has no trigger yet (TAP-T10). */
+/** How each state comes about. */
 const CASES: Record<TapStateKey, { res: TapResolution; lookup: AssetLookup | null } | null> = {
   newForSale: { res: resolvedTap(STATE.ACTIVATED), lookup: record(STATE.ACTIVATED, true) },
   newNotForSale: { res: resolvedTap(STATE.ACTIVATED), lookup: record(STATE.ACTIVATED) },
@@ -60,7 +63,7 @@ const CASES: Record<TapStateKey, { res: TapResolution; lookup: AssetLookup | nul
   reported: { res: resolvedTap(STATE.FLAGGED), lookup: record(STATE.FLAGGED) },
   retired: { res: resolvedTap(STATE.RECYCLED), lookup: record(STATE.RECYCLED) },
   checkFailed: { res: FAILED_TAP, lookup: null },
-  linkUsed: null,
+  linkUsed: { res: USED_LINK_TAP, lookup: null },
   noProduct: { res: UNLINKED_TAP, lookup: null },
   ourSide: { res: BROKEN_LOOKUP_TAP, lookup: null },
   linkIncomplete: { res: { kind: "bad-params" }, lookup: null },
@@ -97,6 +100,7 @@ function render(
       technical={model.technical}
       detailsCheck={model.detailsCheck}
       missingDetails={model.missingDetails}
+      repeat={model.repeat}
       retryHref="/sun?picc=AA&cmac=BB"
       progress={withFrame ? model.progress : undefined}
       timing="sdm;dur=0.2, total;dur=250.0"
@@ -379,6 +383,175 @@ describe("the parts each state does and does not get", () => {
   });
 });
 
+describe("a used link (TAP-T10)", () => {
+  it("says the check has expired and how to get a fresh one, and nothing about any product", () => {
+    const text = readable(body("linkUsed"));
+    expect(text).toContain(`# ${TAP_STATES.linkUsed.headline}`);
+    expect(text).toContain(COPY.linkUsed.againTitle);
+    expect(text).toContain(COPY.linkUsed.againBody);
+    for (const line of COPY.linkUsed.why) expect(text).toContain(line);
+    expect(text).not.toMatch(/authentic/i);
+    expect(text).not.toContain("Renewal Cream");
+    expect(text).not.toContain(COPY.buy.buttonNoPrice);
+  });
+
+  it("is drawn in the warning tone, never the reassuring one", () => {
+    const html = body("linkUsed");
+    expect(html).toContain('data-verdict="warn"');
+    expect(html).not.toContain('data-verdict="ok"');
+  });
+
+  it("stays a used link even if it is handed a product, a buy button and reviews", () => {
+    const model = tapPageModel({
+      res: resolvedTap(STATE.ACTIVATED),
+      lookup: record(STATE.ACTIVATED, true),
+      stepsSeen: 1,
+      tookMs: 250,
+    });
+    const html = renderToStaticMarkup(
+      <TapResult
+        state="linkUsed"
+        product={model.product}
+        recordNumber={model.recordNumber}
+        slots={{
+          buy: <button type="button">BUY-SLOT</button>,
+          photo: <img src="/photo.webp" alt="PHOTO-SLOT" />,
+          rating: <p>RATING-SLOT</p>,
+        }}
+      />,
+    );
+    for (const leaked of ["BUY-SLOT", "PHOTO-SLOT", "RATING-SLOT", "Renewal Cream", "$23.33"]) {
+      expect(html).not.toContain(leaked);
+    }
+  });
+
+  it("a link that could not be checked reads exactly like any other failure on our side", () => {
+    const unchecked = render({ res: UNCHECKED_LINK_TAP, lookup: null }, "ourSide", false);
+    expect(unchecked).toBe(body("ourSide"));
+    expect(readable(unchecked)).not.toMatch(/authentic/i);
+    expect(readable(unchecked)).toContain(COPY.actions.tryAgain);
+  });
+});
+
+describe("the same phone opening its check again (TAP-T10)", () => {
+  /** The states a tap that led to an item can end in. */
+  const RESULT_STATES = STATES.filter((state) => CASES[state]?.res.kind === "resolved");
+  const again = (
+    state: TapStateKey,
+    secondsAgo = AGAIN.kind === "again" ? AGAIN.secondsAgo : 0,
+  ) => {
+    const built = CASES[state]!;
+    if (built.res.kind !== "resolved") throw new Error("not a result state");
+    return render(
+      { res: { ...built.res, link: { kind: "again", secondsAgo } }, lookup: built.lookup },
+      state,
+      false,
+    );
+  };
+
+  it("covers every state a tap can lead to an item in", () => {
+    expect(RESULT_STATES.sort()).toEqual(
+      [
+        "newForSale",
+        "newNotForSale",
+        "notReleased",
+        "owned",
+        "privateItem",
+        "reported",
+        "retired",
+      ].sort(),
+    );
+  });
+
+  it.each(RESULT_STATES)(
+    "%s: says it is an earlier check, before anything about the product",
+    (state) => {
+      const text = readable(again(state));
+      const note = COPY.repeat.note(3);
+
+      expect(text).toContain(note);
+      // the verdict first, then the note, then the rest of the page
+      expect(text.indexOf(`# ${TAP_STATES[state].headline}`)).toBeLessThan(text.indexOf(note));
+      if (text.includes("Renewal Cream")) {
+        expect(text.indexOf(note)).toBeLessThan(text.indexOf("Renewal Cream"));
+      }
+    },
+  );
+
+  it.each(RESULT_STATES)("%s: nothing on the page reads as checked just now", (state) => {
+    expect(readable(again(state))).not.toMatch(/just now/i);
+    // …while the first look of the two "new" states does say it
+    if (/just now/i.test(TAP_STATES[state].line)) {
+      expect(readable(body(state))).toMatch(/just now/i);
+    }
+  });
+
+  it("replaces only the line that says 'just now', and keeps every other state's line", () => {
+    for (const state of RESULT_STATES) {
+      const text = readable(again(state));
+      if (/just now/i.test(TAP_STATES[state].line)) {
+        expect(text, state).toContain(`${COPY.repeat.line}.`);
+        expect(text, state).not.toContain(TAP_STATES[state].line);
+      } else {
+        expect(text, state).toContain(`${TAP_STATES[state].line}.`);
+        expect(text, state).not.toContain(COPY.repeat.line);
+      }
+    }
+  });
+
+  it.each(RESULT_STATES)("%s: is otherwise the very page of the first look", (state) => {
+    const first = readable(body(state));
+    const second = readable(again(state))
+      .replace(`${COPY.repeat.note(3)}\n`, "")
+      .replace(COPY.repeat.note(3), "")
+      .replace(`${COPY.repeat.line}.`, `${TAP_STATES[state].line}.`);
+    const squeeze = (text: string) => text.replace(/\s+/g, " ").trim();
+    expect(squeeze(second)).toBe(squeeze(first));
+  });
+
+  it.each(RESULT_STATES)("%s: keeps its verdict, its tone and its rows", (state) => {
+    const first = body(state);
+    const second = again(state);
+    expect(second).toContain(`data-verdict="${TAP_STATES[state].tone}"`);
+    expect(second.match(/<h1\b/g)).toHaveLength(1);
+    expect(rowNames(second)).toEqual(rowNames(first));
+    expect(second).toContain(COPY.honestStatus);
+  });
+
+  it("says how long ago in whole minutes", () => {
+    expect(readable(again("owned", 5))).toContain("You checked this a moment ago.");
+    expect(readable(again("owned", 60))).toContain("You checked this 1 minute ago.");
+    expect(readable(again("owned", 7 * 60 + 59))).toContain("You checked this 7 minutes ago.");
+    expect(readable(again("owned", 600))).toContain("You checked this 10 minutes ago.");
+  });
+
+  it("a first look never carries the note", () => {
+    for (const state of STATES) {
+      expect(readable(body(state)), state).not.toContain("You checked this");
+    }
+  });
+
+  it("shows no owner, seller or reviewer address, and nothing technical outside the drawer", () => {
+    for (const state of RESULT_STATES) {
+      const html = again(state);
+      for (const secret of [OWNER, OWNER_SHORT, OWNER.slice(0, 8), SELLER, REVIEWER]) {
+        expect(html, state).not.toContain(secret);
+      }
+      const visible = outsideDrawer(html);
+      expect(visible, state).not.toMatch(/0x[0-9a-fA-F]{4,}/);
+      expect(visible, state).not.toContain(TAG_ID_SHOWN);
+    }
+  });
+
+  it("owned, opened again: the whole reading", () => {
+    expect(readable(again("owned"))).toMatchSnapshot();
+  });
+
+  it("new and for sale, opened again: the whole reading", () => {
+    expect(readable(again("newForSale"))).toMatchSnapshot();
+  });
+});
+
 describe("when the tap led to an item whose details are not on the page", () => {
   const SCENARIOS: Record<
     string,
@@ -591,7 +764,8 @@ describe("the order a shopper reads in", () => {
       reported: ["about", "history", "technical"],
       retired: ["about", "history", "technical"],
       checkFailed: ["how-it-works"],
-      linkUsed: ["how-it-works"],
+      // A used link comes from a real tag, so it has that tag's technical rows.
+      linkUsed: ["how-it-works", "technical"],
       noProduct: ["technical"],
       ourSide: ["technical"],
       linkIncomplete: [],

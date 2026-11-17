@@ -66,6 +66,12 @@ const STATE_GLYPH: Record<TapStateKey, IconName> = {
   linkIncomplete: "alert",
 };
 
+/**
+ * States whose line says the check was made just now. On an earlier check
+ * opened again, that line is replaced (see COPY.repeat).
+ */
+const SAYS_JUST_NOW: ReadonlySet<TapStateKey> = new Set(["newForSale", "newNotForSale"]);
+
 /** States that have a product to show. */
 const HAS_PRODUCT: ReadonlySet<TapStateKey> = new Set([
   "newForSale",
@@ -88,6 +94,12 @@ export interface TapResultProps {
   detailsCheck?: DetailsCheck;
   /** Why the item's details are not on the page, when they are not. */
   missingDetails?: "private" | "unavailable";
+  /**
+   * Set when the same phone opened this check again (TAP-T10): the whole
+   * minutes since it first did. The page then says it is an earlier check,
+   * and no line on it reads as checked just now.
+   */
+  repeat?: { minutesAgo: number };
   /** This same tap again, for "Try again". */
   retryHref?: string;
   /** When set, the checking frame resolves over the page (see <CheckingResolved>). */
@@ -237,6 +249,7 @@ export function TapResult({
   technical,
   detailsCheck,
   missingDetails,
+  repeat,
   retryHref,
   progress,
   timing,
@@ -260,11 +273,14 @@ export function TapResult({
         tone={copy.tone}
         icon={STATE_GLYPH[state]}
         headline={copy.headline}
-        line={copy.line}
+        line={repeat && SAYS_JUST_NOW.has(state) ? COPY.repeat.line : copy.line}
       />
 
       {/* ── What it is: photo, name, price ─────────────────────────────────── */}
       <Group order={0}>
+        {/* An earlier check, opened again by the same phone: say so first. */}
+        {repeat && <Note icon="clock">{COPY.repeat.note(repeat.minutesAgo)}</Note>}
+
         {withProduct && (
           <ProductCard
             name={product.name}

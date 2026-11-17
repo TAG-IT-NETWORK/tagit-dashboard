@@ -21,6 +21,7 @@ import {
   tapStateFor,
 } from "../tap-view";
 import {
+  AGAIN,
   BROKEN_LOOKUP_TAP,
   FAILED_TAP,
   OWNER,
@@ -28,7 +29,9 @@ import {
   RESTRICTED,
   SELLER,
   STATE,
+  UNCHECKED_LINK_TAP,
   UNLINKED_TAP,
+  USED_LINK_TAP,
   record,
   recordDto,
   resolvedTap,
@@ -54,6 +57,9 @@ describe("tapStateFor", () => {
     ["a genuine tag with no item", UNLINKED_TAP, "noProduct"],
     ["a lookup that failed", BROKEN_LOOKUP_TAP, "ourSide"],
     ["a server that is not set up", { kind: "not-configured" }, "ourSide"],
+    // TAP-T10: a real tag whose link was opened before, or could not be checked
+    ["a link that was already used", USED_LINK_TAP, "linkUsed"],
+    ["a link the one-time store could not check", UNCHECKED_LINK_TAP, "ourSide"],
   ])("%s is the same state whatever the record says", (_name, res, expected) => {
     for (const facts of ANY_RECORD) expect(tapStateFor(res, facts)).toBe(expected);
   });
@@ -65,6 +71,8 @@ describe("tapStateFor", () => {
       FAILED_TAP,
       UNLINKED_TAP,
       BROKEN_LOOKUP_TAP,
+      USED_LINK_TAP,
+      UNCHECKED_LINK_TAP,
     ];
     for (const res of notResolved) {
       for (const facts of ANY_RECORD) {
@@ -97,6 +105,16 @@ describe("tapStateFor", () => {
     [9, false, true, "noProduct"],
   ])("resolved, state %i, restricted %s, listed %s → %s", (state, restricted, listed, expected) => {
     expect(tapStateFor(resolvedTap(state), { restricted, listed })).toBe(expected);
+  });
+
+  it("lands the same phone coming back in the very state its first look had (TAP-T10)", () => {
+    for (let state = 0; state <= 9; state++) {
+      for (const facts of ANY_RECORD) {
+        expect(tapStateFor(resolvedTap(state, AGAIN), facts)).toBe(
+          tapStateFor(resolvedTap(state), facts),
+        );
+      }
+    }
   });
 
   it("says Authentic only for an item that is released and not reported or retired", () => {

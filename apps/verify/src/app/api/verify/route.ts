@@ -9,12 +9,20 @@
  * app maps straight onto its Result screen. CORS-open for the native client.
  *
  * Stable contract (do not break without bumping the app):
- *   resolved        → 200 { verified, bound:true, uid, tapCounter, asset{...}, metadataHash, chain }
+ *   resolved        → 200 { verified, bound:true, uid, tapCounter, asset{...}, metadataHash, chain, tapLink }
  *   authentic-unbound→200 { verified:false, bound:false, uid, tapCounter, reason }
  *   counterfeit     → 200 { verified:false, reason }
+ *   link used       → 200 { verified:false, bound:true, uid, tapCounter, reason, tapLink:"used" }
  *   bad params      → 400 { verified:false, error }
  *   not configured  → 503 { verified:false, error }
  *   lookup failed   → 502 { verified:false, error }
+ *   link unchecked  → 503 { verified:false, error }
+ *
+ * `tapLink` (TAP-T10) is the one field added for one-time links: "fresh" for a
+ * link opened for the first time, "again" when the same device opens its own
+ * link once more within a few minutes, "used" for a link that was already
+ * opened. A used link is never `verified`, so a build of the app that does not
+ * know the field still shows it as not verified, with `reason` as the text.
  *
  * Product fields come only from the item's own record: `picc` and `cmac` are
  * the only query parameters this route reads.
@@ -24,9 +32,11 @@
  * @/lib/tap-timing) — this is the route the TAG IT app calls, so its taps are
  * measured the same way the web page's are.
  */
+import { TAP_STATES } from "@/lib/consumer-copy";
 import { resolveTap, isAuthenticState } from "@/lib/resolve";
 import { loadProduct, CHAIN_ID, CHAIN_NAME, type ProductMetadata } from "@/lib/dpp";
 import { STATES } from "@/lib/states";
+import { tapDeviceOf } from "@/lib/tap-device";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +68,8 @@ export async function GET(req: Request) {
       productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
     },
     timer,
+    // Lets the same device ask about its own link again for a few minutes.
+    device: tapDeviceOf(req.headers),
   });
   if (res.kind !== "resolved") logTap("/api/verify", res.kind, timer);
   const chain = { id: CHAIN_ID, name: CHAIN_NAME };
@@ -87,10 +99,33 @@ export async function GET(req: Request) {
         { verified: false, error: res.reason, uid: res.uid, tapCounter: res.counter, chain },
         502,
       );
+    case "link-used":
+      // The tag is real, but this link was opened before. Never `verified`.
+      return reply({
+        verified: false,
+        bound: true,
+        uid: res.uid,
+        tapCounter: res.counter,
+        reason: `${TAP_STATES.linkUsed.headline}. ${TAP_STATES.linkUsed.line}.`,
+        tapLink: "used",
+        chain,
+      });
+    case "link-unchecked":
+      // The one-time store did not answer: nothing may be said about the product.
+      return reply(
+        {
+          verified: false,
+          error: `${TAP_STATES.ourSide.headline}. ${TAP_STATES.ourSide.line}.`,
+          uid: res.uid,
+          tapCounter: res.counter,
+          chain,
+        },
+        503,
+      );
     case "resolved": {
       const product = await (productLookup ??
         timer.time("product", () => loadProduct(res.tokenId.toString())));
-      logTap("/api/verify", "resolved", timer);
+      logTap("/api/verify", res.link.kind === "again" ? "resolved-again" : "resolved", timer);
       return reply({
         verified: isAuthenticState(res.asset.state),
         bound: true,
@@ -111,7 +146,14 @@ export async function GET(req: Request) {
         },
         metadataHash: res.metadataHash,
         chain,
+        tapLink: res.link.kind,
       });
+    }
+    default: {
+      // Every outcome is handled above; a new one must be added there. If one
+      // ever reaches this line the request fails rather than passing.
+      const unhandled: never = res;
+      throw new Error(`unhandled tap outcome: ${(unhandled as { kind: string }).kind}`);
     }
   }
 }

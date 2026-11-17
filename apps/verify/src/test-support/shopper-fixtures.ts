@@ -5,7 +5,7 @@
  * prove they are not shown.
  */
 import type { RatingsView } from "@/lib/ratings-shared";
-import type { TapResolution } from "@/lib/resolve";
+import type { TapLinkState, TapResolution } from "@/lib/resolve";
 import type { AssetDto, AssetLookup } from "@/lib/services";
 
 /** The item's owner. Must appear NOWHERE on a shopper page. */
@@ -35,8 +35,11 @@ export const STATE = {
   RECYCLED: 6,
 } as const;
 
-/** A tap that led to item 58 in the given lifecycle state. */
-export function resolvedTap(state: number): TapResolution {
+/**
+ * A tap that led to item 58 in the given lifecycle state. Its link is being
+ * opened for the first time unless `link` says the same phone came back.
+ */
+export function resolvedTap(state: number, link: TapLinkState = { kind: "fresh" }): TapResolution {
   return {
     kind: "resolved",
     uid: TAG_UID,
@@ -44,8 +47,12 @@ export function resolvedTap(state: number): TapResolution {
     tokenId: 58n,
     asset: { owner: OWNER, timestamp: 1_788_600_600n, state, flags: 0, reserved: 0 },
     metadataHash: FINGERPRINT as `0x${string}`,
+    link,
   };
 }
+
+/** The same phone opening its check again, 3 minutes and 5 seconds after the first time. */
+export const AGAIN: TapLinkState = { kind: "again", secondsAgo: 185 };
 
 export const FAILED_TAP: TapResolution = { kind: "counterfeit", reason: FAIL_REASON };
 export const UNLINKED_TAP: TapResolution = { kind: "authentic-unbound", uid: TAG_UID, counter: 42 };
@@ -54,6 +61,14 @@ export const BROKEN_LOOKUP_TAP: TapResolution = {
   uid: TAG_UID,
   counter: 42,
   reason: LOOKUP_ERROR,
+};
+/** A real tag whose link was opened before. */
+export const USED_LINK_TAP: TapResolution = { kind: "link-used", uid: TAG_UID, counter: 42 };
+/** A real tag whose link could not be checked with the one-time store. */
+export const UNCHECKED_LINK_TAP: TapResolution = {
+  kind: "link-unchecked",
+  uid: TAG_UID,
+  counter: 42,
 };
 
 const VERIFIED = {

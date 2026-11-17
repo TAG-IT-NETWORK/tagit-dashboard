@@ -8,11 +8,20 @@
  * a W3C Verifiable Credential (VCDM 2.0 JSON-LD, UNTP DigitalProductPassport).
  * CORS-open so external verifiers / GS1 resolvers can consume it. Unsigned in
  * v1 (integrity via the on-chain anchor in `evidence`); see /lib/dpp.ts.
+ *
+ * ONE-TIME LINKS (TAP-T10). A tap link answers here once, like everywhere
+ * else: the passport is returned for a link that is fresh, or for the device
+ * that opened the link first, for a few minutes (that is how the "machine-
+ * readable passport" link on the /01 page works: same browser, same link).
+ * Every answer says which it was in an `x-tap-link` header. A link that was
+ * already opened gets `{ verified: false, tapLink: "used" }` and no passport.
  */
+import { TAP_STATES } from "@/lib/consumer-copy";
 import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap } from "@/lib/resolve";
 import { buildDpp, dppToVerifiableCredential, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { neverCacheControl } from "@/lib/cache";
+import { tapDeviceOf } from "@/lib/tap-device";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +77,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
       productLookup = timer.time("product", () => loadProduct(tokenId.toString()));
     },
     timer,
+    // Lets the browser that opened the /01 page follow its passport link.
+    device: tapDeviceOf(req.headers),
   });
   if (res.kind !== "resolved") logTap("/api/dpp", res.kind, timer);
   const timing = (): Record<string, string> => {
@@ -101,10 +112,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
       );
     case "lookup-failed":
       return json({ verified: true, error: res.reason }, 502, timing());
+    case "link-used":
+      // The tag is real, but this link was opened before: no passport for it.
+      return json(
+        {
+          verified: false,
+          reason: `${TAP_STATES.linkUsed.headline}. ${TAP_STATES.linkUsed.line}.`,
+          tapLink: "used",
+        },
+        200,
+        { ...timing(), "x-tap-link": "used" },
+      );
+    case "link-unchecked":
+      // The one-time store did not answer: nothing may be said about the product.
+      return json(
+        {
+          verified: false,
+          error: `${TAP_STATES.ourSide.headline}. ${TAP_STATES.ourSide.line}.`,
+        },
+        503,
+        timing(),
+      );
     case "resolved": {
       const product = await (productLookup ??
         timer.time("product", () => loadProduct(res.tokenId.toString())));
-      logTap("/api/dpp", "resolved", timer);
+      logTap("/api/dpp", res.link.kind === "again" ? "resolved-again" : "resolved", timer);
+      // When the tap was checked: now for a fresh link; for a link opened
+      // again, the moment it was first opened.
+      const checkedAt =
+        res.link.kind === "again" ? Date.now() - res.link.secondsAgo * 1000 : Date.now();
       const dpp = buildDpp({
         gtin: link?.gtin ?? null,
         gtinValid: link?.gtinValid ?? false,
@@ -115,12 +151,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
         asset: res.asset,
         metadataHash: res.metadataHash,
         product,
-        verifiedAt: new Date().toISOString(),
+        verifiedAt: new Date(checkedAt).toISOString(),
       });
       return new Response(JSON.stringify(dppToVerifiableCredential(dpp), null, 2), {
         status: 200,
-        headers: { ...JSON_LD_HEADERS, ...timing() },
+        headers: { ...JSON_LD_HEADERS, ...timing(), "x-tap-link": res.link.kind },
       });
+    }
+    default: {
+      // Every outcome is handled above; a new one must be added there. If one
+      // ever reaches this line the request fails rather than passing.
+      const unhandled: never = res;
+      throw new Error(`unhandled tap outcome: ${(unhandled as { kind: string }).kind}`);
     }
   }
 }

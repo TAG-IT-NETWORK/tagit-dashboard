@@ -1,5 +1,128 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`the same phone opening its check again (TAP-T10) > new and for sale, opened again: the whole reading 1`] = `
+"Product check
+# Authentic
+Checked with the brand's record.
+You checked this 3 minutes ago. Tap the tag again for a fresh check.
+[image: Photo of Renewal Cream]
+- New
+- For sale
+## Renewal Cream
+TAG IT Demo · Made in South Korea
+(4.5 out of 5 stars) 2 verified owner reviews
+$23.33
+Approximately 21.11 EUR, converted amount — approximate, not the charged price
+[button: Buy now · $23.33]
+New. No one has registered it yet.
+[closed drawer]
+## Owner reviews
+4.5
+(4.5 out of 5 stars) 2 verified owner reviews
+Only people who own this product can review it, so every review is from a real buyer.
+- (5.0 out of 5 stars) Verified owner Oct 12, 2026
+Soaks in fast and lasts all day.
+[button: Own it? Write a review]
+[end of drawer]
+[closed drawer]
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Last updated: Sep 5, 2026
+[end of drawer]
+[closed drawer]
+## Product history
+(product history loads here)
+[end of drawer]
+[closed drawer]
+## How we know it's authentic
+- The tag proves itself
+Each tap makes a one-time code that only this tag can produce. A copy fails.
+- The brand registered this exact item
+TAG IT Demo recorded it when it was made.
+- The record can't be quietly changed
+It is kept on a public ledger that anyone can inspect.
+[end of drawer]
+[closed drawer]
+## Technical details
+Record number: 58
+Times this tag was checked: 42
+Network: Base Sepolia (test network)
+Tag ID: 04:A1:B2:C3:D4:E5:F6
+Record state: ACTIVATED (3)
+Product details: Match the brand's public record
+Record fingerprint: 0xabababababababab…
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[Open this product's record page → /asset/58]
+[end of drawer]
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20check%20(record%2058)]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
+exports[`the same phone opening its check again (TAP-T10) > owned, opened again: the whole reading 1`] = `
+"Product check
+# Authentic
+This item has a registered owner.
+You checked this 3 minutes ago. Tap the tag again for a fresh check.
+[image: Photo of Renewal Cream]
+- Owned
+## Renewal Cream
+TAG IT Demo · Made in South Korea
+(4.5 out of 5 stars) 2 verified owner reviews
+Buying it second-hand?
+Ask the seller to transfer it to you in the TAG IT app. Only the real owner can do that.
+[closed drawer]
+## Owner reviews
+4.5
+(4.5 out of 5 stars) 2 verified owner reviews
+Only people who own this product can review it, so every review is from a real buyer.
+- (5.0 out of 5 stars) Verified owner Oct 12, 2026
+Soaks in fast and lasts all day.
+[button: Own it? Write a review]
+[end of drawer]
+[closed drawer]
+## About this product
+A light daily face cream for dry skin. 50 ml jar.
+Brand: TAG IT Demo
+Made in: South Korea
+Product code: TD-RC-50
+Last updated: Sep 5, 2026
+[end of drawer]
+[closed drawer]
+## Product history
+(product history loads here)
+[end of drawer]
+[closed drawer]
+## How we know it's authentic
+- The tag proves itself
+Each tap makes a one-time code that only this tag can produce. A copy fails.
+- The brand registered this exact item
+TAG IT Demo recorded it when it was made.
+- The record can't be quietly changed
+It is kept on a public ledger that anyone can inspect.
+[end of drawer]
+[closed drawer]
+## Technical details
+Record number: 58
+Times this tag was checked: 42
+Network: Base Sepolia (test network)
+Tag ID: 04:A1:B2:C3:D4:E5:F6
+Record state: CLAIMED (4)
+Product details: Match the brand's public record
+Record fingerprint: 0xabababababababab…
+[View the public record → https://sepolia.basescan.org/token/0x3aDc7EFDb58Ae85483eFf5D4966D916185f31d1D?a=58]
+[Open this product's record page → /asset/58]
+[end of drawer]
+## Need help?
+[Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20check%20(record%2058)]
+Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.
+[TAG IT Network → https://www.tagit.network]"
+`;
+
 exports[`what a shopper reads, state by state > checkFailed 1`] = `
 "Product check
 # We couldn't verify this tag
@@ -54,6 +177,12 @@ Each tap makes a one-time code that only the real tag can produce. A copy fails.
 The check compares the tag with the brand's record of that exact item.
 - Records can't be quietly changed
 They are kept on a public ledger that anyone can inspect.
+[end of drawer]
+[closed drawer]
+## Technical details
+Times this tag was checked: 42
+Network: Base Sepolia (test network)
+Tag ID: 04:A1:B2:C3:D4:E5:F6
 [end of drawer]
 ## Need help?
 [Report a problem → mailto:info@tagit.network?subject=Help%20with%20a%20product%20check]

@@ -1,7 +1,7 @@
 /**
  * Cost containment at the edge for the token-id read path.
  *
- * SCOPE — deliberately narrow. The `matcher` below covers /asset/<tokenId> and
+ * SCOPE — deliberately narrow. The limiter covers /asset/<tokenId> and
  * /api/asset/<tokenId> (pure on-chain state lookups with no cryptographic
  * freshness requirement) plus /mcp.
  *
@@ -14,8 +14,10 @@
  * budget (MCP_RATE_LIMIT) in its own counter bucket, so agent traffic and
  * browser traffic cannot 429 each other. See @/lib/rate-limit.
  *
- * The SUN tap routes (/sun, /01/…, /api/verify, /api/dpp/…) are NOT matched and
- * MUST NOT BE ADDED:
+ * The SUN tap routes (/sun, /01/…, /api/verify, /api/dpp/…) are matched for ONE
+ * thing only: the device id that lets a phone reopen its own check for a few
+ * minutes (TAP-T10, see `withTapDevice` below and @/lib/tap-device-cookie).
+ * They return before the limiter is ever reached, and MUST STAY THAT WAY:
  *   • Caching them would let a captured cryptogram be replayed against a cached
  *     "authentic" verdict without the monotonic tap counter ever being
  *     re-checked. See the boundary note in src/lib/cache.ts.
@@ -42,7 +44,7 @@
  *      on the wrong layer.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { MCP_PATH, isRateLimitedPath, neverCacheControl } from "@/lib/cache";
+import { MCP_PATH, isRateLimitedPath, isTapPath, neverCacheControl } from "@/lib/cache";
 import {
   MCP_RATE_LIMIT,
   READ_RATE_LIMIT,
@@ -50,6 +52,13 @@ import {
   clientKey,
   createRateLimitStore,
 } from "@/lib/rate-limit";
+import {
+  TAP_DEVICE_HEADER,
+  TAP_DEVICE_MAX_AGE_SECONDS,
+  isTapDeviceId,
+  newTapDeviceId,
+  tapDeviceCookieName,
+} from "@/lib/tap-device-cookie";
 
 export const config = {
   // Token-id reads and /mcp. See the scope note above before widening this.
@@ -66,11 +75,72 @@ export const config = {
   // unmatched middleware would leave the only control on the only uncacheable
   // path silently absent, which is exactly the failure the `:tokenId` trap above
   // produced once already.
-  matcher: ["/asset/:path*", "/api/asset/:path*", "/mcp"],
+  //
+  // The last four are the tap routes, matched only for the device id (see
+  // `withTapDevice`). /sun and /api/verify are exact paths; /01 and /api/dpp
+  // take the rest of the path. src/lib/__tests__/middleware-matcher.test.ts
+  // keeps this list and `isTapPath` saying the same thing.
+  matcher: [
+    "/asset/:path*",
+    "/api/asset/:path*",
+    "/mcp",
+    "/sun",
+    "/01/:path*",
+    "/api/verify",
+    "/api/dpp/:path*",
+  ],
 };
+
+/**
+ * A tap route: pass the request on with the device id, and do nothing else.
+ *
+ * The id is read from the cookie, or made new when there is none (or when
+ * what the cookie holds is not an id). It is handed to the route in a request
+ * header — set here, so whatever a client sent under that name is replaced —
+ * and written back as a cookie on the response, which renews it for another
+ * 15 minutes. A page rendered by the App Router cannot set a cookie itself
+ * once it has started sending, which is why this happens here.
+ *
+ * A HEAD request is answered here and goes no further. It asks for no page,
+ * so nobody would see a result, yet running the route would open the link
+ * and leave the person who then follows it looking at "expired". Link
+ * checkers and some preview tools send HEAD before, or instead of, GET.
+ *
+ * No limiter and no cache header that allows storing: see the top of this file.
+ */
+function withTapDevice(request: NextRequest): NextResponse {
+  if (request.method === "HEAD") {
+    return new NextResponse(null, {
+      status: 200,
+      headers: { "cache-control": neverCacheControl() },
+    });
+  }
+
+  const secure = request.nextUrl.protocol === "https:";
+  const cookie = tapDeviceCookieName(secure);
+  const held = request.cookies.get(cookie)?.value;
+  const id = isTapDeviceId(held) ? held : newTapDeviceId();
+
+  const headers = new Headers(request.headers);
+  headers.set(TAP_DEVICE_HEADER, id);
+  const response = NextResponse.next({ request: { headers } });
+  response.cookies.set(cookie, id, {
+    httpOnly: true,
+    secure,
+    // Lax, not Strict: a shopper who comes back to the page from a sign-in or
+    // a checkout on another site must still be the same phone.
+    sameSite: "lax",
+    path: "/",
+    maxAge: TAP_DEVICE_MAX_AGE_SECONDS,
+  });
+  return response;
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Tap routes leave here, before the limiter: they are never rate-limited.
+  if (isTapPath(pathname)) return withTapDevice(request);
 
   // Belt-and-braces: the matcher already restricts us, but re-assert the
   // predicate so a future matcher edit can't silently start rate-limiting a tap
