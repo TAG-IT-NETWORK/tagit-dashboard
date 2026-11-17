@@ -302,6 +302,13 @@
    numbers after the commas only apply to a frame shown outside one. */
 .frame[data-phase="resolved"] {
   animation: ck-out 0.24s ease-out var(--ck-leave, 0.92s) both;
+  /* The page is already there under this frame, so every tap belongs to the
+     page. Without this the frame goes on taking taps after it has faded: its
+     two "how long this takes" lines switch themselves visible with their own
+     animations, and a visible child of a hidden parent still gets the tap. The
+     result was an unseen strip across the middle of the screen where a button
+     or a row under it could not be pressed. */
+  pointer-events: none;
 }
 
 /* Remaining ticks land one after the other… */

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
@@ -176,5 +179,46 @@ describe("the pace of the wrap-up", () => {
     expect(paceOf(MIN_ON_SCREEN_MS - 1)).toBe("full");
     expect(paceOf(MIN_ON_SCREEN_MS)).toBe("brisk");
     expect(paceOf(STILL_CHECKING_AFTER_MS)).toBe("brisk");
+  });
+});
+
+describe("the frame replayed over the finished page takes no taps", () => {
+  // The frame sits on top of the page it gives way to. Once it has faded, two
+  // of its lines switch themselves visible again with their own animations —
+  // and a visible child of a hidden parent still receives taps. That left an
+  // unseen strip across the middle of the screen where nothing under it could
+  // be pressed (found on the live site, 2026-11-16). How the frame looks is
+  // checked in a real browser; this pins the one rule that keeps the page
+  // under it usable, so it cannot be dropped without a test noticing.
+  const css = readFileSync(path.join(__dirname, "..", "checking.module.css"), "utf8");
+
+  /** The declarations of every rule whose selector is exactly `selector`. */
+  function declarationsOf(selector: string): string {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    return [...withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selectors]) =>
+        selectors!
+          .split(",")
+          .map((part) => part.trim())
+          .includes(selector),
+      )
+      .map(([, , body]) => body)
+      .join("\n");
+  }
+
+  it("the resolved frame lets every tap through to the page", () => {
+    expect(declarationsOf('.frame[data-phase="resolved"]')).toMatch(/pointer-events:\s*none\s*;/);
+  });
+
+  it("nothing inside it switches taps back on", () => {
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    const turnedOn = [...withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, , body]) =>
+      /pointer-events:\s*(?!none)[a-z-]+/.test(body!),
+    );
+    expect(turnedOn.map(([, selectors]) => selectors!.trim())).toEqual([]);
+  });
+
+  it("the frame shown while the check runs still takes taps (its Try again link must work)", () => {
+    expect(declarationsOf(".frame")).not.toMatch(/pointer-events/);
   });
 });
