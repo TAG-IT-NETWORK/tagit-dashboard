@@ -46,6 +46,15 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  // Upstream takes a JS number (capped at MAX_SAFE_INTEGER). A larger id would
+  // be silently rounded to a DIFFERENT token while bind keeps the exact string —
+  // verify one token, bind another. Refuse instead (fail closed).
+  if (tokenId.length > 16 || BigInt(tokenId) > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return NextResponse.json(
+      { ok: false, error: "tokenId is too large to verify safely" },
+      { status: 400 },
+    );
+  }
   const uid = nfcPayload?.uid;
   const cmac = nfcPayload?.cmac;
   const counter = nfcPayload?.counter;
