@@ -3,8 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Loader2, Nfc, RefreshCw, Usb, Wifi, WifiOff, Zap } from "lucide-react";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@tagit/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@tagit/ui";
 import { useNfcBridge } from "@/lib/nfc-bridge";
+import { SingleAssetBind } from "@/components/binding/single-asset-bind";
 import {
   batchWizardHref,
   parseBatchListRows,
@@ -18,7 +27,13 @@ import {
 /** Batches whose per-token status we resolve (newest first) — bounded fan-out. */
 const STATUS_FANOUT = 12;
 
-export function StationLanding() {
+export function StationLanding({
+  writable = false,
+  initialTokenId = null,
+}: {
+  writable?: boolean;
+  initialTokenId?: string | null;
+} = {}) {
   const bridge = useNfcBridge(true);
   const [batches, setBatches] = useState<BatchStationSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +48,9 @@ export function StationLanding() {
         fetch("/api/catalog-proxy/batches?limit=50", { cache: "no-store" }),
       ]);
       const names = parseTemplateNames(await templatesRes.json().catch(() => null));
-      const rows = batchesRes.ok ? parseBatchListRows(await batchesRes.json().catch(() => null)) : null;
+      const rows = batchesRes.ok
+        ? parseBatchListRows(await batchesRes.json().catch(() => null))
+        : null;
       if (rows === null) {
         setError(`Could not load the batch list (${batchesRes.status || "network"})`);
         setBatches([]);
@@ -47,9 +64,17 @@ export function StationLanding() {
               cache: "no-store",
             });
             const body: unknown = res.ok ? await res.json().catch(() => null) : null;
-            return summarizeBatch(row, body, row.templateId ? (names.get(row.templateId) ?? null) : null);
+            return summarizeBatch(
+              row,
+              body,
+              row.templateId ? (names.get(row.templateId) ?? null) : null,
+            );
           } catch {
-            return summarizeBatch(row, null, row.templateId ? (names.get(row.templateId) ?? null) : null);
+            return summarizeBatch(
+              row,
+              null,
+              row.templateId ? (names.get(row.templateId) ?? null) : null,
+            );
           }
         }),
       );
@@ -89,13 +114,19 @@ export function StationLanding() {
       {/* Hardware status — the same bridge the station uses */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 pt-6 text-sm">
-          <span className={`flex items-center gap-2 ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}>
+          <span
+            className={`flex items-center gap-2 ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}
+          >
             {bridge.wsConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {bridge.wsConnected ? "Bridge connected" : "Bridge not connected"}
           </span>
-          <span className={`flex items-center gap-2 ${bridge.readerConnected ? "text-green-500" : "text-muted-foreground"}`}>
+          <span
+            className={`flex items-center gap-2 ${bridge.readerConnected ? "text-green-500" : "text-muted-foreground"}`}
+          >
             <Usb className="h-4 w-4" />
-            {bridge.readerConnected ? (bridge.readerName ?? "Reader connected") : "No reader detected"}
+            {bridge.readerConnected
+              ? (bridge.readerName ?? "Reader connected")
+              : "No reader detected"}
           </span>
           {bridge.card && (
             <span className="font-mono text-xs text-muted-foreground">
@@ -126,11 +157,11 @@ export function StationLanding() {
         ) : open.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground">
-              Every minted item has a chip. Create a new batch from a template in{" "}
+              Every batch item has a chip. Create a new batch from a template in{" "}
               <Link href="/catalog" className="underline">
                 Catalog
               </Link>{" "}
-              to bind more.
+              to bind more, or bind a single asset below.
             </CardContent>
           </Card>
         ) : (
@@ -141,6 +172,8 @@ export function StationLanding() {
           </div>
         )}
       </section>
+
+      <SingleAssetBind bridge={bridge} writable={writable} initialTokenId={initialTokenId} />
 
       {done.length > 0 && (
         <section className="space-y-3">
@@ -164,8 +197,13 @@ export function StationLanding() {
               Place the chip on the reader. A blank chip from the roll shows{" "}
               <span className="text-foreground">Program SDM and retry</span> — click it once.
             </li>
-            <li>The station verifies the chip&apos;s SUN signature with the server (amber = counter-only until the SDM key is provisioned).</li>
-            <li>The relayer binds the tag on-chain and the metadata anchor follows automatically.</li>
+            <li>
+              The station verifies the chip&apos;s SUN signature with the server (amber =
+              counter-only until the SDM key is provisioned).
+            </li>
+            <li>
+              The relayer binds the tag on-chain and the metadata anchor follows automatically.
+            </li>
           </ol>
         </CardContent>
       </Card>
@@ -184,14 +222,20 @@ function BatchCard({ batch, primary = false }: { batch: BatchStationSummary; pri
             <CardDescription className="font-mono text-xs">{batch.id}</CardDescription>
           </div>
           <Badge variant={batch.unbound > 0 ? "default" : "secondary"}>
-            {batch.unknown ? "status unknown" : batch.unbound > 0 ? `${batch.unbound} to bind` : "complete"}
+            {batch.unknown
+              ? "status unknown"
+              : batch.unbound > 0
+                ? `${batch.unbound} to bind`
+                : "complete"}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="text-sm text-muted-foreground">
           {batch.unknown ? (
-            <>size {batch.size} · state {batch.state}</>
+            <>
+              size {batch.size} · state {batch.state}
+            </>
           ) : (
             <>
               {batch.bound}/{batch.total} bound
@@ -221,7 +265,9 @@ function BatchCard({ batch, primary = false }: { batch: BatchStationSummary; pri
               </Button>
             </>
           ) : (
-            <span className="text-xs text-muted-foreground">No template linked — open it from Catalog.</span>
+            <span className="text-xs text-muted-foreground">
+              No template linked — open it from Catalog.
+            </span>
           )}
         </div>
       </CardContent>
