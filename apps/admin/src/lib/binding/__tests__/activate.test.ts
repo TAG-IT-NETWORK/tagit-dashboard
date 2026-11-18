@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { activatableTokenIds, describeOutcome, parseActivateOutcome, validatePriceInput } from "../activate";
+import {
+  activatableTokenIds,
+  describeOutcome,
+  parseActivateOutcome,
+  validatePriceInput,
+} from "../activate";
 
 describe("activate helpers", () => {
   it("picks bound/anchored tokens in numeric order", () => {

@@ -176,9 +176,7 @@ export function parseRfc4180(text: string): string[][] {
         continue;
       }
       if (ch === "\r" && text[i + 1] !== "\n") {
-        throw new CsvParseError(
-          `CSV row ${line}: bare CR (\\r without \\n) inside a quoted field`,
-        );
+        throw new CsvParseError(`CSV row ${line}: bare CR (\\r without \\n) inside a quoted field`);
       }
       if (ch === "\n") line++;
       field += ch;
@@ -359,10 +357,7 @@ export function buildCsvPreview(text: string): CsvPreview {
  * server is the enforcement point — anything it flags that the client mirror
  * missed still surfaces inline on the right row). Dedupes identical strings.
  */
-export function attachServerErrors(
-  preview: CsvPreview,
-  serverErrors: BatchRowError[],
-): CsvPreview {
+export function attachServerErrors(preview: CsvPreview, serverErrors: BatchRowError[]): CsvPreview {
   if (serverErrors.length === 0) return preview;
   const byRow = new Map<number, Set<string>>();
   for (const e of serverErrors) {
@@ -391,7 +386,10 @@ export function validateQuantity(value: string): { quantity: number | null; erro
   }
   const quantity = Number(value.trim());
   if (quantity < 1 || quantity > MAX_BATCH_SIZE) {
-    return { quantity: null, error: `quantity must be 1–${MAX_BATCH_SIZE} (one batchMint tx per batch)` };
+    return {
+      quantity: null,
+      error: `quantity must be 1–${MAX_BATCH_SIZE} (one batchMint tx per batch)`,
+    };
   }
   return { quantity, error: null };
 }
@@ -429,8 +427,7 @@ export function parseServerBatchList(body: unknown): RecentBatch[] | null {
     const b = raw as Record<string, unknown>;
     if (typeof b.id !== "string" || !BATCH_ID_RE.test(b.id)) continue;
     if (typeof b.state !== "string") continue;
-    const size =
-      typeof b.quantity === "number" && Number.isFinite(b.quantity) ? b.quantity : null;
+    const size = typeof b.quantity === "number" && Number.isFinite(b.quantity) ? b.quantity : null;
     if (size === null) continue;
     rows.push({
       id: b.id,

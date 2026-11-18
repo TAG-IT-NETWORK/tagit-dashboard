@@ -200,7 +200,10 @@ export function isEncryptedSunUrl(url: string): boolean {
   } catch {
     return false;
   }
-  return /^[0-9a-fA-F]{32}$/.test(params.get("picc") ?? "") && /^[0-9a-fA-F]{16}$/.test(params.get("cmac") ?? "");
+  return (
+    /^[0-9a-fA-F]{32}$/.test(params.get("picc") ?? "") &&
+    /^[0-9a-fA-F]{16}$/.test(params.get("cmac") ?? "")
+  );
 }
 
 /**
@@ -255,7 +258,11 @@ export function interpretNdefRead(result: unknown, cardUid: string): TapEvaluati
     (r) => r && r.recordType === "url" && typeof r.data === "string",
   );
   if (urls.length === 0) {
-    return { ok: false, kind: "unreadable", message: "Chip carries no URL record (not SDM-personalized?)" };
+    return {
+      ok: false,
+      kind: "unreadable",
+      message: "Chip carries no URL record (not SDM-personalized?)",
+    };
   }
   for (const record of urls) {
     const sun = parseSunFromUrl(record.data);
@@ -424,7 +431,8 @@ export function stationReducer(state: StationState, action: StationAction): Stat
     case "LOAD": {
       // Server truth wins: rebuild the queue, keep this session's log/lastBind.
       // Mid-flight phases survive a background refresh untouched.
-      const busy = state.phase === "verifying" || state.phase === "binding" || state.phase === "bound";
+      const busy =
+        state.phase === "verifying" || state.phase === "binding" || state.phase === "bound";
       return {
         ...state,
         tokens: action.tokens,

@@ -80,7 +80,7 @@ describe("canUnstickBatch", () => {
 // ── RFC 4180 parser (mirror of services parseRfc4180) ────────────────────────
 
 describe("parseRfc4180", () => {
-  it("parses quoted fields, \"\" escapes and CRLF/LF breaks", () => {
+  it('parses quoted fields, "" escapes and CRLF/LF breaks', () => {
     expect(parseRfc4180('serial,name_override\r\n"SN,1","say ""hi"""\nSN2,plain')).toEqual([
       ["serial", "name_override"],
       ["SN,1", 'say "hi"'],

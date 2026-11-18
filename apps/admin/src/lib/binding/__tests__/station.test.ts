@@ -22,10 +22,17 @@ import {
 } from "../station";
 
 const UID = "04:A1:B2:C3:D4:E5:F6";
-const SUN_URL = "https://verify.tagit.network/sun?uid=04A1B2C3D4E5F6&ctr=00000A&cmac=0102030405060708";
+const SUN_URL =
+  "https://verify.tagit.network/sun?uid=04A1B2C3D4E5F6&ctr=00000A&cmac=0102030405060708";
 /** Encrypted-PICC layout (what the bridge personalizes) — opaque without the master key. */
 const ENC_SUN_URL = `https://verify.tagit.network/sun?picc=${"AB".repeat(16)}&cmac=0102030405060708`;
-const BRIDGE_SUN = { uid: UID, counter: 10, cmac: "0102030405060708", picc: "AB".repeat(16), cmacVerified: true };
+const BRIDGE_SUN = {
+  uid: UID,
+  counter: 10,
+  cmac: "0102030405060708",
+  picc: "AB".repeat(16),
+  cmacVerified: true,
+};
 
 function token(tokenId: string, lifecycle = "minted", serial: string | null = null): StationToken {
   return { tokenId, lifecycle, tagUid: null, serial };
@@ -176,16 +183,20 @@ describe("interpretNdefRead / sunCheckViaBridge (mocked bridge)", () => {
 
   it("fails unreadable when there is no NDEF / no URL / no SUN params", () => {
     expect(interpretNdefRead(null, UID)).toMatchObject({ ok: false, kind: "unreadable" });
-    expect(
-      interpretNdefRead([{ recordType: "text", data: "hello" }], UID),
-    ).toMatchObject({ ok: false, kind: "unreadable" });
+    expect(interpretNdefRead([{ recordType: "text", data: "hello" }], UID)).toMatchObject({
+      ok: false,
+      kind: "unreadable",
+    });
     expect(
       interpretNdefRead([{ recordType: "url", data: "https://x.test/plain" }], UID),
     ).toMatchObject({ ok: false, kind: "unreadable" });
   });
 
   it("fails tamper on a mirrored-UID mismatch", () => {
-    const result = interpretNdefRead([{ recordType: "url", data: SUN_URL }], "04:99:99:99:99:99:99");
+    const result = interpretNdefRead(
+      [{ recordType: "url", data: SUN_URL }],
+      "04:99:99:99:99:99:99",
+    );
     expect(result).toMatchObject({ ok: false, kind: "tamper" });
   });
 
@@ -233,7 +244,11 @@ describe("bridge-decoded SUN (encrypted-PICC layout)", () => {
 
   it("is unreadable with the bridge's reason when the encrypted SUN was not decoded", () => {
     const withReason = interpretNdefRead(
-      { records: [encRecord], sun: null, sunError: "chip was personalized with a different SDM master key" },
+      {
+        records: [encRecord],
+        sun: null,
+        sunError: "chip was personalized with a different SDM master key",
+      },
       UID,
     );
     expect(withReason).toMatchObject({ ok: false, kind: "unreadable" });
@@ -437,7 +452,9 @@ describe("stationReducer — VOID_DONE", () => {
 
   it("ignores unknown token ids", () => {
     const s = loadedState();
-    expect(stationReducer(s, { type: "VOID_DONE", tokenId: "99", replacementTokenId: null, at: 1 })).toBe(s);
+    expect(
+      stationReducer(s, { type: "VOID_DONE", tokenId: "99", replacementTokenId: null, at: 1 }),
+    ).toBe(s);
   });
 });
 

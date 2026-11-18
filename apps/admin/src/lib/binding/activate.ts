@@ -19,7 +19,9 @@ export interface ActivateOutcome {
 const ACTIVATABLE = new Set(["bound", "anchored"]);
 
 /** Token ids the station may send: bound (or bound + anchored) rows, numeric order. */
-export function activatableTokenIds(tokens: ReadonlyArray<{ tokenId: string; lifecycle: string }>): string[] {
+export function activatableTokenIds(
+  tokens: ReadonlyArray<{ tokenId: string; lifecycle: string }>,
+): string[] {
   return tokens
     .filter((t) => ACTIVATABLE.has(t.lifecycle))
     .map((t) => t.tokenId)
@@ -45,7 +47,10 @@ export function parseActivateOutcome(body: unknown): ActivateOutcome {
   const listErrors = Array.isArray(b.listErrors)
     ? (b.listErrors as Array<Record<string, unknown>>)
         .filter((e) => typeof e?.tokenId === "string")
-        .map((e) => ({ tokenId: e.tokenId as string, error: typeof e.error === "string" ? e.error : "failed" }))
+        .map((e) => ({
+          tokenId: e.tokenId as string,
+          error: typeof e.error === "string" ? e.error : "failed",
+        }))
     : [];
   return {
     ok: b.ok === true,
@@ -64,9 +69,11 @@ export function parseActivateOutcome(body: unknown): ActivateOutcome {
 /** Human summary lines, most important first. */
 export function describeOutcome(o: ActivateOutcome, priceUsdc?: string | null): string[] {
   const lines: string[] = [];
-  if (o.activated.length > 0) lines.push(`${o.activated.length} activated (#${o.activated.join(", #")})`);
+  if (o.activated.length > 0)
+    lines.push(`${o.activated.length} activated (#${o.activated.join(", #")})`);
   if (o.alreadyActive.length > 0) lines.push(`${o.alreadyActive.length} already active`);
-  if (o.listed.length > 0) lines.push(`${o.listed.length} listed${priceUsdc ? ` at $${priceUsdc}` : ""}`);
+  if (o.listed.length > 0)
+    lines.push(`${o.listed.length} listed${priceUsdc ? ` at $${priceUsdc}` : ""}`);
   if (o.alreadyListed.length > 0) lines.push(`${o.alreadyListed.length} already listed`);
   for (const s of o.skipped) lines.push(`#${s.tokenId} skipped: ${s.reason}`);
   for (const e of o.listErrors) lines.push(`#${e.tokenId} not listed: ${e.error}`);
@@ -75,10 +82,14 @@ export function describeOutcome(o: ActivateOutcome, priceUsdc?: string | null): 
 }
 
 /** Blank = activate only. Otherwise a positive decimal with ≤ 6 decimals. */
-export function validatePriceInput(raw: string): { priceUsdc: string | null; error: string | null } {
+export function validatePriceInput(raw: string): {
+  priceUsdc: string | null;
+  error: string | null;
+} {
   const s = raw.trim();
   if (s === "") return { priceUsdc: null, error: null };
-  if (!/^\d{1,12}(\.\d{1,6})?$/.test(s)) return { priceUsdc: null, error: "enter a USDC amount like 23.33 (max 6 decimals)" };
+  if (!/^\d{1,12}(\.\d{1,6})?$/.test(s))
+    return { priceUsdc: null, error: "enter a USDC amount like 23.33 (max 6 decimals)" };
   if (Number(s) <= 0) return { priceUsdc: null, error: "price must be greater than zero" };
   return { priceUsdc: s, error: null };
 }

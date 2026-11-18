@@ -100,7 +100,12 @@ function upstreamError(body: Record<string, unknown> | null, fallback: string): 
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
-export function BindingStation({ batchId, role, exceptionsTab, templateId = null }: BindingStationProps) {
+export function BindingStation({
+  batchId,
+  role,
+  exceptionsTab,
+  templateId = null,
+}: BindingStationProps) {
   const writable = canMutateCatalog(role);
   // Void + remint recycles on-chain (irreversible) — admin-only, same posture
   // as batch unstick; the proxy + middleware enforce it server-side too.
@@ -158,7 +163,8 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
       const res = await proxyJson(`/api/catalog-proxy/assets/${lastBind.tokenId}`);
       if (cancelled) return;
       const verification = (res.body?.verification ?? null) as Record<string, unknown> | null;
-      const status = typeof verification?.anchorStatus === "string" ? verification.anchorStatus : null;
+      const status =
+        typeof verification?.anchorStatus === "string" ? verification.anchorStatus : null;
       dispatch({
         type: "ANCHOR",
         status: status === "confirmed" ? "confirmed" : status === "failed" ? "failed" : "pending",
@@ -214,10 +220,7 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
           });
           return;
         }
-        const evaluation = await sunCheckViaBridge(
-          (r) => bridge.request(r),
-          uid,
-        );
+        const evaluation = await sunCheckViaBridge((r) => bridge.request(r), uid);
         if (!evaluation.ok) {
           dispatch({
             type: "SUN_FAIL",
@@ -311,7 +314,8 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
   const programAndRetry = useCallback(async () => {
     const card = bridge.card;
     const tapUid = stateRef.current.tapUid;
-    if (!card || card.uid !== tapUid || card.chip !== "NTAG424DNA" || pipelineBusyRef.current) return;
+    if (!card || card.uid !== tapUid || card.chip !== "NTAG424DNA" || pipelineBusyRef.current)
+      return;
     setProgramming(true);
     try {
       await bridge.request({ type: "personalize-sdm", baseUrl: SUN_BASE_URL });
@@ -384,7 +388,9 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
   const queue = pendingQueue(state.tokens);
   const next = queue[0] ?? null;
   const totalTokens = state.tokens.length;
-  const boundTotal = state.tokens.filter((t) => t.lifecycle !== "minted" && t.lifecycle !== "recycled").length;
+  const boundTotal = state.tokens.filter(
+    (t) => t.lifecycle !== "minted" && t.lifecycle !== "recycled",
+  ).length;
   const graceLeftMs = graceRemainingMs(state.lastBind, now);
   const fixEnabled = writable && canFixLastBind(state, now);
 
@@ -416,7 +422,9 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
               type="button"
               onClick={() => setTab(t)}
               className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                tab === t
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t === "station" ? "Station" : "Exception log"}
@@ -516,13 +524,19 @@ function BridgeStatus({ bridge }: { bridge: ReturnType<typeof useNfcBridge> }) {
     <Card>
       <CardContent className="pt-6">
         <div className="flex flex-wrap items-center gap-6">
-          <span className={`flex items-center gap-2 text-sm ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}>
+          <span
+            className={`flex items-center gap-2 text-sm ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}
+          >
             {bridge.wsConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {bridge.wsConnected ? "Bridge connected" : "Bridge not connected"}
           </span>
-          <span className={`flex items-center gap-2 text-sm ${bridge.readerConnected ? "text-green-500" : "text-yellow-500"}`}>
+          <span
+            className={`flex items-center gap-2 text-sm ${bridge.readerConnected ? "text-green-500" : "text-yellow-500"}`}
+          >
             <Usb className="h-4 w-4" />
-            {bridge.readerConnected ? (bridge.readerName ?? "Reader connected") : "No reader detected"}
+            {bridge.readerConnected
+              ? (bridge.readerName ?? "Reader connected")
+              : "No reader detected"}
           </span>
           {bridge.card && (
             <span className="flex items-center gap-2 font-mono text-sm">
@@ -738,7 +752,9 @@ function LastBindCard({
           <AnchorBadge status={lastBind.anchorStatus} />
           <CmacBadge cmacVerified={lastBind.cmacVerified} />
           {lastBind.txHash && (
-            <code className="text-xs text-muted-foreground">{lastBind.txHash.slice(0, 10)}…{lastBind.txHash.slice(-6)}</code>
+            <code className="text-xs text-muted-foreground">
+              {lastBind.txHash.slice(0, 10)}…{lastBind.txHash.slice(-6)}
+            </code>
           )}
           {graceLeftMs > 0 ? (
             <span className="text-muted-foreground">
@@ -760,7 +776,8 @@ function LastBindCard({
                 : "Only available during the 120s anchor grace window"
             }
           >
-            <Undo2 className="mr-1 h-3.5 w-3.5" /> Fix last bind{graceLeftMs > 0 ? ` (${seconds}s)` : ""}
+            <Undo2 className="mr-1 h-3.5 w-3.5" /> Fix last bind
+            {graceLeftMs > 0 ? ` (${seconds}s)` : ""}
           </Button>
           <Button
             size="sm"
@@ -844,7 +861,9 @@ function SessionLogCard({ log }: { log: LogEntry[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Session log</CardTitle>
-        <CardDescription>This browser session only — the durable trail is the exception log.</CardDescription>
+        <CardDescription>
+          This browser session only — the durable trail is the exception log.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="space-y-1 text-sm">
@@ -950,7 +969,11 @@ function SkipDialog({
             Cancel
           </Button>
           <Button disabled={busy || reason.trim().length === 0} onClick={() => void submit()}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SkipForward className="mr-2 h-4 w-4" />}
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <SkipForward className="mr-2 h-4 w-4" />
+            )}
             Record skip
           </Button>
         </DialogFooter>
@@ -1026,8 +1049,8 @@ function FixLastBindDialog({
           <DialogTitle>Fix last bind</DialogTitle>
           <DialogDescription>
             Wrong physical item tapped? Swaps the content of token #{lastBind?.tokenId ?? "?"} with
-            another token while the anchor grace timer is armed (
-            {Math.ceil(graceLeftMs / 1000)}s left). The chip binding itself stays put.
+            another token while the anchor grace timer is armed ({Math.ceil(graceLeftMs / 1000)}s
+            left). The chip binding itself stays put.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -1070,7 +1093,11 @@ function FixLastBindDialog({
             disabled={busy || !targetValid || reason.trim().length === 0 || graceLeftMs <= 0}
             onClick={() => void submit()}
           >
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Undo2 className="mr-2 h-4 w-4" />
+            )}
             Swap content
           </Button>
         </DialogFooter>
