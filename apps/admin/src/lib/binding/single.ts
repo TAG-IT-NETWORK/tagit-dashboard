@@ -21,16 +21,26 @@
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { sunCheckViaBridge, type SunFailKind } from "@/lib/binding/station";
 
-/** Token ids are uint256 decimals — bounded so a pasted blob is rejected early. */
+/** Token ids are decimal strings — bounded so a pasted blob is rejected early. */
 export const TOKEN_ID_RE = /^[0-9]{1,78}$/;
+
+/**
+ * Largest token id the verify path can carry exactly. On-chain ids are
+ * uint256, but services' SUN verify schema (nfcVerifyRequestSchema) is
+ * capped at Number.MAX_SAFE_INTEGER — anything above would be rounded to a
+ * DIFFERENT token between verify and bind, so it is refused up front.
+ */
+export const MAX_BINDABLE_TOKEN_ID = BigInt(Number.MAX_SAFE_INTEGER);
 
 /** Normalize a typed/queried token id ("#59", " 59 ") → "59", or null when invalid. */
 export function parseTokenIdInput(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim().replace(/^#/, "");
   if (!TOKEN_ID_RE.test(trimmed)) return null;
+  const value = BigInt(trimmed);
+  if (value > MAX_BINDABLE_TOKEN_ID) return null;
   // Canonical decimal (no leading zeros) so "059" and "59" are the same token.
-  return BigInt(trimmed).toString();
+  return value.toString();
 }
 
 /** Lifecycle state code for MINTED (TAGITCore.State). */

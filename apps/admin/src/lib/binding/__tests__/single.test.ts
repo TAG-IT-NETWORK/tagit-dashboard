@@ -31,6 +31,13 @@ describe("parseTokenIdInput", () => {
     expect(parseTokenIdInput("059")).toBe("59");
   });
 
+  it("accepts the largest safe id and refuses anything above it (verify path is a JS number)", () => {
+    expect(parseTokenIdInput(String(Number.MAX_SAFE_INTEGER))).toBe(
+      String(Number.MAX_SAFE_INTEGER),
+    );
+    expect(parseTokenIdInput((BigInt(Number.MAX_SAFE_INTEGER) + 1n).toString())).toBeNull();
+  });
+
   it("rejects empty, non-numeric, negative and oversized input", () => {
     for (const bad of [null, undefined, "", "abc", "-1", "5 9", "1".repeat(79)]) {
       expect(parseTokenIdInput(bad as string)).toBeNull();

@@ -61,7 +61,7 @@ type AnchorState = "pending" | "confirmed" | "failed";
 
 interface SingleAssetBindProps {
   bridge: UseNfcBridge;
-  /** Operator+ may bind; viewers see the card read-only. */
+  /** Editor+ may bind; viewers see the card read-only. */
   writable: boolean;
   /** Pre-filled from /station?token=59 (the asset page's Bind button). */
   initialTokenId?: string | null;
@@ -76,18 +76,33 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
   const [outcome, setOutcome] = useState<SingleBindOutcome | null>(null);
   const [failedUid, setFailedUid] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<AnchorState | null>(null);
+  /**
+   * The token the last bind attempt was SENT for — pinned at click time so
+   * the result, explorer link and anchor poll never follow a later lookup.
+   */
+  const [outcomeTokenId, setOutcomeTokenId] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const lookupSeqRef = useRef(0);
 
   const lookUp = useCallback(async (raw: string) => {
+    // Never swap the shown asset under an in-flight bind.
+    if (busyRef.current) return;
+    const seq = ++lookupSeqRef.current;
     const tokenId = parseTokenIdInput(raw);
     setOutcome(null);
+    setOutcomeTokenId(null);
     setAnchor(null);
+    // Drop the previous asset at once: its Bind button must not stay
+    // clickable while a different token is being looked up.
+    setAsset(null);
     if (!tokenId) {
-      setAsset(null);
+      setLooking(false);
       return;
     }
     setLooking(true);
     const res = await proxyJson(`/api/catalog-proxy/assets/${tokenId}`);
+    // A newer lookup started meanwhile — this answer is stale.
+    if (seq !== lookupSeqRef.current) return;
     setAsset(readSingleAsset(tokenId, res.status, res.body));
     setLooking(false);
   }, []);
@@ -98,7 +113,7 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
   }, [initialTokenId, lookUp]);
 
   // After a bind: poll the anchor (pending → confirmed) like the batch station.
-  const boundTokenId = outcome?.ok ? (asset?.tokenId ?? null) : null;
+  const boundTokenId = outcome?.ok ? outcomeTokenId : null;
   useEffect(() => {
     if (!boundTokenId || anchor === "confirmed" || anchor === "failed") return;
     let cancelled = false;
@@ -122,18 +137,21 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
     writable &&
     asset?.bindable === true &&
     card !== null &&
+    !looking &&
     !binding &&
     !programming &&
     !outcome?.ok;
 
   const bind = useCallback(async () => {
-    if (!asset?.bindable || !card || busyRef.current) return;
+    if (!asset?.bindable || !card || looking || busyRef.current) return;
     busyRef.current = true;
+    const tokenId = asset.tokenId;
     setBinding(true);
     setOutcome(null);
+    setOutcomeTokenId(tokenId);
     try {
       const result = await verifyThenBind({
-        tokenId: asset.tokenId,
+        tokenId,
         uid: card.uid,
         chip: card.chip,
         readNdef: (r) => bridge.request(r),
@@ -146,7 +164,7 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
       busyRef.current = false;
       setBinding(false);
     }
-  }, [asset, card, bridge]);
+  }, [asset, card, bridge, looking]);
 
   // Factory-fresh chip: personalize SDM on the spot, then retry the bind.
   const canProgram =
@@ -183,6 +201,7 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
     setInput("");
     setAsset(null);
     setOutcome(null);
+    setOutcomeTokenId(null);
     setAnchor(null);
   };
 
@@ -301,7 +320,7 @@ export function SingleAssetBind({ bridge, writable, initialTokenId = null }: Sin
             {outcome?.ok && (
               <div className="space-y-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3">
                 <p className="flex items-center gap-2 text-emerald-500">
-                  <CheckCircle2 className="h-4 w-4" /> Chip bound to #{asset.tokenId}
+                  <CheckCircle2 className="h-4 w-4" /> Chip bound to #{outcomeTokenId}
                   {!outcome.cmacVerified && (
                     <span className="text-amber-500">(counter-only SUN check)</span>
                   )}
