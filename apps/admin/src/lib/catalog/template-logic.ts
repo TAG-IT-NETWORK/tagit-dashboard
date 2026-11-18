@@ -226,6 +226,142 @@ export function computePublishState(
 }
 
 // ──────────────────────────────────────────────
+// What a template needs before publishing and minting (TAP-T19)
+// ──────────────────────────────────────────────
+
+/**
+ * The parts a template must carry before it can be published, and before
+ * items can be minted from it. Mirror of tagit-services
+ * src/catalog/template-readiness.ts, which is the enforcement point: an
+ * item's public record needs every one of them, and an item minted in a batch
+ * gets them only from its template. The console checks them too so the user
+ * sees what is missing before pressing a button, not after.
+ */
+export const TEMPLATE_PARTS = [
+  "name",
+  "brand",
+  "model",
+  "sku",
+  "category",
+  "origin",
+  "description",
+  "photo",
+] as const;
+
+export type TemplatePart = (typeof TEMPLATE_PARTS)[number];
+
+/** Each part under the name the editor gives it. */
+export const TEMPLATE_PART_LABELS: Readonly<Record<TemplatePart, string>> = {
+  name: "Name",
+  brand: "Brand",
+  model: "Model",
+  sku: "SKU",
+  category: "Category",
+  origin: "Origin",
+  description: "Description",
+  photo: "A photo",
+};
+
+/** Where in the editor each part is filled in. */
+export const TEMPLATE_PART_TAB: Readonly<Record<TemplatePart, "Details" | "Media">> = {
+  name: "Details",
+  brand: "Details",
+  model: "Details",
+  sku: "Details",
+  category: "Details",
+  origin: "Details",
+  description: "Details",
+  photo: "Media",
+};
+
+/**
+ * A photo counts only when it is one the services side lifts into an item's
+ * record: a media:hero or media:gallery row holding an address of our own
+ * media pipeline (services template-snapshot.ts, contentAddressedMediaRe).
+ * The Media tab writes nothing else.
+ */
+const PIPELINE_PHOTO_RE =
+  /^https:\/\/media\.tagit\.network\/i\/[0-9a-f]{64}\/[A-Za-z0-9_-]+\.webp$/;
+const PHOTO_TRAITS = new Set(["media:hero", "media:gallery"]);
+
+function hasPipelinePhoto(attributes: unknown): boolean {
+  if (!Array.isArray(attributes)) return false;
+  return attributes.some((row) => {
+    if (typeof row !== "object" || row === null) return false;
+    const { trait_type, value } = row as { trait_type?: unknown; value?: unknown };
+    return (
+      typeof trait_type === "string" &&
+      PHOTO_TRAITS.has(trait_type) &&
+      typeof value === "string" &&
+      PIPELINE_PHOTO_RE.test(value)
+    );
+  });
+}
+
+function isFilled(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/** The keys a working copy (TemplateDto) and a published snapshot share. */
+export interface TemplatePartsSource {
+  name?: unknown;
+  brand?: unknown;
+  model?: unknown;
+  sku?: unknown;
+  category?: unknown;
+  origin?: unknown;
+  description?: unknown;
+  attributes?: unknown;
+}
+
+/**
+ * The parts still missing, in TEMPLATE_PARTS order. Takes the working copy
+ * (TemplateDto) or a published snapshot: both carry these keys under the same
+ * names. A value of nothing but spaces counts as missing.
+ */
+export function templateGaps(source: TemplatePartsSource): TemplatePart[] {
+  const present: Record<TemplatePart, boolean> = {
+    name: isFilled(source.name),
+    brand: isFilled(source.brand),
+    model: isFilled(source.model),
+    sku: isFilled(source.sku),
+    category: isFilled(source.category),
+    origin: isFilled(source.origin),
+    description: isFilled(source.description),
+    photo: hasPipelinePhoto(source.attributes),
+  };
+  return TEMPLATE_PARTS.filter((part) => !present[part]);
+}
+
+/** "Brand", "Brand and a photo", "Brand, Model and a photo". */
+export function listTemplateParts(parts: readonly TemplatePart[]): string {
+  const words = parts.map((part, i) => {
+    const label = TEMPLATE_PART_LABELS[part];
+    // Mid-sentence, "A photo" reads as "a photo".
+    return i > 0 && part === "photo" ? label.toLowerCase() : label;
+  });
+  if (words.length <= 1) return words.join("");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/**
+ * Whether items can be minted from a template: it has a published version,
+ * and the LATEST one — the one a mint reads — is complete. Mirror of the
+ * services mintReadiness().
+ */
+export interface MintReadiness {
+  published: boolean;
+  /** Parts the latest published version misses. Empty when not published. */
+  missing: TemplatePart[];
+}
+
+export function mintReadiness(versions: readonly TemplateVersionDto[]): MintReadiness {
+  if (versions.length === 0) return { published: false, missing: [] };
+  const latest = versions.reduce((newest, v) => (v.version > newest.version ? v : newest));
+  return { published: true, missing: templateGaps(latest.snapshot) };
+}
+
+// ──────────────────────────────────────────────
 // Template-items enumeration page (WB-05)
 // ──────────────────────────────────────────────
 

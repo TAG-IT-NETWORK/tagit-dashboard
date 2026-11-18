@@ -42,6 +42,11 @@ export interface StationToken {
   lifecycle: string;
   tagUid: string | null;
   serial: string | null;
+  /**
+   * The item's state on the registry as the catalog last mirrored it (BOUND,
+   * ACTIVATED, …), or null: unknown, or a services build older than TAP-T19.
+   */
+  chainState?: string | null;
 }
 
 /** Tolerant parse of the batch-status body → station tokens (null = bad DTO). */
@@ -57,6 +62,7 @@ export function parseBatchTokens(body: unknown): StationToken[] | null {
       lifecycle: t.lifecycle,
       tagUid: typeof t.tagUid === "string" ? t.tagUid : null,
       serial: typeof t.serial === "string" ? t.serial : null,
+      chainState: typeof t.chainState === "string" ? t.chainState : null,
     });
   }
   return tokens;

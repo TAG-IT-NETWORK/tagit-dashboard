@@ -28,6 +28,53 @@ export function activatableTokenIds(
     .sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0));
 }
 
+/** Registry states in which an item is past activation. */
+const PAST_ACTIVATION = new Set(["ACTIVATED", "CLAIMED", "FLAGGED", "RECYCLED"]);
+
+/**
+ * How many items are bound and, as far as the catalog knows, not yet activated
+ * on the registry (TAP-T19). This is what the station's one-line offer counts,
+ * so it stops offering items that are already on sale.
+ *
+ * It is not what the panel SENDS: that stays activatableTokenIds(), every
+ * bound item, because pressing the button again is also how an item that was
+ * activated without a price gets listed later. An item whose registry state
+ * is unknown counts as waiting: offering one too many costs a click, hiding
+ * one that waits costs a sale.
+ */
+export function awaitingActivation(
+  tokens: ReadonlyArray<{ lifecycle: string; chainState?: string | null }>,
+): number {
+  return tokens.filter(
+    (t) => ACTIVATABLE.has(t.lifecycle) && !PAST_ACTIVATION.has(t.chainState ?? ""),
+  ).length;
+}
+
+/**
+ * When the station shows the "Activate & list" panel (TAP-T19).
+ *
+ * It used to appear only once EVERY token of the batch was bound, so a batch
+ * with one chip left over could not put its finished items on sale. Now:
+ *
+ *   - as soon as at least one token is bound and not yet activated
+ *     (awaitingActivation), and
+ *   - as before, when nothing is left to bind, and
+ *   - once the operator has opened it, it stays (`shownBefore`): activating
+ *     the bound part leaves nothing to activate, and the panel's report of
+ *     what it just did must not vanish with it.
+ */
+export function showActivatePanel(input: {
+  loading: boolean;
+  /** Tokens still waiting for a tag. */
+  pending: number;
+  /** Tokens that are bound and still wait for activation (awaitingActivation). */
+  activatable: number;
+  shownBefore: boolean;
+}): boolean {
+  if (input.loading) return false;
+  return input.pending === 0 || input.activatable > 0 || input.shownBefore;
+}
+
 function stringList(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }

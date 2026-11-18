@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getActorRole } from "@/lib/actor-role";
-import { MAX_BATCH_SIZE } from "@/lib/catalog/batch-logic";
+import { BATCH_SIZE_ADVICE, MAX_BATCH_SIZE } from "@/lib/catalog/batch-logic";
 import { parseBatchFactsBody } from "@/lib/catalog/product-facts";
 import { TEMPLATE_ID_RE, canMutateCatalog } from "@/lib/catalog/template-logic";
 import { batchesUpstream } from "@/lib/server/batches-upstream";
@@ -127,16 +127,16 @@ export async function POST(req: Request) {
     return NextResponse.json(res.body, { status: res.status });
   }
 
-  if (
-    typeof body.quantity !== "number" ||
-    !Number.isInteger(body.quantity) ||
-    body.quantity < 1 ||
-    body.quantity > MAX_BATCH_SIZE
-  ) {
+  if (typeof body.quantity !== "number" || !Number.isInteger(body.quantity) || body.quantity < 1) {
     return NextResponse.json(
-      { ok: false, error: `quantity must be an integer 1–${MAX_BATCH_SIZE}` },
+      { ok: false, error: "quantity must be a whole number, 1 or more" },
       { status: 400 },
     );
+  }
+  if (body.quantity > MAX_BATCH_SIZE) {
+    // TAP-T19: the registry takes at most 100 items in one mint. Services
+    // refuses the same, in the same words.
+    return NextResponse.json({ ok: false, error: BATCH_SIZE_ADVICE }, { status: 400 });
   }
   const res = await batchesUpstream("/api/v1/admin/batches", {
     method: "POST",

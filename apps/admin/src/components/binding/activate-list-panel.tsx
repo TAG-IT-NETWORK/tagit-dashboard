@@ -23,20 +23,25 @@ import {
 } from "@/lib/binding/activate";
 
 /**
- * "Activate & list" — shown by the station once every token of the batch is
- * bound. One click takes every bound token to ACTIVATED through the relayer
- * and lists it at the price below (defaults to the template's price).
+ * "Activate & list" — shown by the station as soon as part of the batch is
+ * bound (TAP-T19; it used to wait for the whole batch). One click takes every
+ * bound token to ACTIVATED through the relayer and lists it at the price below
+ * (defaults to the template's price). Tokens still waiting for a tag are left
+ * alone and can be done later with the same button.
  * Safe to run again: already-active / already-listed tokens are skipped.
  */
 export function ActivateListPanel({
   templateId,
   tokens,
   writable,
+  pendingCount = 0,
   onDone,
 }: {
   templateId: string | null;
   tokens: ReadonlyArray<{ tokenId: string; lifecycle: string }>;
   writable: boolean;
+  /** Tokens of the batch that still wait for a tag. 0 = the batch is fully bound. */
+  pendingCount?: number;
   onDone?: () => void;
 }) {
   const ids = activatableTokenIds(tokens);
@@ -163,6 +168,12 @@ export function ActivateListPanel({
         ) : (
           <p className="text-xs text-muted-foreground">
             Leave the price empty to activate without listing.
+          </p>
+        )}
+        {pendingCount > 0 && (
+          <p className="text-xs text-muted-foreground" data-testid="activate-partial">
+            {pendingCount} {pendingCount === 1 ? "item still waits" : "items still wait"} for a tag.
+            This button only touches the bound ones; use it again after binding the rest.
           </p>
         )}
         {!writable && <p className="text-xs text-yellow-500">Operator role required.</p>}

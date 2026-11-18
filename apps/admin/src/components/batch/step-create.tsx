@@ -11,6 +11,10 @@
  * number and the made-on and best-before dates that every item of the batch
  * shares. They are written into each item when the batch is minted and shown
  * to shoppers on the product page.
+ *
+ * Guardrails (TAP-T19): a batch holds at most 100 items, and it can only be
+ * made from a template that is published and complete. When the template is
+ * not ready the step says why, links to the template and offers no button.
  */
 
 import { useMemo, useRef, useState } from "react";
@@ -18,6 +22,7 @@ import { Button, Input, Label } from "@tagit/ui";
 import { FileUp, Hash, Loader2, Upload } from "lucide-react";
 
 import { CsvPreviewTable } from "@/components/batch/csv-preview";
+import { MintBlockNotice } from "@/components/batch/mint-block-notice";
 import {
   FORMULA_GUARD_IMPORT_COPY,
   MAX_BATCH_SIZE,
@@ -25,6 +30,7 @@ import {
   buildCsvPreview,
   validateQuantity,
   type CsvPreview,
+  type MintBlock,
 } from "@/lib/catalog/batch-logic";
 import type { BatchCreateResponse, BatchDto, BatchRowError } from "@/lib/catalog/batch-types";
 import {
@@ -46,10 +52,24 @@ interface StepCreateProps {
    * will be minted from is cosmetics and the API knows about facts.
    */
   factsAvailable: boolean;
+  /**
+   * Why no batch can be made from this template right now (TAP-T19), or null.
+   * Optional so the step still works where the template was not read.
+   */
+  block?: MintBlock | null;
+  /** Read the template again, for the notice's "Check again". */
+  onRecheck?: () => void;
   onCreated: (batch: BatchDto) => void;
 }
 
-export function StepCreate({ templateId, canCreate, factsAvailable, onCreated }: StepCreateProps) {
+export function StepCreate({
+  templateId,
+  canCreate,
+  factsAvailable,
+  block = null,
+  onRecheck,
+  onCreated,
+}: StepCreateProps) {
   const [mode, setMode] = useState<Mode>("quantity");
   const [quantity, setQuantity] = useState("");
   const [csvText, setCsvText] = useState("");
@@ -77,6 +97,7 @@ export function StepCreate({ templateId, canCreate, factsAvailable, onCreated }:
 
   const canSubmit =
     canCreate &&
+    block === null &&
     !submitting &&
     factsValid &&
     (mode === "quantity" ? quantityCheck.quantity !== null : preview !== null && preview.ok);
@@ -131,6 +152,9 @@ export function StepCreate({ templateId, canCreate, factsAvailable, onCreated }:
         <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           Your role is read-only here — creating batches needs operator or admin.
         </div>
+      )}
+      {block !== null && (
+        <MintBlockNotice block={block} templateId={templateId} onRecheck={onRecheck} />
       )}
 
       {/* Mode toggle */}
@@ -270,8 +294,8 @@ export function StepCreate({ templateId, canCreate, factsAvailable, onCreated }:
 
       <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-1">
         <p>
-          • Max {MAX_BATCH_SIZE} rows per batch — the whole batch mints as ONE on-chain batchMint
-          transaction; split larger runs into several batches.
+          • At most {MAX_BATCH_SIZE} items per batch. The whole batch is minted in one transaction
+          and the registry takes no more; split a larger run into several batches.
         </p>
         <p>
           • CSV columns: <span className="font-mono">serial</span> (required, unique),{" "}

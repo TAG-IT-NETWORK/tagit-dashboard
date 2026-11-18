@@ -28,6 +28,7 @@ import {
   RECENT_BATCH_CAP,
   WIZARD_STEPS,
   isBatchInFlight,
+  mintBlock,
   parseRecentBatches,
   parseServerBatchList,
   recentBatchesKey,
@@ -38,8 +39,18 @@ import {
   type WizardStep,
 } from "@/lib/catalog/batch-logic";
 import { factsSupported, mintCategory, takesProductFacts } from "@/lib/catalog/product-facts";
-import { canMutateCatalog, type CatalogRole } from "@/lib/catalog/template-logic";
-import type { BatchDto, BatchProgress, BatchStatusResponse } from "@/lib/catalog/batch-types";
+import {
+  canMutateCatalog,
+  mintReadiness,
+  type CatalogRole,
+  type MintReadiness,
+} from "@/lib/catalog/template-logic";
+import type {
+  BatchDto,
+  BatchFailure,
+  BatchProgress,
+  BatchStatusResponse,
+} from "@/lib/catalog/batch-types";
 
 const POLL_MS = 2500;
 
@@ -68,6 +79,14 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
   // the API must know facts, and the category the items will be minted with
   // must be cosmetics. False until the template has loaded.
   const [batchFactsAvailable, setBatchFactsAvailable] = useState(false);
+  // Whether items can be minted from the template (TAP-T19): published, and
+  // its latest published version complete. Null until the template is read,
+  // and when it cannot be read: then nothing is blocked here and the API,
+  // which enforces the same rules, answers.
+  const [readiness, setReadiness] = useState<MintReadiness | null>(null);
+  const [templateNonce, setTemplateNonce] = useState(0);
+  // Why the batch on screen is in mint_failed, from its status (TAP-T19).
+  const [failure, setFailure] = useState<BatchFailure | null>(null);
   const [recent, setRecent] = useState<RecentBatch[]>([]);
   const [recentSource, setRecentSource] = useState<"server" | "local">("local");
   const [pollNonce, setPollNonce] = useState(0);
@@ -133,13 +152,13 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
         });
         const data = await res.json();
         if (!cancelled && res.ok && data.ok && data.template?.name) {
+          const versions = Array.isArray(data.versions) ? data.versions : [];
           setTemplateName(data.template.name as string);
           setBatchFactsAvailable(
             factsSupported(data.template) &&
-              takesProductFacts(
-                mintCategory(data.template, Array.isArray(data.versions) ? data.versions : []),
-              ),
+              takesProductFacts(mintCategory(data.template, versions)),
           );
+          setReadiness(mintReadiness(versions));
         }
       } catch {
         // header degrades to the raw id
@@ -148,7 +167,9 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
     return () => {
       cancelled = true;
     };
-  }, [templateId]);
+  }, [templateId, templateNonce]);
+
+  const recheckTemplate = useCallback(() => setTemplateNonce((n) => n + 1), []);
 
   const rememberRef = useRef(remember);
   rememberRef.current = remember;
@@ -171,6 +192,7 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
         }
         setBatch(data.batch);
         setProgress(data.progress ?? null);
+        setFailure(data.failure ?? null);
         setStatusError(null);
         setLoadingStatus(false);
         rememberRef.current(data.batch);
@@ -200,6 +222,7 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
     (id: string | null) => {
       setBatch(null);
       setProgress(null);
+      setFailure(null);
       setStatusError(null);
       setBatchId(id);
       router.replace(
@@ -214,6 +237,7 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
     (b: BatchDto) => {
       setBatch(b);
       setProgress({ expected: b.size, minted: 0, tokens: [] });
+      setFailure(null);
       remember(b);
       setBatchId(b.id);
       router.replace(`/catalog/${templateId}/batch?batch=${b.id}`, { scroll: false });
@@ -296,6 +320,8 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
               templateId={templateId}
               canCreate={canMutateCatalog(role)}
               factsAvailable={batchFactsAvailable}
+              block={mintBlock({ size: null, hasTx: false }, readiness)}
+              onRecheck={recheckTemplate}
               onCreated={onCreated}
             />
           ) : batch !== null && step === "mint" ? (
@@ -305,6 +331,9 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
               role={role}
               canExecute={canMutateCatalog(role)}
               onRefresh={refresh}
+              failure={failure}
+              block={mintBlock({ size: batch.size, hasTx: Boolean(batch.txHash) }, readiness)}
+              onRecheck={recheckTemplate}
             />
           ) : batch !== null ? (
             <StepExport templateId={templateId} batch={batch} progress={progress} />

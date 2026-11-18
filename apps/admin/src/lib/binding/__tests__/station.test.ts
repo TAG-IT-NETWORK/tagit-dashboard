@@ -65,10 +65,30 @@ describe("parseBatchTokens", () => {
         ],
       },
     };
+    // An API older than TAP-T19 sends no registry state: it reads as unknown.
     expect(parseBatchTokens(body)).toEqual([
-      { tokenId: "1", lifecycle: "minted", tagUid: null, serial: "SN-1" },
-      { tokenId: "2", lifecycle: "bound", tagUid: "04:AA", serial: null },
+      { tokenId: "1", lifecycle: "minted", tagUid: null, serial: "SN-1", chainState: null },
+      { tokenId: "2", lifecycle: "bound", tagUid: "04:AA", serial: null, chainState: null },
     ]);
+  });
+
+  it("keeps each item's registry state when the API sends it (TAP-T19)", () => {
+    const tokens = parseBatchTokens({
+      progress: {
+        tokens: [
+          {
+            tokenId: "1",
+            lifecycle: "bound",
+            tagUid: "04:AA",
+            serial: null,
+            chainState: "ACTIVATED",
+          },
+          { tokenId: "2", lifecycle: "bound", tagUid: "04:AB", serial: null, chainState: null },
+          { tokenId: "3", lifecycle: "bound", tagUid: "04:AC", serial: null, chainState: 3 },
+        ],
+      },
+    });
+    expect(tokens?.map((t) => t.chainState)).toEqual(["ACTIVATED", null, null]);
   });
 
   it("returns null on a malformed body and skips malformed rows", () => {

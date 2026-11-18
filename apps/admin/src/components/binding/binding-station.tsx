@@ -52,6 +52,7 @@ import { useNfcBridge } from "@/lib/nfc-bridge";
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
 import { ActivateListPanel } from "@/components/binding/activate-list-panel";
+import { awaitingActivation, showActivatePanel } from "@/lib/binding/activate";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import { canMutateCatalog, canPublishCatalog } from "@/lib/catalog/template-logic";
 import {
@@ -123,6 +124,7 @@ export function BindingStation({
   const [skipOpen, setSkipOpen] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
 
   const lastUidRef = useRef<string | null>(null);
   const pipelineBusyRef = useRef(false);
@@ -394,6 +396,18 @@ export function BindingStation({
   const graceLeftMs = graceRemainingMs(state.lastBind, now);
   const fixEnabled = writable && canFixLastBind(state, now);
 
+  // "Activate & list" for whatever part of the batch is bound (TAP-T19).
+  // Once the operator has opened it, it stays for the session, so the report
+  // of what it did survives the refresh that follows.
+  const activatableCount = awaitingActivation(state.tokens);
+  const activateDue = showActivatePanel({
+    loading: state.phase === "loading",
+    pending: queue.length,
+    activatable: activatableCount,
+    shownBefore: activateOpen,
+  });
+  const activateExpanded = queue.length === 0 || activateOpen;
+
   const onVoided = useCallback(
     (tokenId: string, replacementTokenId: string | null) => {
       dispatch({ type: "VOID_DONE", tokenId, replacementTokenId, at: Date.now() });
@@ -450,14 +464,33 @@ export function BindingStation({
         <>
           <BridgeStatus bridge={bridge} />
 
-          {state.phase !== "loading" && queue.length === 0 && (
-            <ActivateListPanel
-              templateId={templateId}
-              tokens={state.tokens}
-              writable={writable}
-              onDone={() => void refreshStatus()}
-            />
-          )}
+          {/* Activate & list. With the whole batch bound it is the next step and
+              shows in full, as before. While part of the batch is still
+              unbound (TAP-T19) it is one line the operator can open, so the
+              binding cards below stay the main work. */}
+          {activateDue &&
+            (activateExpanded ? (
+              <ActivateListPanel
+                templateId={templateId}
+                tokens={state.tokens}
+                writable={writable}
+                pendingCount={queue.length}
+                onDone={() => void refreshStatus()}
+              />
+            ) : (
+              <div
+                data-testid="activate-offer"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-500/40 px-4 py-3 text-sm"
+              >
+                <span>
+                  {activatableCount} bound {activatableCount === 1 ? "item" : "items"} can go on
+                  sale now, before the rest of the batch is bound.
+                </span>
+                <Button variant="outline" size="sm" onClick={() => setActivateOpen(true)}>
+                  Activate &amp; list…
+                </Button>
+              </div>
+            ))}
 
           <NextUpCard
             state={state}

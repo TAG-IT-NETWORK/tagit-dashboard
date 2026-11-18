@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BATCH_ID_RE,
+  BATCH_SIZE_ADVICE,
   MAX_BATCH_SIZE,
   STALE_MINTING_MS,
   attachServerErrors,
@@ -14,11 +15,13 @@ import {
   parseRfc4180,
   parseServerBatchList,
   upsertRecentBatch,
+  mintBlock,
   validateQuantity,
   wizardStepForBatch,
   wizardStepIndex,
   type RecentBatch,
 } from "@/lib/catalog/batch-logic";
+import type { MintReadiness } from "@/lib/catalog/template-logic";
 
 // ── Wizard state machine ─────────────────────────────────────────────────────
 
@@ -178,7 +181,13 @@ describe("buildCsvPreview", () => {
   it("rejects header-only files and oversize batches structurally", () => {
     expect(buildCsvPreview("serial\n").structuralError).toMatch(/no data rows/);
     const big = `serial\n${Array.from({ length: MAX_BATCH_SIZE + 1 }, (_, i) => `SN-${i}`).join("\n")}`;
-    expect(buildCsvPreview(big).structuralError).toMatch(/max 250 per batch/);
+    expect(buildCsvPreview(big).structuralError).toBe(
+      "This CSV has 101 rows. A batch can hold at most 100 items. Split a larger run into several batches.",
+    );
+    // Exactly the cap is fine.
+    const atCap = `serial\n${Array.from({ length: MAX_BATCH_SIZE }, (_, i) => `SN-${i}`).join("\n")}`;
+    expect(buildCsvPreview(atCap).structuralError).toBeNull();
+    expect(buildCsvPreview(atCap).rows).toHaveLength(100);
   });
 
   it("surfaces parse failures as the structural error", () => {
@@ -316,5 +325,87 @@ describe("parseServerBatchList (WB-09)", () => {
       batches: [{ id: "bat_3", state: "validated", quantity: 2 }],
     });
     expect(rows).toEqual([{ id: "bat_3", size: 2, state: "validated", createdAt: "" }]);
+  });
+});
+
+// ── Cream-run guardrails (TAP-T19) ───────────────────────────────────────────
+
+describe("batch size: at most 100, the registry's own limit (TAP-T19)", () => {
+  it("is the registry's number, and the advice names it", () => {
+    // TAGITCore.MAX_BATCH_SIZE. The services cap (batch.ts) mirrors it too.
+    expect(MAX_BATCH_SIZE).toBe(100);
+    expect(BATCH_SIZE_ADVICE).toBe(
+      "A batch can hold at most 100 items. Split a larger run into several batches.",
+    );
+  });
+
+  it("a quantity of 100 is taken; 101 is refused and told what to do", () => {
+    expect(validateQuantity("100")).toEqual({ quantity: 100, error: null });
+    expect(validateQuantity("101")).toEqual({ quantity: null, error: BATCH_SIZE_ADVICE });
+    expect(validateQuantity("250")).toEqual({ quantity: null, error: BATCH_SIZE_ADVICE });
+  });
+
+  it("zero is told what a batch needs, in plain words", () => {
+    expect(validateQuantity("0")).toEqual({
+      quantity: null,
+      error: "A batch needs at least 1 item.",
+    });
+  });
+});
+
+describe("mintBlock: can this batch be created or minted? (TAP-T19)", () => {
+  const ready: MintReadiness = { published: true, missing: [] };
+  const neverPublished: MintReadiness = { published: false, missing: [] };
+  const incomplete: MintReadiness = { published: true, missing: ["brand", "photo"] };
+  const fresh = { size: null, hasTx: false };
+
+  it("nothing blocks a ready template", () => {
+    expect(mintBlock(fresh, ready)).toBeNull();
+    expect(mintBlock({ size: 100, hasTx: false }, ready)).toBeNull();
+  });
+
+  it("a template that was never published: publish it first", () => {
+    expect(mintBlock(fresh, neverPublished)).toEqual({
+      kind: "not_published",
+      title: "Publish the template first.",
+      fix: "Items can only be minted from a published template.",
+      toTemplate: true,
+    });
+  });
+
+  it("a published version that misses parts: says which, and what to do", () => {
+    expect(mintBlock(fresh, incomplete)).toEqual({
+      kind: "incomplete",
+      title: "The published version of this template is missing: Brand and a photo.",
+      fix: "Add what is missing, publish the template again, then come back here.",
+      toTemplate: true,
+    });
+  });
+
+  it("a stored batch over the limit is blocked, whatever the template", () => {
+    const block = mintBlock({ size: 180, hasTx: false }, ready);
+    expect(block).toEqual({
+      kind: "too_large",
+      title: "This batch has 180 items.",
+      fix: BATCH_SIZE_ADVICE,
+      toTemplate: false,
+    });
+    // Size is judged first: it is the one no template change can fix.
+    expect(mintBlock({ size: 180, hasTx: false }, neverPublished)?.kind).toBe("too_large");
+    // …and without knowing the template at all.
+    expect(mintBlock({ size: 101, hasTx: false }, null)?.kind).toBe("too_large");
+  });
+
+  it("a batch with a transaction on record is never blocked", () => {
+    // The retry looks for that transaction first; a mint that already landed
+    // has to be finished whatever the template looks like today.
+    for (const readiness of [ready, neverPublished, incomplete, null]) {
+      expect(mintBlock({ size: 180, hasTx: true }, readiness)).toBeNull();
+    }
+  });
+
+  it("while the template is unknown nothing is blocked: the API decides", () => {
+    expect(mintBlock(fresh, null)).toBeNull();
+    expect(mintBlock({ size: 5, hasTx: false }, null)).toBeNull();
   });
 });

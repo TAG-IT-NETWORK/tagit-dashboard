@@ -6,19 +6,23 @@
  * surfaces its 400 {rows, errors} preview verbatim when they disagree.
  */
 
-import type { CatalogRole } from "./template-logic";
+import { listTemplateParts, type CatalogRole, type MintReadiness } from "./template-logic";
 import type { BatchRowError } from "./batch-types";
 
 /** Mirror of tagit-services BATCH_ID_RE (batch-router.ts). */
 export const BATCH_ID_RE = /^bat_[0-9A-Za-z]{1,64}$/;
 
 /**
- * Mirror of tagit-services MAX_BATCH_SIZE (batch.ts): one batch = ONE
- * batchMint(recipients[], hashes[]) transaction, capped to stay inside Base's
- * block gas limit and the relayer tx-queue timeout. Larger runs are split
- * into multiple batches.
+ * Mirror of tagit-services MAX_BATCH_SIZE (batch.ts), which mirrors the
+ * registry's own limit: one batch is ONE batchMint transaction, and
+ * TAGITCore.MAX_BATCH_SIZE is 100. It was 250 here until TAP-T19, so a batch
+ * of 101 to 250 was accepted on this screen and then failed on-chain. Larger
+ * runs are split into several batches.
  */
-export const MAX_BATCH_SIZE = 250;
+export const MAX_BATCH_SIZE = 100;
+
+/** Said wherever a batch is refused for its size. Same sentence as the API's. */
+export const BATCH_SIZE_ADVICE = `A batch can hold at most ${MAX_BATCH_SIZE} items. Split a larger run into several batches.`;
 
 /** Mirror of tagit-services BATCH_CSV_COLUMNS (batch.ts). */
 export const BATCH_CSV_COLUMNS = ["serial", "tag_uid", "name_override", "price_usdc"] as const;
@@ -293,7 +297,7 @@ export function buildCsvPreview(text: string): CsvPreview {
     return {
       ...EMPTY_PREVIEW,
       header,
-      structuralError: `CSV has ${dataRecords.length} data rows — max ${MAX_BATCH_SIZE} per batch (split into multiple batches)`,
+      structuralError: `This CSV has ${dataRecords.length} rows. ${BATCH_SIZE_ADVICE}`,
     };
   }
 
@@ -385,13 +389,75 @@ export function validateQuantity(value: string): { quantity: number | null; erro
     return { quantity: null, error: "quantity must be a whole number" };
   }
   const quantity = Number(value.trim());
-  if (quantity < 1 || quantity > MAX_BATCH_SIZE) {
-    return {
-      quantity: null,
-      error: `quantity must be 1–${MAX_BATCH_SIZE} (one batchMint tx per batch)`,
-    };
+  if (quantity < 1) {
+    return { quantity: null, error: "A batch needs at least 1 item." };
+  }
+  if (quantity > MAX_BATCH_SIZE) {
+    return { quantity: null, error: BATCH_SIZE_ADVICE };
   }
   return { quantity, error: null };
+}
+
+// ──────────────────────────────────────────────
+// Can this batch be minted? (TAP-T19)
+// ──────────────────────────────────────────────
+
+/**
+ * Why a mint would be refused, in the words the screen shows. `fix` says what
+ * to do next; `toTemplate` is true when the fix is made in the template editor.
+ */
+export interface MintBlock {
+  kind: "too_large" | "not_published" | "incomplete";
+  title: string;
+  fix: string;
+  toTemplate: boolean;
+}
+
+/**
+ * Mirror of the checks the services side makes before a batch is created or
+ * minted (batch.ts: assertBatchCanBeCreated and executeBatch). The API is the
+ * enforcement point; this lets the wizard say so before a button is pressed.
+ *
+ *   size       the batch's size, or null before a batch exists (step 1 has its
+ *              own check of the number being typed)
+ *   hasTx      a transaction of an earlier attempt is on record. Such a batch
+ *              is never blocked: the retry looks for that transaction first,
+ *              and a mint that already landed has to be finished
+ *   readiness  from the template's published versions; null while unknown
+ *              (not loaded, or the template could not be read): no block,
+ *              the API decides
+ */
+export function mintBlock(
+  batch: { size: number | null; hasTx: boolean },
+  readiness: MintReadiness | null,
+): MintBlock | null {
+  if (batch.hasTx) return null;
+  if (batch.size !== null && batch.size > MAX_BATCH_SIZE) {
+    return {
+      kind: "too_large",
+      title: `This batch has ${batch.size} items.`,
+      fix: BATCH_SIZE_ADVICE,
+      toTemplate: false,
+    };
+  }
+  if (readiness === null) return null;
+  if (!readiness.published) {
+    return {
+      kind: "not_published",
+      title: "Publish the template first.",
+      fix: "Items can only be minted from a published template.",
+      toTemplate: true,
+    };
+  }
+  if (readiness.missing.length > 0) {
+    return {
+      kind: "incomplete",
+      title: `The published version of this template is missing: ${listTemplateParts(readiness.missing)}.`,
+      fix: "Add what is missing, publish the template again, then come back here.",
+      toTemplate: true,
+    };
+  }
+  return null;
 }
 
 // ──────────────────────────────────────────────
