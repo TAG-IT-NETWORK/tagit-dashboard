@@ -33,8 +33,9 @@ const PAST_ACTIVATION = new Set(["ACTIVATED", "CLAIMED", "FLAGGED", "RECYCLED"])
 
 /**
  * How many items are bound and, as far as the catalog knows, not yet activated
- * on the registry (TAP-T19). This is what the station's one-line offer counts,
- * so it stops offering items that are already on sale.
+ * on the registry (TAP-T19). This is what the station's one-line offer counts
+ * as "can go on sale now", so an item that is already activated is not
+ * announced as waiting.
  *
  * It is not what the panel SENDS: that stays activatableTokenIds(), every
  * bound item, because pressing the button again is also how an item that was
@@ -51,6 +52,22 @@ export function awaitingActivation(
 }
 
 /**
+ * How many bound items the catalog shows as ACTIVATED on the registry and no
+ * further: activated, not sold, not flagged, not retired.
+ *
+ * The station cannot tell whether such an item is listed for sale. The batch
+ * status does not say, and an item can be activated without a price, or its
+ * listing can fail after the activation went through. "Activate & list" is
+ * the station's only way to list it. So while such items exist the panel
+ * stays within reach, behind a line that claims neither "on sale" nor "not".
+ */
+export function activatedOnly(
+  tokens: ReadonlyArray<{ lifecycle: string; chainState?: string | null }>,
+): number {
+  return tokens.filter((t) => ACTIVATABLE.has(t.lifecycle) && t.chainState === "ACTIVATED").length;
+}
+
+/**
  * When the station shows the "Activate & list" panel (TAP-T19).
  *
  * It used to appear only once EVERY token of the batch was bound, so a batch
@@ -58,6 +75,10 @@ export function awaitingActivation(
  *
  *   - as soon as at least one token is bound and not yet activated
  *     (awaitingActivation), and
+ *   - while a bound token is activated and may still lack a price
+ *     (activatedOnly): without this, an item activated without a price would
+ *     lose its only way to be listed here after a reload, until the whole
+ *     batch is bound, and
  *   - as before, when nothing is left to bind, and
  *   - once the operator has opened it, it stays (`shownBefore`): activating
  *     the bound part leaves nothing to activate, and the panel's report of
@@ -69,10 +90,12 @@ export function showActivatePanel(input: {
   pending: number;
   /** Tokens that are bound and still wait for activation (awaitingActivation). */
   activatable: number;
+  /** Bound tokens that are activated and may still lack a price (activatedOnly). */
+  activated: number;
   shownBefore: boolean;
 }): boolean {
   if (input.loading) return false;
-  return input.pending === 0 || input.activatable > 0 || input.shownBefore;
+  return input.pending === 0 || input.activatable > 0 || input.activated > 0 || input.shownBefore;
 }
 
 function stringList(v: unknown): string[] {

@@ -755,6 +755,7 @@ describe("Activate & list: the bound part of a batch", () => {
       renderStation();
 
       const offer = await screen.findByTestId("activate-offer");
+      expect(offer).toHaveAttribute("data-kind", "waiting");
       expect(offer).toHaveTextContent(
         "2 bound items can go on sale now, before the rest of the batch is bound.",
       );
@@ -771,7 +772,10 @@ describe("Activate & list: the bound part of a batch", () => {
       expect(screen.queryByTestId("activate-offer")).not.toBeInTheDocument();
     });
 
-    it("bound items that are already on sale are not offered again", async () => {
+    it("bound items that are already activated are not announced as waiting, but the panel stays within reach", async () => {
+      // After a reload: both bound items are activated. One of them may have
+      // been activated without a price, and this panel is the station's only
+      // way to list it. So the line is quieter, and it still opens the panel.
       stubFetch([
         statusRoute(
           TOKENS.map((t) => (t.lifecycle === "minted" ? t : { ...t, chainState: "ACTIVATED" })),
@@ -779,8 +783,48 @@ describe("Activate & list: the bound part of a batch", () => {
         TEMPLATE_ROUTE,
       ]);
       renderStation();
+
+      const offer = await screen.findByTestId("activate-offer");
+      expect(offer).toHaveAttribute("data-kind", "activated");
+      expect(offer).toHaveTextContent(
+        "2 bound items are already activated. If one has no price yet, you can list it here.",
+      );
+      expect(offer).not.toHaveTextContent("can go on sale now");
+      expect(screen.queryByLabelText(/list price/i)).not.toBeInTheDocument();
+
+      fireEvent.click(within(offer).getByRole("button", { name: /activate & list/i }));
+
+      expect(await screen.findByLabelText(/list price/i)).toBeInTheDocument();
+      expect(screen.getByText("2 bound")).toBeInTheDocument();
+      expect(screen.queryByTestId("activate-offer")).not.toBeInTheDocument();
+    });
+
+    it("one activated item reads in the singular", async () => {
+      stubFetch([
+        statusRoute([
+          { ...TOKENS[0]!, chainState: "ACTIVATED" },
+          { ...TOKENS[1]!, lifecycle: "minted", tagUid: null },
+          ...TOKENS.slice(2),
+        ]),
+        TEMPLATE_ROUTE,
+      ]);
+      renderStation();
+      expect(await screen.findByTestId("activate-offer")).toHaveTextContent(
+        "1 bound item is already activated. If it has no price yet, you can list it here.",
+      );
+    });
+
+    it("bound items that are sold leave nothing to offer", async () => {
+      stubFetch([
+        statusRoute(
+          TOKENS.map((t) => (t.lifecycle === "minted" ? t : { ...t, chainState: "CLAIMED" })),
+        ),
+        TEMPLATE_ROUTE,
+      ]);
+      renderStation();
       await screen.findByText(/3 to go/);
       expect(screen.queryByTestId("activate-offer")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/list price/i)).not.toBeInTheDocument();
     });
 
     it("counts only what still waits: one activated, one bound → one offered", async () => {
@@ -793,7 +837,10 @@ describe("Activate & list: the bound part of a batch", () => {
         TEMPLATE_ROUTE,
       ]);
       renderStation();
-      expect(await screen.findByTestId("activate-offer")).toHaveTextContent(
+      const offer = await screen.findByTestId("activate-offer");
+      // Something waits, so the line speaks up, whatever else is activated.
+      expect(offer).toHaveAttribute("data-kind", "waiting");
+      expect(offer).toHaveTextContent(
         "1 bound item can go on sale now, before the rest of the batch is bound.",
       );
     });

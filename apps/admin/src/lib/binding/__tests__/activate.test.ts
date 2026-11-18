@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activatableTokenIds,
+  activatedOnly,
   awaitingActivation,
   describeOutcome,
   parseActivateOutcome,
@@ -91,8 +92,39 @@ describe("awaitingActivation: what the station's offer counts (TAP-T19)", () => 
   });
 });
 
+describe("activatedOnly: bound items that are activated and may still lack a price (TAP-T19)", () => {
+  it("counts bound items the registry shows as ACTIVATED, and nothing else", () => {
+    expect(
+      activatedOnly([
+        { lifecycle: "bound", chainState: "ACTIVATED" },
+        { lifecycle: "anchored", chainState: "ACTIVATED" },
+        { lifecycle: "bound", chainState: "BOUND" }, // still waits for activation
+        { lifecycle: "bound", chainState: "CLAIMED" }, // sold: nothing left to list
+        { lifecycle: "bound", chainState: "FLAGGED" },
+        { lifecycle: "bound", chainState: "RECYCLED" },
+        { lifecycle: "bound", chainState: null }, // unknown counts as waiting, not as activated
+        { lifecycle: "bound" },
+        { lifecycle: "minted", chainState: "ACTIVATED" }, // not bound in the catalog
+        { lifecycle: "recycled", chainState: "ACTIVATED" },
+      ]),
+    ).toBe(2);
+    expect(activatedOnly([])).toBe(0);
+  });
+
+  it("an item is never counted both as waiting and as activated", () => {
+    const tokens = [
+      { lifecycle: "bound", chainState: "BOUND" },
+      { lifecycle: "bound", chainState: "ACTIVATED" },
+      { lifecycle: "bound", chainState: null },
+      { lifecycle: "bound", chainState: "CLAIMED" },
+    ];
+    expect(awaitingActivation(tokens)).toBe(2);
+    expect(activatedOnly(tokens)).toBe(1);
+  });
+});
+
 describe("showActivatePanel: Activate & list for the bound part of a batch (TAP-T19)", () => {
-  const base = { loading: false, pending: 0, activatable: 0, shownBefore: false };
+  const base = { loading: false, pending: 0, activatable: 0, activated: 0, shownBefore: false };
 
   it("shows as soon as one token is bound, while others still wait for a tag", () => {
     expect(showActivatePanel({ ...base, pending: 3, activatable: 2 })).toBe(true);
@@ -101,6 +133,13 @@ describe("showActivatePanel: Activate & list for the bound part of a batch (TAP-
 
   it("does not show while nothing is bound yet", () => {
     expect(showActivatePanel({ ...base, pending: 5, activatable: 0 })).toBe(false);
+  });
+
+  it("stays within reach while a bound item is activated but may have no price yet", () => {
+    // After a reload nothing waits for activation and the operator has not
+    // opened the panel. An item that was activated without a price, or whose
+    // listing failed, must still be listable from here.
+    expect(showActivatePanel({ ...base, pending: 3, activatable: 0, activated: 1 })).toBe(true);
   });
 
   it("shows when nothing is left to bind, as it always did", () => {
@@ -118,7 +157,13 @@ describe("showActivatePanel: Activate & list for the bound part of a batch (TAP-
 
   it("never shows while the batch is still loading", () => {
     expect(
-      showActivatePanel({ loading: true, pending: 0, activatable: 5, shownBefore: true }),
+      showActivatePanel({
+        loading: true,
+        pending: 0,
+        activatable: 5,
+        activated: 5,
+        shownBefore: true,
+      }),
     ).toBe(false);
   });
 });

@@ -52,7 +52,7 @@ import { useNfcBridge } from "@/lib/nfc-bridge";
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
 import { ActivateListPanel } from "@/components/binding/activate-list-panel";
-import { awaitingActivation, showActivatePanel } from "@/lib/binding/activate";
+import { activatedOnly, awaitingActivation, showActivatePanel } from "@/lib/binding/activate";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import { canMutateCatalog, canPublishCatalog } from "@/lib/catalog/template-logic";
 import {
@@ -400,10 +400,14 @@ export function BindingStation({
   // Once the operator has opened it, it stays for the session, so the report
   // of what it did survives the refresh that follows.
   const activatableCount = awaitingActivation(state.tokens);
+  // Bound items that are activated: the station cannot tell whether they are
+  // listed, so it keeps the panel within reach for them, in a quieter line.
+  const activatedCount = activatedOnly(state.tokens);
   const activateDue = showActivatePanel({
     loading: state.phase === "loading",
     pending: queue.length,
     activatable: activatableCount,
+    activated: activatedCount,
     shownBefore: activateOpen,
   });
   const activateExpanded = queue.length === 0 || activateOpen;
@@ -467,7 +471,10 @@ export function BindingStation({
           {/* Activate & list. With the whole batch bound it is the next step and
               shows in full, as before. While part of the batch is still
               unbound (TAP-T19) it is one line the operator can open, so the
-              binding cards below stay the main work. */}
+              binding cards below stay the main work. The line speaks up while
+              bound items wait for activation, and is quieter once the bound
+              ones are all activated: then it is only the way back to the
+              panel for an item that has no price yet. */}
           {activateDue &&
             (activateExpanded ? (
               <ActivateListPanel
@@ -480,13 +487,28 @@ export function BindingStation({
             ) : (
               <div
                 data-testid="activate-offer"
-                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-500/40 px-4 py-3 text-sm"
+                data-kind={activatableCount > 0 ? "waiting" : "activated"}
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
+                  activatableCount > 0 ? "border-emerald-500/40" : "text-muted-foreground"
+                }`}
               >
-                <span>
-                  {activatableCount} bound {activatableCount === 1 ? "item" : "items"} can go on
-                  sale now, before the rest of the batch is bound.
-                </span>
-                <Button variant="outline" size="sm" onClick={() => setActivateOpen(true)}>
+                {activatableCount > 0 ? (
+                  <span>
+                    {activatableCount} bound {activatableCount === 1 ? "item" : "items"} can go on
+                    sale now, before the rest of the batch is bound.
+                  </span>
+                ) : (
+                  <span>
+                    {activatedCount} bound {activatedCount === 1 ? "item is" : "items are"} already
+                    activated. If {activatedCount === 1 ? "it" : "one"} has no price yet, you can
+                    list it here.
+                  </span>
+                )}
+                <Button
+                  variant={activatableCount > 0 ? "outline" : "ghost"}
+                  size="sm"
+                  onClick={() => setActivateOpen(true)}
+                >
                   Activate &amp; list…
                 </Button>
               </div>
