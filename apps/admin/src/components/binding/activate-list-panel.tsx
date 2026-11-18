@@ -124,7 +124,12 @@ export function ActivateListPanel({
               safe to run again.
             </CardDescription>
           </div>
-          <Badge variant={ids.length > 0 ? "default" : "secondary"}>{ids.length} bound</Badge>
+          <Badge
+            variant={ids.length > 0 ? "default" : "secondary"}
+            className="shrink-0 whitespace-nowrap"
+          >
+            {ids.length} bound
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
