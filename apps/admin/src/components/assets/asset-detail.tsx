@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  useState,
-} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useAsset,
   useAssetState,
@@ -16,7 +14,6 @@ import {
 import { useChainId } from "wagmi";
 import { WagmiGuard } from "@/components/wagmi-guard";
 import { useMetadataHash } from "@/lib/hooks/use-metadata-hash";
-import { BindTagModal } from "@/components/bind-tag-modal";
 import { LifecycleCard } from "@/components/assets/lifecycle-card";
 import { RatingsCard } from "@/components/assets/ratings-card";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
@@ -31,13 +28,7 @@ import {
   StateBadge,
   AddressBadge,
 } from "@tagit/ui";
-import {
-  ArrowLeft,
-  ExternalLink,
-  User,
-  Hash,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, ExternalLink, User, Hash, Loader2 } from "lucide-react";
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("en-US", {
@@ -95,9 +86,10 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
     refetch: refetchHistory,
   } = useAssetHistory(chainId, tokenId);
 
-
-  // Modal state
-  const [bindModalOpen, setBindModalOpen] = useState(false);
+  // Bind goes through the Binding Station's single-asset card: SUN-verified,
+  // relayer-signed. The old wallet-signed modal needed BINDER on the connected
+  // wallet and skipped the server SUN check.
+  const router = useRouter();
 
   const isLoading = assetLoading || stateLoading;
   const hasAsset = asset && asset.owner !== "0x0000000000000000000000000000000000000000";
@@ -113,7 +105,6 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
     refetch();
     refetchHistory();
   };
-
 
   // Determine which action buttons to show, with handlers
 
@@ -207,7 +198,6 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
         </div>
       </div>
 
-
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
@@ -215,7 +205,7 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
             tokenId={id}
             stateCode={state ?? null}
             role={role}
-            onBind={() => setBindModalOpen(true)}
+            onBind={() => router.push(`/station?token=${encodeURIComponent(id)}`)}
             onChanged={handleTxSuccess}
           />
 
@@ -239,7 +229,8 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Tag ID</div>
                   {tagHash &&
-                  tagHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
+                  tagHash !==
+                    "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
                     <code className="text-sm break-all">{tagHash}</code>
                   ) : (
                     <span className="text-muted-foreground">Not bound</span>
@@ -255,9 +246,7 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Timestamp</div>
-                  <div className="text-sm">
-                    {timestampMs > 0 ? formatDate(timestampMs) : "—"}
-                  </div>
+                  <div className="text-sm">{timestampMs > 0 ? formatDate(timestampMs) : "—"}</div>
                 </div>
               </div>
             </CardContent>
@@ -276,9 +265,7 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
                   Loading timeline...
                 </div>
               ) : stateChanges.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No state changes recorded yet.
-                </p>
+                <p className="text-sm text-muted-foreground py-4">No state changes recorded yet.</p>
               ) : (
                 <div className="relative">
                   {/* Timeline line */}
@@ -344,9 +331,7 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
                   Loading transfers...
                 </div>
               ) : transfers.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No transfers recorded yet.
-                </p>
+                <p className="text-sm text-muted-foreground py-4">No transfers recorded yet.</p>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full">
@@ -429,11 +414,7 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
             <CardContent className="space-y-3">
               <div>
                 <div className="text-sm text-muted-foreground mb-1">TAGITCore</div>
-                <AddressBadge
-                  address={coreAddress}
-                  chainId={chainId}
-                  truncate
-                />
+                <AddressBadge address={coreAddress} chainId={chainId} truncate />
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Network</div>
@@ -443,14 +424,6 @@ function AssetDetailContent({ id, role }: { id: string; role: CatalogRole | null
           </Card>
         </div>
       </div>
-
-      {/* Modals */}
-      <BindTagModal
-        open={bindModalOpen}
-        onOpenChange={setBindModalOpen}
-        tokenId={tokenId}
-        onSuccess={() => handleTxSuccess()}
-      />
     </div>
   );
 }
