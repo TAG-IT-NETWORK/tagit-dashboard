@@ -11,15 +11,22 @@ import {
   formatMsrpDisplay,
   formatUsdc6Display,
   itemsBehindLatest,
+  listTemplateParts,
   mediaListFromAttributes,
   mergeMediaIntoAttributes,
+  mintReadiness,
   parseTokenIdInput,
   readTemplateItemRow,
   readTemplateItemsPage,
+  TEMPLATE_PARTS,
+  TEMPLATE_PART_LABELS,
+  TEMPLATE_PART_TAB,
+  templateGaps,
   templateStatusStyle,
   templateThumbUrl,
   usdc6ToDecimalInput,
   workingCopySnapshot,
+  type TemplatePart,
 } from "@/lib/catalog/template-logic";
 import type { TemplateDto, TemplateVersionDto } from "@/lib/catalog/template-types";
 
@@ -483,5 +490,152 @@ describe("itemsBehindLatest (WB-05 drift banner from enumerated rows)", () => {
 
   it("empty when nothing is published yet", () => {
     expect(itemsBehindLatest(rows, 0)).toEqual([]);
+  });
+});
+
+// ── What a template needs before publishing and minting (TAP-T19) ────────────
+
+const SHA = "5".repeat(64);
+const PHOTO = `https://media.tagit.network/i/${SHA}/lg.webp`;
+const photoRow = (value: string, trait = "media:hero") => ({ trait_type: trait, value });
+
+/** A template with every part: makeTemplate() has all the text and no photo. */
+function completeTemplate(overrides: Partial<TemplateDto> = {}): TemplateDto {
+  return makeTemplate({ attributes: [photoRow(PHOTO)], ...overrides });
+}
+
+describe("templateGaps", () => {
+  const TEXT_PARTS = [
+    "name",
+    "brand",
+    "model",
+    "sku",
+    "category",
+    "origin",
+    "description",
+  ] as const;
+
+  it("finds nothing missing on a complete template", () => {
+    expect(templateGaps(completeTemplate())).toEqual([]);
+  });
+
+  it.each(TEXT_PARTS)("names %s, and only it, when it is empty, blank or not there", (part) => {
+    for (const value of [null, "", "   "]) {
+      expect(
+        templateGaps(completeTemplate({ [part]: value } as Partial<TemplateDto>)),
+        JSON.stringify(value),
+      ).toEqual([part]);
+    }
+  });
+
+  it("names the photo when there is none", () => {
+    expect(templateGaps(makeTemplate())).toEqual(["photo"]); // only an ordinary attribute row
+    expect(templateGaps(completeTemplate({ attributes: null }))).toEqual(["photo"]);
+    expect(templateGaps(completeTemplate({ attributes: [] }))).toEqual(["photo"]);
+  });
+
+  it("takes a hero or a gallery photo from our own media pipeline, and nothing else", () => {
+    expect(
+      templateGaps(completeTemplate({ attributes: [photoRow(PHOTO, "media:gallery")] })),
+    ).toEqual([]);
+    const notPhotos = [
+      photoRow(`https://evil.example/i/${SHA}/lg.webp`),
+      photoRow(`http://media.tagit.network/i/${SHA}/lg.webp`),
+      photoRow(`https://media.tagit.network.evil.example/i/${SHA}/lg.webp`),
+      photoRow(`https://media.tagit.network/i/${"5".repeat(63)}/lg.webp`),
+      photoRow(`https://media.tagit.network/i/${SHA}/lg.png`),
+      photoRow("https://media.tagit.network/photo.webp"),
+      photoRow(""),
+      photoRow(PHOTO, "media:video"),
+      photoRow(PHOTO, "Color"),
+    ];
+    for (const row of notPhotos) {
+      expect(templateGaps(completeTemplate({ attributes: [row] })), JSON.stringify(row)).toEqual([
+        "photo",
+      ]);
+    }
+  });
+
+  it("lists several gaps in one fixed order", () => {
+    expect(
+      templateGaps(
+        completeTemplate({ description: null, attributes: null, brand: " ", sku: null }),
+      ),
+    ).toEqual(["brand", "sku", "description", "photo"]);
+    expect([...TEMPLATE_PARTS]).toEqual([
+      "name",
+      "brand",
+      "model",
+      "sku",
+      "category",
+      "origin",
+      "description",
+      "photo",
+    ]);
+  });
+
+  it("judges a published snapshot the same way as a working copy", () => {
+    const complete = completeTemplate();
+    expect(templateGaps(workingCopySnapshot(complete))).toEqual([]);
+    expect(templateGaps(workingCopySnapshot(completeTemplate({ model: null })))).toEqual(["model"]);
+    // Odd shapes do not throw.
+    expect(templateGaps({})).toEqual([...TEMPLATE_PARTS]);
+    expect(templateGaps({ name: 7, attributes: "nope" })).toEqual([...TEMPLATE_PARTS]);
+  });
+
+  it("every part has a label and a tab where it is filled in", () => {
+    for (const part of TEMPLATE_PARTS) {
+      expect(TEMPLATE_PART_LABELS[part], part).toMatch(/^[A-Z]/);
+      expect(["Details", "Media"], part).toContain(TEMPLATE_PART_TAB[part]);
+    }
+    expect(TEMPLATE_PART_TAB.photo).toBe("Media");
+    expect(TEMPLATE_PART_LABELS.sku).toBe("SKU");
+    expect(TEMPLATE_PART_LABELS.origin).toBe("Origin");
+  });
+});
+
+describe("listTemplateParts", () => {
+  it("reads as part of a sentence", () => {
+    expect(listTemplateParts(["brand"])).toBe("Brand");
+    expect(listTemplateParts(["photo"])).toBe("A photo");
+    expect(listTemplateParts(["brand", "photo"])).toBe("Brand and a photo");
+    expect(listTemplateParts(["brand", "sku", "origin", "photo"] as TemplatePart[])).toBe(
+      "Brand, SKU, Origin and a photo",
+    );
+    expect(listTemplateParts([])).toBe("");
+  });
+});
+
+describe("mintReadiness", () => {
+  it("a template with no published version is not ready", () => {
+    expect(mintReadiness([])).toEqual({ published: false, missing: [] });
+  });
+
+  it("judges the LATEST published version, whatever order they arrive in", () => {
+    const complete = completeTemplate();
+    const noPhoto = completeTemplate({ attributes: null });
+    // v1 incomplete, v2 complete → ready.
+    expect(mintReadiness([versionOf(noPhoto, 1), versionOf(complete, 2)])).toEqual({
+      published: true,
+      missing: [],
+    });
+    expect(mintReadiness([versionOf(complete, 2), versionOf(noPhoto, 1)])).toEqual({
+      published: true,
+      missing: [],
+    });
+    // v1 complete, v2 incomplete → not ready, and it says why.
+    expect(mintReadiness([versionOf(complete, 1), versionOf(noPhoto, 2)])).toEqual({
+      published: true,
+      missing: ["photo"],
+    });
+  });
+
+  it("does not look at the working copy at all", () => {
+    // Only versions go in: an editor fix that was not published changes nothing.
+    const published = completeTemplate({ brand: null });
+    expect(mintReadiness([versionOf(published, 1)])).toEqual({
+      published: true,
+      missing: ["brand"],
+    });
   });
 });

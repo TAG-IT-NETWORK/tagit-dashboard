@@ -19,11 +19,83 @@ export interface ActivateOutcome {
 const ACTIVATABLE = new Set(["bound", "anchored"]);
 
 /** Token ids the station may send: bound (or bound + anchored) rows, numeric order. */
-export function activatableTokenIds(tokens: ReadonlyArray<{ tokenId: string; lifecycle: string }>): string[] {
+export function activatableTokenIds(
+  tokens: ReadonlyArray<{ tokenId: string; lifecycle: string }>,
+): string[] {
   return tokens
     .filter((t) => ACTIVATABLE.has(t.lifecycle))
     .map((t) => t.tokenId)
     .sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0));
+}
+
+/** Registry states in which an item is past activation. */
+const PAST_ACTIVATION = new Set(["ACTIVATED", "CLAIMED", "FLAGGED", "RECYCLED"]);
+
+/**
+ * How many items are bound and, as far as the catalog knows, not yet activated
+ * on the registry (TAP-T19). This is what the station's one-line offer counts
+ * as "can go on sale now", so an item that is already activated is not
+ * announced as waiting.
+ *
+ * It is not what the panel SENDS: that stays activatableTokenIds(), every
+ * bound item, because pressing the button again is also how an item that was
+ * activated without a price gets listed later. An item whose registry state
+ * is unknown counts as waiting: offering one too many costs a click, hiding
+ * one that waits costs a sale.
+ */
+export function awaitingActivation(
+  tokens: ReadonlyArray<{ lifecycle: string; chainState?: string | null }>,
+): number {
+  return tokens.filter(
+    (t) => ACTIVATABLE.has(t.lifecycle) && !PAST_ACTIVATION.has(t.chainState ?? ""),
+  ).length;
+}
+
+/**
+ * How many bound items the catalog shows as ACTIVATED on the registry and no
+ * further: activated, not sold, not flagged, not retired.
+ *
+ * The station cannot tell whether such an item is listed for sale. The batch
+ * status does not say, and an item can be activated without a price, or its
+ * listing can fail after the activation went through. "Activate & list" is
+ * the station's only way to list it. So while such items exist the panel
+ * stays within reach, behind a line that claims neither "on sale" nor "not".
+ */
+export function activatedOnly(
+  tokens: ReadonlyArray<{ lifecycle: string; chainState?: string | null }>,
+): number {
+  return tokens.filter((t) => ACTIVATABLE.has(t.lifecycle) && t.chainState === "ACTIVATED").length;
+}
+
+/**
+ * When the station shows the "Activate & list" panel (TAP-T19).
+ *
+ * It used to appear only once EVERY token of the batch was bound, so a batch
+ * with one chip left over could not put its finished items on sale. Now:
+ *
+ *   - as soon as at least one token is bound and not yet activated
+ *     (awaitingActivation), and
+ *   - while a bound token is activated and may still lack a price
+ *     (activatedOnly): without this, an item activated without a price would
+ *     lose its only way to be listed here after a reload, until the whole
+ *     batch is bound, and
+ *   - as before, when nothing is left to bind, and
+ *   - once the operator has opened it, it stays (`shownBefore`): activating
+ *     the bound part leaves nothing to activate, and the panel's report of
+ *     what it just did must not vanish with it.
+ */
+export function showActivatePanel(input: {
+  loading: boolean;
+  /** Tokens still waiting for a tag. */
+  pending: number;
+  /** Tokens that are bound and still wait for activation (awaitingActivation). */
+  activatable: number;
+  /** Bound tokens that are activated and may still lack a price (activatedOnly). */
+  activated: number;
+  shownBefore: boolean;
+}): boolean {
+  if (input.loading) return false;
+  return input.pending === 0 || input.activatable > 0 || input.activated > 0 || input.shownBefore;
 }
 
 function stringList(v: unknown): string[] {
@@ -45,7 +117,10 @@ export function parseActivateOutcome(body: unknown): ActivateOutcome {
   const listErrors = Array.isArray(b.listErrors)
     ? (b.listErrors as Array<Record<string, unknown>>)
         .filter((e) => typeof e?.tokenId === "string")
-        .map((e) => ({ tokenId: e.tokenId as string, error: typeof e.error === "string" ? e.error : "failed" }))
+        .map((e) => ({
+          tokenId: e.tokenId as string,
+          error: typeof e.error === "string" ? e.error : "failed",
+        }))
     : [];
   return {
     ok: b.ok === true,
@@ -64,9 +139,11 @@ export function parseActivateOutcome(body: unknown): ActivateOutcome {
 /** Human summary lines, most important first. */
 export function describeOutcome(o: ActivateOutcome, priceUsdc?: string | null): string[] {
   const lines: string[] = [];
-  if (o.activated.length > 0) lines.push(`${o.activated.length} activated (#${o.activated.join(", #")})`);
+  if (o.activated.length > 0)
+    lines.push(`${o.activated.length} activated (#${o.activated.join(", #")})`);
   if (o.alreadyActive.length > 0) lines.push(`${o.alreadyActive.length} already active`);
-  if (o.listed.length > 0) lines.push(`${o.listed.length} listed${priceUsdc ? ` at $${priceUsdc}` : ""}`);
+  if (o.listed.length > 0)
+    lines.push(`${o.listed.length} listed${priceUsdc ? ` at $${priceUsdc}` : ""}`);
   if (o.alreadyListed.length > 0) lines.push(`${o.alreadyListed.length} already listed`);
   for (const s of o.skipped) lines.push(`#${s.tokenId} skipped: ${s.reason}`);
   for (const e of o.listErrors) lines.push(`#${e.tokenId} not listed: ${e.error}`);
@@ -75,10 +152,14 @@ export function describeOutcome(o: ActivateOutcome, priceUsdc?: string | null): 
 }
 
 /** Blank = activate only. Otherwise a positive decimal with ≤ 6 decimals. */
-export function validatePriceInput(raw: string): { priceUsdc: string | null; error: string | null } {
+export function validatePriceInput(raw: string): {
+  priceUsdc: string | null;
+  error: string | null;
+} {
   const s = raw.trim();
   if (s === "") return { priceUsdc: null, error: null };
-  if (!/^\d{1,12}(\.\d{1,6})?$/.test(s)) return { priceUsdc: null, error: "enter a USDC amount like 23.33 (max 6 decimals)" };
+  if (!/^\d{1,12}(\.\d{1,6})?$/.test(s))
+    return { priceUsdc: null, error: "enter a USDC amount like 23.33 (max 6 decimals)" };
   if (Number(s) <= 0) return { priceUsdc: null, error: "price must be greater than zero" };
   return { priceUsdc: s, error: null };
 }

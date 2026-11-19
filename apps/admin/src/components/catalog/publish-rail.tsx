@@ -6,6 +6,11 @@
  *
  * Diff sources: any published snapshot or the current working copy (mapped
  * through the client mirror of buildTemplateSnapshot so shapes align).
+ *
+ * Required parts (TAP-T19): a template can only be published when it carries
+ * everything an item's public record needs. Until then the rail lists what is
+ * missing and where to add it, and the Publish button is off. The services
+ * side enforces the same rule and its answer is shown if the two ever differ.
  */
 
 import { useMemo, useState } from "react";
@@ -14,7 +19,13 @@ import { Archive, GitCommitHorizontal, Loader2, Rocket } from "lucide-react";
 
 import { SnapshotDiff } from "@/components/catalog/snapshot-diff";
 import { StatusChip } from "@/components/catalog/status-chip";
-import { workingCopySnapshot, type PublishState } from "@/lib/catalog/template-logic";
+import {
+  TEMPLATE_PART_LABELS,
+  TEMPLATE_PART_TAB,
+  templateGaps,
+  workingCopySnapshot,
+  type PublishState,
+} from "@/lib/catalog/template-logic";
 import type { TemplateDto, TemplateVersionDto } from "@/lib/catalog/template-types";
 
 import { upstreamErrorMessage } from "@/lib/upstream-error";
@@ -90,6 +101,10 @@ export function PublishRail({
 
   const archived = template.status === "archived";
   const canWrite = writable && !archived;
+  // What the saved working copy still misses. Publishing uses the saved copy,
+  // so this is exactly what the publish would be judged on.
+  const missing = useMemo(() => templateGaps(template), [template]);
+  const incomplete = missing.length > 0;
 
   return (
     <Card className="h-fit">
@@ -108,15 +123,39 @@ export function PublishRail({
       <CardContent className="space-y-4">
         {/* Actions */}
         <div className="flex flex-col gap-2">
+          {incomplete && !archived && (
+            <div
+              role="status"
+              data-testid="publish-missing"
+              className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm"
+            >
+              <p className="font-medium">Add these before publishing:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {missing.map((part) => (
+                  <li key={part} data-part={part}>
+                    {TEMPLATE_PART_LABELS[part]}{" "}
+                    <span className="text-xs text-muted-foreground">
+                      ({TEMPLATE_PART_TAB[part]} tab)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Every item&apos;s public record needs them. Save the tab after adding each one.
+              </p>
+            </div>
+          )}
           <Button
             onClick={() => post("publish")}
-            disabled={!canWrite || !canPublish || busy !== null}
+            disabled={!canWrite || !canPublish || incomplete || busy !== null}
             title={
               !canPublish
                 ? "Publishing requires the admin role"
-                : publishState.latestVersion > 0 && !publishState.workingDirty
-                  ? "Working copy matches the latest snapshot — publishing inserts an identical version"
-                  : undefined
+                : incomplete
+                  ? "Add what is missing first"
+                  : publishState.latestVersion > 0 && !publishState.workingDirty
+                    ? "Working copy matches the latest snapshot — publishing inserts an identical version"
+                    : undefined
             }
           >
             {busy === "publish" ? (

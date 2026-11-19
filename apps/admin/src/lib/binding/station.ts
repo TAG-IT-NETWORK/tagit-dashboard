@@ -42,6 +42,11 @@ export interface StationToken {
   lifecycle: string;
   tagUid: string | null;
   serial: string | null;
+  /**
+   * The item's state on the registry as the catalog last mirrored it (BOUND,
+   * ACTIVATED, …), or null: unknown, or a services build older than TAP-T19.
+   */
+  chainState?: string | null;
 }
 
 /** Tolerant parse of the batch-status body → station tokens (null = bad DTO). */
@@ -57,6 +62,7 @@ export function parseBatchTokens(body: unknown): StationToken[] | null {
       lifecycle: t.lifecycle,
       tagUid: typeof t.tagUid === "string" ? t.tagUid : null,
       serial: typeof t.serial === "string" ? t.serial : null,
+      chainState: typeof t.chainState === "string" ? t.chainState : null,
     });
   }
   return tokens;
@@ -200,7 +206,10 @@ export function isEncryptedSunUrl(url: string): boolean {
   } catch {
     return false;
   }
-  return /^[0-9a-fA-F]{32}$/.test(params.get("picc") ?? "") && /^[0-9a-fA-F]{16}$/.test(params.get("cmac") ?? "");
+  return (
+    /^[0-9a-fA-F]{32}$/.test(params.get("picc") ?? "") &&
+    /^[0-9a-fA-F]{16}$/.test(params.get("cmac") ?? "")
+  );
 }
 
 /**
@@ -255,7 +264,11 @@ export function interpretNdefRead(result: unknown, cardUid: string): TapEvaluati
     (r) => r && r.recordType === "url" && typeof r.data === "string",
   );
   if (urls.length === 0) {
-    return { ok: false, kind: "unreadable", message: "Chip carries no URL record (not SDM-personalized?)" };
+    return {
+      ok: false,
+      kind: "unreadable",
+      message: "Chip carries no URL record (not SDM-personalized?)",
+    };
   }
   for (const record of urls) {
     const sun = parseSunFromUrl(record.data);
@@ -424,7 +437,8 @@ export function stationReducer(state: StationState, action: StationAction): Stat
     case "LOAD": {
       // Server truth wins: rebuild the queue, keep this session's log/lastBind.
       // Mid-flight phases survive a background refresh untouched.
-      const busy = state.phase === "verifying" || state.phase === "binding" || state.phase === "bound";
+      const busy =
+        state.phase === "verifying" || state.phase === "binding" || state.phase === "bound";
       return {
         ...state,
         tokens: action.tokens,

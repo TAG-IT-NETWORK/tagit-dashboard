@@ -90,6 +90,11 @@ export interface BatchTokenRow {
   lifecycle: string;
   tagUid: string | null;
   serial: string | null;
+  /**
+   * The item's state on the registry as the catalog last mirrored it, or
+   * null. ABSENT on a services build older than TAP-T19.
+   */
+  chainState?: string | null;
 }
 
 export interface BatchProgress {
@@ -98,11 +103,28 @@ export interface BatchProgress {
   tokens: BatchTokenRow[];
 }
 
+/**
+ * Why a batch is in `mint_failed` (TAP-T19): a code from a fixed list and a
+ * sentence the services side wrote for it. The sentence is safe to show as it
+ * is; it never carries text from the underlying error.
+ */
+export interface BatchFailure {
+  code: string;
+  message: string;
+  /** When the failed attempt ended (ISO), or null. */
+  at: string | null;
+}
+
 /** GET /api/v1/admin/batches/:id. */
 export interface BatchStatusResponse {
   ok: boolean;
   batch?: BatchDto;
   progress?: BatchProgress;
+  /**
+   * Null unless the batch is in `mint_failed` and its reason was recorded.
+   * ABSENT on a services build older than TAP-T19.
+   */
+  failure?: BatchFailure | null;
   error?: string;
   message?: string;
 }

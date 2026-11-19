@@ -52,6 +52,7 @@ import { useNfcBridge } from "@/lib/nfc-bridge";
 import { CHIP_SPECS } from "@/lib/nfc-bridge-protocol";
 import { VoidRemintWizard } from "@/components/binding/void-remint-wizard";
 import { ActivateListPanel } from "@/components/binding/activate-list-panel";
+import { activatedOnly, awaitingActivation, showActivatePanel } from "@/lib/binding/activate";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import { canMutateCatalog, canPublishCatalog } from "@/lib/catalog/template-logic";
 import {
@@ -100,7 +101,12 @@ function upstreamError(body: Record<string, unknown> | null, fallback: string): 
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
-export function BindingStation({ batchId, role, exceptionsTab, templateId = null }: BindingStationProps) {
+export function BindingStation({
+  batchId,
+  role,
+  exceptionsTab,
+  templateId = null,
+}: BindingStationProps) {
   const writable = canMutateCatalog(role);
   // Void + remint recycles on-chain (irreversible) — admin-only, same posture
   // as batch unstick; the proxy + middleware enforce it server-side too.
@@ -118,6 +124,7 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
   const [skipOpen, setSkipOpen] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
 
   const lastUidRef = useRef<string | null>(null);
   const pipelineBusyRef = useRef(false);
@@ -158,7 +165,8 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
       const res = await proxyJson(`/api/catalog-proxy/assets/${lastBind.tokenId}`);
       if (cancelled) return;
       const verification = (res.body?.verification ?? null) as Record<string, unknown> | null;
-      const status = typeof verification?.anchorStatus === "string" ? verification.anchorStatus : null;
+      const status =
+        typeof verification?.anchorStatus === "string" ? verification.anchorStatus : null;
       dispatch({
         type: "ANCHOR",
         status: status === "confirmed" ? "confirmed" : status === "failed" ? "failed" : "pending",
@@ -214,10 +222,7 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
           });
           return;
         }
-        const evaluation = await sunCheckViaBridge(
-          (r) => bridge.request(r),
-          uid,
-        );
+        const evaluation = await sunCheckViaBridge((r) => bridge.request(r), uid);
         if (!evaluation.ok) {
           dispatch({
             type: "SUN_FAIL",
@@ -311,7 +316,8 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
   const programAndRetry = useCallback(async () => {
     const card = bridge.card;
     const tapUid = stateRef.current.tapUid;
-    if (!card || card.uid !== tapUid || card.chip !== "NTAG424DNA" || pipelineBusyRef.current) return;
+    if (!card || card.uid !== tapUid || card.chip !== "NTAG424DNA" || pipelineBusyRef.current)
+      return;
     setProgramming(true);
     try {
       await bridge.request({ type: "personalize-sdm", baseUrl: SUN_BASE_URL });
@@ -384,9 +390,27 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
   const queue = pendingQueue(state.tokens);
   const next = queue[0] ?? null;
   const totalTokens = state.tokens.length;
-  const boundTotal = state.tokens.filter((t) => t.lifecycle !== "minted" && t.lifecycle !== "recycled").length;
+  const boundTotal = state.tokens.filter(
+    (t) => t.lifecycle !== "minted" && t.lifecycle !== "recycled",
+  ).length;
   const graceLeftMs = graceRemainingMs(state.lastBind, now);
   const fixEnabled = writable && canFixLastBind(state, now);
+
+  // "Activate & list" for whatever part of the batch is bound (TAP-T19).
+  // Once the operator has opened it, it stays for the session, so the report
+  // of what it did survives the refresh that follows.
+  const activatableCount = awaitingActivation(state.tokens);
+  // Bound items that are activated: the station cannot tell whether they are
+  // listed, so it keeps the panel within reach for them, in a quieter line.
+  const activatedCount = activatedOnly(state.tokens);
+  const activateDue = showActivatePanel({
+    loading: state.phase === "loading",
+    pending: queue.length,
+    activatable: activatableCount,
+    activated: activatedCount,
+    shownBefore: activateOpen,
+  });
+  const activateExpanded = queue.length === 0 || activateOpen;
 
   const onVoided = useCallback(
     (tokenId: string, replacementTokenId: string | null) => {
@@ -416,7 +440,9 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
               type="button"
               onClick={() => setTab(t)}
               className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                tab === t
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t === "station" ? "Station" : "Exception log"}
@@ -442,14 +468,51 @@ export function BindingStation({ batchId, role, exceptionsTab, templateId = null
         <>
           <BridgeStatus bridge={bridge} />
 
-          {state.phase !== "loading" && queue.length === 0 && (
-            <ActivateListPanel
-              templateId={templateId}
-              tokens={state.tokens}
-              writable={writable}
-              onDone={() => void refreshStatus()}
-            />
-          )}
+          {/* Activate & list. With the whole batch bound it is the next step and
+              shows in full, as before. While part of the batch is still
+              unbound (TAP-T19) it is one line the operator can open, so the
+              binding cards below stay the main work. The line speaks up while
+              bound items wait for activation, and is quieter once the bound
+              ones are all activated: then it is only the way back to the
+              panel for an item that has no price yet. */}
+          {activateDue &&
+            (activateExpanded ? (
+              <ActivateListPanel
+                templateId={templateId}
+                tokens={state.tokens}
+                writable={writable}
+                pendingCount={queue.length}
+                onDone={() => void refreshStatus()}
+              />
+            ) : (
+              <div
+                data-testid="activate-offer"
+                data-kind={activatableCount > 0 ? "waiting" : "activated"}
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
+                  activatableCount > 0 ? "border-emerald-500/40" : "text-muted-foreground"
+                }`}
+              >
+                {activatableCount > 0 ? (
+                  <span>
+                    {activatableCount} bound {activatableCount === 1 ? "item" : "items"} can go on
+                    sale now, before the rest of the batch is bound.
+                  </span>
+                ) : (
+                  <span>
+                    {activatedCount} bound {activatedCount === 1 ? "item is" : "items are"} already
+                    activated. If {activatedCount === 1 ? "it" : "one"} has no price yet, you can
+                    list it here.
+                  </span>
+                )}
+                <Button
+                  variant={activatableCount > 0 ? "outline" : "ghost"}
+                  size="sm"
+                  onClick={() => setActivateOpen(true)}
+                >
+                  Activate &amp; list…
+                </Button>
+              </div>
+            ))}
 
           <NextUpCard
             state={state}
@@ -516,13 +579,19 @@ function BridgeStatus({ bridge }: { bridge: ReturnType<typeof useNfcBridge> }) {
     <Card>
       <CardContent className="pt-6">
         <div className="flex flex-wrap items-center gap-6">
-          <span className={`flex items-center gap-2 text-sm ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}>
+          <span
+            className={`flex items-center gap-2 text-sm ${bridge.wsConnected ? "text-green-500" : "text-yellow-500"}`}
+          >
             {bridge.wsConnected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {bridge.wsConnected ? "Bridge connected" : "Bridge not connected"}
           </span>
-          <span className={`flex items-center gap-2 text-sm ${bridge.readerConnected ? "text-green-500" : "text-yellow-500"}`}>
+          <span
+            className={`flex items-center gap-2 text-sm ${bridge.readerConnected ? "text-green-500" : "text-yellow-500"}`}
+          >
             <Usb className="h-4 w-4" />
-            {bridge.readerConnected ? (bridge.readerName ?? "Reader connected") : "No reader detected"}
+            {bridge.readerConnected
+              ? (bridge.readerName ?? "Reader connected")
+              : "No reader detected"}
           </span>
           {bridge.card && (
             <span className="flex items-center gap-2 font-mono text-sm">
@@ -738,7 +807,9 @@ function LastBindCard({
           <AnchorBadge status={lastBind.anchorStatus} />
           <CmacBadge cmacVerified={lastBind.cmacVerified} />
           {lastBind.txHash && (
-            <code className="text-xs text-muted-foreground">{lastBind.txHash.slice(0, 10)}…{lastBind.txHash.slice(-6)}</code>
+            <code className="text-xs text-muted-foreground">
+              {lastBind.txHash.slice(0, 10)}…{lastBind.txHash.slice(-6)}
+            </code>
           )}
           {graceLeftMs > 0 ? (
             <span className="text-muted-foreground">
@@ -760,7 +831,8 @@ function LastBindCard({
                 : "Only available during the 120s anchor grace window"
             }
           >
-            <Undo2 className="mr-1 h-3.5 w-3.5" /> Fix last bind{graceLeftMs > 0 ? ` (${seconds}s)` : ""}
+            <Undo2 className="mr-1 h-3.5 w-3.5" /> Fix last bind
+            {graceLeftMs > 0 ? ` (${seconds}s)` : ""}
           </Button>
           <Button
             size="sm"
@@ -844,7 +916,9 @@ function SessionLogCard({ log }: { log: LogEntry[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Session log</CardTitle>
-        <CardDescription>This browser session only — the durable trail is the exception log.</CardDescription>
+        <CardDescription>
+          This browser session only — the durable trail is the exception log.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="space-y-1 text-sm">
@@ -950,7 +1024,11 @@ function SkipDialog({
             Cancel
           </Button>
           <Button disabled={busy || reason.trim().length === 0} onClick={() => void submit()}>
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SkipForward className="mr-2 h-4 w-4" />}
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <SkipForward className="mr-2 h-4 w-4" />
+            )}
             Record skip
           </Button>
         </DialogFooter>
@@ -1026,8 +1104,8 @@ function FixLastBindDialog({
           <DialogTitle>Fix last bind</DialogTitle>
           <DialogDescription>
             Wrong physical item tapped? Swaps the content of token #{lastBind?.tokenId ?? "?"} with
-            another token while the anchor grace timer is armed (
-            {Math.ceil(graceLeftMs / 1000)}s left). The chip binding itself stays put.
+            another token while the anchor grace timer is armed ({Math.ceil(graceLeftMs / 1000)}s
+            left). The chip binding itself stays put.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -1070,7 +1148,11 @@ function FixLastBindDialog({
             disabled={busy || !targetValid || reason.trim().length === 0 || graceLeftMs <= 0}
             onClick={() => void submit()}
           >
-            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Undo2 className="mr-2 h-4 w-4" />
+            )}
             Swap content
           </Button>
         </DialogFooter>

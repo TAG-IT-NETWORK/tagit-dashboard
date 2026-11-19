@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { activatableTokenIds, describeOutcome, parseActivateOutcome, validatePriceInput } from "../activate";
+import {
+  activatableTokenIds,
+  activatedOnly,
+  awaitingActivation,
+  describeOutcome,
+  parseActivateOutcome,
+  showActivatePanel,
+  validatePriceInput,
+} from "../activate";
 
 describe("activate helpers", () => {
   it("picks bound/anchored tokens in numeric order", () => {
@@ -43,5 +51,119 @@ describe("activate helpers", () => {
     expect(validatePriceInput("0")).toMatchObject({ priceUsdc: null });
     expect(validatePriceInput("1.1234567").error).toMatch(/6 decimals/);
     expect(validatePriceInput("$5").error).toMatch(/USDC/);
+  });
+});
+
+describe("awaitingActivation: what the station's offer counts (TAP-T19)", () => {
+  it("counts bound items that are not yet activated on the registry", () => {
+    expect(
+      awaitingActivation([
+        { lifecycle: "bound", chainState: "BOUND" },
+        { lifecycle: "anchored", chainState: "BOUND" },
+        { lifecycle: "bound", chainState: "ACTIVATED" }, // already on sale
+        { lifecycle: "anchored", chainState: "CLAIMED" }, // sold
+        { lifecycle: "bound", chainState: "FLAGGED" },
+        { lifecycle: "bound", chainState: "RECYCLED" },
+        { lifecycle: "minted", chainState: null }, // still waits for a tag
+        { lifecycle: "recycled", chainState: "RECYCLED" },
+      ]),
+    ).toBe(2);
+  });
+
+  it("counts a bound item whose registry state is unknown: better one offer too many", () => {
+    expect(
+      awaitingActivation([
+        { lifecycle: "bound", chainState: null },
+        { lifecycle: "bound" }, // an API that does not send the state
+        { lifecycle: "bound", chainState: "SOMETHING_NEW" },
+      ]),
+    ).toBe(3);
+  });
+
+  it("is not what the panel sends: every bound item still goes to the API", () => {
+    // Pressing the button again is how an item activated without a price is
+    // listed later, so already-activated items stay in the request.
+    const tokens = [
+      { tokenId: "1", lifecycle: "bound", chainState: "ACTIVATED" },
+      { tokenId: "2", lifecycle: "bound", chainState: "BOUND" },
+    ];
+    expect(awaitingActivation(tokens)).toBe(1);
+    expect(activatableTokenIds(tokens)).toEqual(["1", "2"]);
+  });
+});
+
+describe("activatedOnly: bound items that are activated and may still lack a price (TAP-T19)", () => {
+  it("counts bound items the registry shows as ACTIVATED, and nothing else", () => {
+    expect(
+      activatedOnly([
+        { lifecycle: "bound", chainState: "ACTIVATED" },
+        { lifecycle: "anchored", chainState: "ACTIVATED" },
+        { lifecycle: "bound", chainState: "BOUND" }, // still waits for activation
+        { lifecycle: "bound", chainState: "CLAIMED" }, // sold: nothing left to list
+        { lifecycle: "bound", chainState: "FLAGGED" },
+        { lifecycle: "bound", chainState: "RECYCLED" },
+        { lifecycle: "bound", chainState: null }, // unknown counts as waiting, not as activated
+        { lifecycle: "bound" },
+        { lifecycle: "minted", chainState: "ACTIVATED" }, // not bound in the catalog
+        { lifecycle: "recycled", chainState: "ACTIVATED" },
+      ]),
+    ).toBe(2);
+    expect(activatedOnly([])).toBe(0);
+  });
+
+  it("an item is never counted both as waiting and as activated", () => {
+    const tokens = [
+      { lifecycle: "bound", chainState: "BOUND" },
+      { lifecycle: "bound", chainState: "ACTIVATED" },
+      { lifecycle: "bound", chainState: null },
+      { lifecycle: "bound", chainState: "CLAIMED" },
+    ];
+    expect(awaitingActivation(tokens)).toBe(2);
+    expect(activatedOnly(tokens)).toBe(1);
+  });
+});
+
+describe("showActivatePanel: Activate & list for the bound part of a batch (TAP-T19)", () => {
+  const base = { loading: false, pending: 0, activatable: 0, activated: 0, shownBefore: false };
+
+  it("shows as soon as one token is bound, while others still wait for a tag", () => {
+    expect(showActivatePanel({ ...base, pending: 3, activatable: 2 })).toBe(true);
+    expect(showActivatePanel({ ...base, pending: 9, activatable: 1 })).toBe(true);
+  });
+
+  it("does not show while nothing is bound yet", () => {
+    expect(showActivatePanel({ ...base, pending: 5, activatable: 0 })).toBe(false);
+  });
+
+  it("stays within reach while a bound item is activated but may have no price yet", () => {
+    // After a reload nothing waits for activation and the operator has not
+    // opened the panel. An item that was activated without a price, or whose
+    // listing failed, must still be listable from here.
+    expect(showActivatePanel({ ...base, pending: 3, activatable: 0, activated: 1 })).toBe(true);
+  });
+
+  it("shows when nothing is left to bind, as it always did", () => {
+    expect(showActivatePanel({ ...base, pending: 0, activatable: 5 })).toBe(true);
+    // Everything already activated: the panel still shows (with nothing to do).
+    expect(showActivatePanel({ ...base, pending: 0, activatable: 0 })).toBe(true);
+  });
+
+  it("stays once the operator has opened it, so its report does not vanish", () => {
+    // The bound part was just activated: nothing left to activate, some left to bind.
+    expect(showActivatePanel({ ...base, pending: 3, activatable: 0, shownBefore: true })).toBe(
+      true,
+    );
+  });
+
+  it("never shows while the batch is still loading", () => {
+    expect(
+      showActivatePanel({
+        loading: true,
+        pending: 0,
+        activatable: 5,
+        activated: 5,
+        shownBefore: true,
+      }),
+    ).toBe(false);
   });
 });

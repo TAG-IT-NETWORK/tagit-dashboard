@@ -10,26 +10,35 @@
  * retryable (same button). A batch stuck in 'minting' past the stale window
  * surfaces the ADMIN-ONLY Unstick action (resolves state from the chain,
  * broadcasts nothing).
+ *
+ * Guardrails (TAP-T19): a failed mint shows WHY it failed, in the sentence the
+ * services side wrote for the reason. And a batch that cannot be minted (its
+ * template is not published or not complete, or it is larger than the
+ * registry takes) says so and offers no Mint button.
  */
 
 import { useEffect, useState } from "react";
 import { Button, Input, Label } from "@tagit/ui";
 import { AlertTriangle, ExternalLink, Loader2, Play, Wrench } from "lucide-react";
 
+import { MintBlockNotice } from "@/components/batch/mint-block-notice";
 import {
   basescanTxUrl,
   canExecuteBatch,
   canUnstickBatch,
   isBatchInFlight,
+  type MintBlock,
 } from "@/lib/catalog/batch-logic";
 import { describeBatchFacts } from "@/lib/catalog/product-facts";
 import type { CatalogRole } from "@/lib/catalog/template-logic";
 import type {
   BatchDto,
   BatchExecuteResponse,
+  BatchFailure,
   BatchProgress,
   BatchUnstickResponse,
 } from "@/lib/catalog/batch-types";
+import { upstreamErrorMessage } from "@/lib/upstream-error";
 
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 const MINT_TO_STORAGE_KEY = "tagit.admin.batch.mintTo";
@@ -42,9 +51,24 @@ interface StepMintProps {
   canExecute: boolean;
   /** Re-poll the batch status now (after execute/unstick). */
   onRefresh: () => void;
+  /** Why the last attempt failed (TAP-T19); null when unknown or not failed. */
+  failure?: BatchFailure | null;
+  /** Why this batch cannot be minted right now (TAP-T19), or null. */
+  block?: MintBlock | null;
+  /** Read the template again, for the notice's "Check again". */
+  onRecheck?: () => void;
 }
 
-export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepMintProps) {
+export function StepMint({
+  batch,
+  progress,
+  role,
+  canExecute,
+  onRefresh,
+  failure = null,
+  block = null,
+  onRecheck,
+}: StepMintProps) {
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState<"execute" | "unstick" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +83,7 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
     }
   }, []);
 
-  const executable = canExecute && canExecuteBatch(batch.state);
+  const executable = canExecute && canExecuteBatch(batch.state) && block === null;
   const inFlight = isBatchInFlight(batch.state);
   const msSinceUpdate = Date.now() - Date.parse(batch.updatedAt);
   const unstickable = canUnstickBatch(role, batch.state, msSinceUpdate);
@@ -82,7 +106,8 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
       });
       const data = (await res.json()) as BatchExecuteResponse;
       if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? data.message ?? `execute failed (${res.status})`);
+        // Services answers {error: CODE, message: sentence}: show the sentence.
+        throw new Error(upstreamErrorMessage(data, res.status, "execute"));
       }
       onRefresh();
     } catch (err) {
@@ -103,7 +128,7 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
       });
       const data = (await res.json()) as BatchUnstickResponse;
       if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? data.message ?? `unstick failed (${res.status})`);
+        throw new Error(upstreamErrorMessage(data, res.status, "unstick"));
       }
       setUnstickNote(
         data.action === "finalized_from_receipt"
@@ -127,6 +152,10 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
 
   return (
     <div className="space-y-4">
+      {canExecuteBatch(batch.state) && block !== null && (
+        <MintBlockNotice block={block} templateId={batch.templateId} onRecheck={onRecheck} />
+      )}
+
       {/* Execute controls */}
       {canExecuteBatch(batch.state) && (
         <div className="space-y-2 max-w-lg">
@@ -172,11 +201,17 @@ export function StepMint({ batch, progress, role, canExecute, onRefresh }: StepM
       )}
 
       {batch.state === "mint_failed" && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div
+          role="alert"
+          data-testid="mint-failure"
+          data-code={failure?.code ?? "unknown"}
+          className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            The last mint attempt failed and the batch is retryable. Retrying is double-mint safe:
-            the services side re-checks any recorded broadcast&apos;s receipt before rebroadcasting.
+            {failure
+              ? failure.message
+              : "The last mint attempt failed. You can retry: the retry looks for the earlier transaction before it sends anything."}
           </span>
         </div>
       )}
