@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { encodeFunctionData, type Hex } from "viem";
 import { COPY, isFailureAfterPayment, purchaseFailure, supportMailto } from "@/lib/consumer-copy";
-import { isPurchasable, type CanonicalPrice } from "@/lib/price";
+import { offeredMethods } from "@/lib/buy-methods";
+import { isPurchasable, priceDisplay, type CanonicalPrice } from "@/lib/price";
 
 import { PRIMARY_BUTTON } from "./shared";
 
@@ -58,15 +59,28 @@ interface BuyButtonProps {
   price: CanonicalPrice;
   /** Live re-read of the canonical price (also updates the widget's state). */
   refetchPrice: () => Promise<CanonicalPrice | null>;
+  /** Whether to say that no real money is charged. The server's word (see @/lib/buy-methods). */
+  demo?: boolean;
+  /**
+   * The shopper already pressed "Buy now" and chose this way to pay in the
+   * sheet (TAP-T13), so carry on without a second press: open the sign-in
+   * when they are not signed in, then start the purchase. Each happens once.
+   * A shopper who closes the sign-in is left with the button.
+   */
+  autoStart?: boolean;
+  /** Back to the list of ways to pay. */
+  onChooseAnother?: () => void;
 }
 
-/** usdc6 → "$22.00" (fallback when the API omitted `display`). */
-function formatUsdc6(priceUsdc6: string): string {
-  const padded = priceUsdc6.padStart(7, "0");
-  return `$${padded.slice(0, -6)}.${padded.slice(-6, -4)}`;
-}
-
-export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButtonProps) {
+export function BuyButton({
+  tokenId,
+  productName,
+  price,
+  refetchPrice,
+  demo = true,
+  autoStart = false,
+  onChooseAnother,
+}: BuyButtonProps) {
   const { ready, authenticated, user, login } = usePrivy();
   const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
@@ -74,7 +88,7 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
 
-  const display = price.display ?? (price.priceUsdc6 ? formatUsdc6(price.priceUsdc6) : "—");
+  const display = priceDisplay(price) || "—";
 
   const buyerWallet = useMemo(() => {
     const embedded = wallets.find((w) => w.walletClientType === "privy");
@@ -97,6 +111,14 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       const fresh = await refetchPrice();
       if (!isPurchasable(fresh)) {
         setError(COPY.buy.justSold);
+        setPhase("error");
+        return;
+      }
+      // The same fresh answer also says which ways to pay are offered NOW.
+      // Signing in can take minutes; if the server stopped offering this way
+      // in the meantime, nothing is sent.
+      if (!offeredMethods(fresh).includes("crypto")) {
+        setError(COPY.buy.methodWithdrawn);
         setPhase("error");
         return;
       }
@@ -160,6 +182,25 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       setPhase("error");
     }
   }, [buyerWallet, tokenId, refetchPrice, sendTransaction]);
+
+  // Carry on from the sheet (see `autoStart`). The two refs make each step
+  // happen once, whatever re-renders in between.
+  const askedToSignIn = useRef(false);
+  const startedPurchase = useRef(false);
+  useEffect(() => {
+    if (!autoStart || !ready) return;
+    if (!authenticated) {
+      if (!askedToSignIn.current) {
+        askedToSignIn.current = true;
+        login();
+      }
+      return;
+    }
+    if (buyerWallet && phase === "idle" && !startedPurchase.current) {
+      startedPurchase.current = true;
+      void buy();
+    }
+  }, [autoStart, ready, authenticated, buyerWallet, phase, login, buy]);
 
   const primaryBtn = PRIMARY_BUTTON;
   const note = "text-center text-[13px] leading-[18px] text-muted";
@@ -258,8 +299,19 @@ export function BuyButton({ tokenId, productName, price, refetchPrice }: BuyButt
       ) : (
         <p className={note}>
           {ready && !authenticated ? `${COPY.buy.signInNote} ` : ""}
-          {COPY.buy.demoNote}
+          {demo ? COPY.buy.demoNote : ""}
         </p>
+      )}
+
+      {onChooseAnother && !working && (
+        <button
+          type="button"
+          onClick={onChooseAnother}
+          data-choose-another
+          className="inline-flex min-h-[44px] items-center self-center text-sm font-semibold leading-5 text-brand-link underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          {COPY.buy.chooseAnother}
+        </button>
       )}
     </div>
   );

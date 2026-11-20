@@ -457,10 +457,28 @@ export const COPY = {
     "Pilot version. Records are kept on a public test network, and the system has not completed an external security audit.",
   footerBrand: "TAG IT Network",
 
-  /** Copy deck: buying. The three-way payment sheet is TAP-T13. */
+  /** Copy deck: buying. The sheet lists the ways to pay the server offers (TAP-T13). */
   buy: {
     button: (price: string) => `Buy now · ${price}`,
     buttonNoPrice: "Buy now",
+    /** "Pay by card, PayPal or crypto wallet": built by methodsLine() from what is offered. */
+    payBy: "Pay by",
+    or: "or",
+    methodNames: { card: "card", paypal: "PayPal", crypto: "crypto wallet" },
+    sheetTitle: "How would you like to pay?",
+    sheetRows: {
+      card: { title: "Card", line: "Visa, Mastercard, Amex or Apple Pay" },
+      paypal: { title: "PayPal", line: "Pay with your PayPal account" },
+      crypto: { title: "Crypto wallet", line: "Pay with USDC" },
+    },
+    sheetFooter: "Secure checkout. You become the registered owner as soon as your payment clears.",
+    sheetClose: "Close",
+    chooseAnother: "Choose another way to pay",
+    /** A way to pay the server offers but this version of the page cannot take yet. */
+    methodUnavailable: "That way to pay isn't available here yet. Choose another way to pay.",
+    /** The server stopped offering a way to pay between the choice and the charge. */
+    methodWithdrawn:
+      "That way to pay is no longer offered for this item. You haven't been charged. Choose another way to pay.",
     signInNote: "You'll sign in with your email first.",
     demoNote: "Demo checkout. No real money is charged.",
     preparing: "Getting things ready…",
@@ -469,7 +487,8 @@ export const COPY = {
     successTitle: "It's yours.",
     successBody: (name: string) => `${name} is now registered to you.`,
     viewRecord: "View the public record",
-    paymentFailed: "Payment didn't go through. You haven't been charged. Try again.",
+    paymentFailed:
+      "Payment didn't go through. You haven't been charged. Try again or choose another way to pay.",
     noFunds:
       "There are no test funds in your demo account yet, so the payment didn't go through. You haven't been charged.",
     /** A closed note under that message: how to put test funds in the demo account. */

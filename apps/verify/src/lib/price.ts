@@ -16,6 +16,15 @@ export interface CanonicalPrice {
     token: string;
     chainId: number;
     settleEndpoint: string;
+    /**
+     * The ways to pay the server offers for this item (TAP-T13). Read through
+     * offeredMethods() in ./buy-methods, never directly: a server from before
+     * this field sends none, and one from after may name a way this build
+     * does not know.
+     */
+    methods?: unknown;
+    /** True when the checkout is a demo: no real money moves. */
+    demo?: unknown;
   };
 }
 
@@ -28,6 +37,24 @@ export function isPurchasable(price: CanonicalPrice | null | undefined): price i
     !!price.priceUsdc6 &&
     /^\d+$/.test(price.priceUsdc6)
   );
+}
+
+/** usdc6 → "$22.00". */
+function formatUsdc6(priceUsdc6: string): string {
+  const padded = priceUsdc6.padStart(7, "0");
+  return `$${padded.slice(0, -6)}.${padded.slice(-6, -4)}`;
+}
+
+/**
+ * The price as the shopper reads it: the server's own `display`, and when the
+ * server sent none, the same amount written out from `priceUsdc6`. Empty only
+ * when there is no amount at all. One function, so the button, the sheet and
+ * the wallet step can never show different prices.
+ */
+export function priceDisplay(price: CanonicalPrice | null | undefined): string {
+  if (!price) return "";
+  if (price.display) return price.display;
+  return price.priceUsdc6 && /^\d+$/.test(price.priceUsdc6) ? formatUsdc6(price.priceUsdc6) : "";
 }
 
 /**
