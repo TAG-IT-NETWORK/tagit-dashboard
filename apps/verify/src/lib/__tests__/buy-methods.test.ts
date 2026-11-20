@@ -11,7 +11,7 @@ import {
   type PayMethod,
 } from "../buy-methods";
 import { COPY } from "../consumer-copy";
-import type { CanonicalPrice } from "../price";
+import { priceDisplay, type CanonicalPrice } from "../price";
 
 /**
  * TAP-T13: the ways to pay are the server's list, and only that. These pin
@@ -167,5 +167,24 @@ describe("buyFlowReducer", () => {
 
   it("knows every way in the sheet's order", () => {
     expect(PAY_METHOD_ORDER).toEqual(["card", "paypal", "crypto"]);
+  });
+});
+
+describe("priceDisplay", () => {
+  it("is the server's own text when there is one", () => {
+    expect(priceDisplay(listed())).toBe("$23.33");
+  });
+
+  it("writes the amount out from priceUsdc6 when the server sent no text", () => {
+    expect(priceDisplay({ ...listed(), display: null })).toBe("$23.33");
+    expect(priceDisplay({ ...listed(), display: null, priceUsdc6: "5000000" })).toBe("$5.00");
+    expect(priceDisplay({ ...listed(), display: null, priceUsdc6: "990000" })).toBe("$0.99");
+    expect(priceDisplay({ ...listed(), display: "", priceUsdc6: "1234560000" })).toBe("$1234.56");
+  });
+
+  it("is empty only when there is no amount at all", () => {
+    expect(priceDisplay(null)).toBe("");
+    expect(priceDisplay({ ...listed(), display: null, priceUsdc6: null })).toBe("");
+    expect(priceDisplay({ ...listed(), display: null, priceUsdc6: "12.5" })).toBe("");
   });
 });

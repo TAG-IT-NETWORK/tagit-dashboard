@@ -170,7 +170,7 @@ describe("when a purchase fails", () => {
       expect(purchaseFailure(kind, true)).not.toMatch(NOT_CHARGED);
     }
     // failures that can only happen before or instead of a payment
-    for (const message of [COPY.buy.paymentFailed, COPY.buy.noFunds]) {
+    for (const message of [COPY.buy.paymentFailed, COPY.buy.noFunds, COPY.buy.methodWithdrawn]) {
       expect(message).toMatch(NOT_CHARGED);
     }
   });

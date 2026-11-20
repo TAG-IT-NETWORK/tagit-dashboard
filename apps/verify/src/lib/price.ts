@@ -39,6 +39,24 @@ export function isPurchasable(price: CanonicalPrice | null | undefined): price i
   );
 }
 
+/** usdc6 → "$22.00". */
+function formatUsdc6(priceUsdc6: string): string {
+  const padded = priceUsdc6.padStart(7, "0");
+  return `$${padded.slice(0, -6)}.${padded.slice(-6, -4)}`;
+}
+
+/**
+ * The price as the shopper reads it: the server's own `display`, and when the
+ * server sent none, the same amount written out from `priceUsdc6`. Empty only
+ * when there is no amount at all. One function, so the button, the sheet and
+ * the wallet step can never show different prices.
+ */
+export function priceDisplay(price: CanonicalPrice | null | undefined): string {
+  if (!price) return "";
+  if (price.display) return price.display;
+  return price.priceUsdc6 && /^\d+$/.test(price.priceUsdc6) ? formatUsdc6(price.priceUsdc6) : "";
+}
+
 /**
  * Live price read via this host's proxy. Returns null for "no listing"
  * (404 / NOT_AVAILABLE) AND for transport errors — the widget treats both as

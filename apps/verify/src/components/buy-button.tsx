@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { encodeFunctionData, type Hex } from "viem";
 import { COPY, isFailureAfterPayment, purchaseFailure, supportMailto } from "@/lib/consumer-copy";
-import { isPurchasable, type CanonicalPrice } from "@/lib/price";
+import { offeredMethods } from "@/lib/buy-methods";
+import { isPurchasable, priceDisplay, type CanonicalPrice } from "@/lib/price";
 
 import { PRIMARY_BUTTON } from "./shared";
 
@@ -71,12 +72,6 @@ interface BuyButtonProps {
   onChooseAnother?: () => void;
 }
 
-/** usdc6 → "$22.00" (fallback when the API omitted `display`). */
-function formatUsdc6(priceUsdc6: string): string {
-  const padded = priceUsdc6.padStart(7, "0");
-  return `$${padded.slice(0, -6)}.${padded.slice(-6, -4)}`;
-}
-
 export function BuyButton({
   tokenId,
   productName,
@@ -93,7 +88,7 @@ export function BuyButton({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
 
-  const display = price.display ?? (price.priceUsdc6 ? formatUsdc6(price.priceUsdc6) : "—");
+  const display = priceDisplay(price) || "—";
 
   const buyerWallet = useMemo(() => {
     const embedded = wallets.find((w) => w.walletClientType === "privy");
@@ -116,6 +111,14 @@ export function BuyButton({
       const fresh = await refetchPrice();
       if (!isPurchasable(fresh)) {
         setError(COPY.buy.justSold);
+        setPhase("error");
+        return;
+      }
+      // The same fresh answer also says which ways to pay are offered NOW.
+      // Signing in can take minutes; if the server stopped offering this way
+      // in the meantime, nothing is sent.
+      if (!offeredMethods(fresh).includes("crypto")) {
+        setError(COPY.buy.methodWithdrawn);
         setPhase("error");
         return;
       }

@@ -13,7 +13,7 @@ import {
   type PayMethod,
 } from "@/lib/buy-methods";
 import { COPY } from "@/lib/consumer-copy";
-import { fetchPriceFromProxy, isPurchasable, type CanonicalPrice } from "@/lib/price";
+import { fetchPriceFromProxy, isPurchasable, priceDisplay, type CanonicalPrice } from "@/lib/price";
 
 import { BuySheet } from "./buy-sheet";
 import { PRIMARY_BUTTON } from "./shared";
@@ -100,7 +100,7 @@ export function BuyWidget(props: { tokenId: string; productName: string }) {
 
   // Hidden entirely when there is no live purchase block, or no way to pay.
   if (!isPurchasable(price) || offered.length === 0) return null;
-  const display = price.display ?? "";
+  const display = priceDisplay(price);
   placeholderDisplay = display;
   const demo = isDemoCheckout(price);
 

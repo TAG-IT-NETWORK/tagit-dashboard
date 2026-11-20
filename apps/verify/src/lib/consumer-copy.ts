@@ -476,6 +476,9 @@ export const COPY = {
     chooseAnother: "Choose another way to pay",
     /** A way to pay the server offers but this version of the page cannot take yet. */
     methodUnavailable: "That way to pay isn't available here yet. Choose another way to pay.",
+    /** The server stopped offering a way to pay between the choice and the charge. */
+    methodWithdrawn:
+      "That way to pay is no longer offered for this item. You haven't been charged. Choose another way to pay.",
     signInNote: "You'll sign in with your email first.",
     demoNote: "Demo checkout. No real money is charged.",
     preparing: "Getting things ready…",
