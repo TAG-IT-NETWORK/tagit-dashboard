@@ -16,6 +16,15 @@ export interface CanonicalPrice {
     token: string;
     chainId: number;
     settleEndpoint: string;
+    /**
+     * The ways to pay the server offers for this item (TAP-T13). Read through
+     * offeredMethods() in ./buy-methods, never directly: a server from before
+     * this field sends none, and one from after may name a way this build
+     * does not know.
+     */
+    methods?: unknown;
+    /** True when the checkout is a demo: no real money moves. */
+    demo?: unknown;
   };
 }
 

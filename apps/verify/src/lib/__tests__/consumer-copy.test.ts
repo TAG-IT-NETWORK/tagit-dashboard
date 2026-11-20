@@ -96,11 +96,27 @@ describe("one word per thing", () => {
   // Outside the Technical details drawer the shopper reads: tag, check, record,
   // owner, brand. The drawer (COPY.technical) may name the network.
   const { technical: _technical, ...shown } = COPY;
+  // One thing does have "wallet" in its name: the third way to pay. The copy
+  // deck (PRD-TAP-001 section 8) calls it "Crypto wallet: Pay with USDC", and
+  // those three strings, exactly as written there, are the only exception.
+  const PAY_METHOD_NAME = new Set(["crypto wallet", "Crypto wallet", "Pay with USDC"]);
   const everything = [
     ...strings(shown, "COPY"),
     ...strings(TAP_STATES, "TAP_STATES"),
     ...strings(RECORD_STATES, "RECORD_STATES"),
-  ];
+  ].filter(
+    ([path, text]) =>
+      !(/\.buy\.(methodNames|sheetRows)\.crypto\b/.test(path) && PAY_METHOD_NAME.has(text)),
+  );
+
+  it("lets the crypto wallet keep its name, in three places and nowhere else", () => {
+    const named = strings(shown, "COPY").filter(([, text]) => /\bwallets?\b|\bUSDC\b/i.test(text));
+    expect(named.map(([, text]) => text).sort()).toEqual([
+      "Crypto wallet",
+      "Pay with USDC",
+      "crypto wallet",
+    ]);
+  });
 
   it("finds the copy", () => {
     expect(everything.length).toBeGreaterThan(120);
@@ -244,5 +260,44 @@ describe("the same phone opening its check again (TAP-T10)", () => {
       expect(COPY.repeat.note(minutes)).not.toMatch(/just now/i);
     }
     expect(COPY.repeat.line).not.toMatch(/just now/i);
+  });
+});
+
+/** TAP-T13: the words of the buy button and the payment sheet, as PRD-TAP-001 section 8 has them. */
+describe("copy deck: buying", () => {
+  it("matches the deck word for word", () => {
+    expect(COPY.buy.button("$23.33")).toBe("Buy now · $23.33");
+    expect(COPY.buy.sheetTitle).toBe("How would you like to pay?");
+    expect(COPY.buy.sheetRows).toEqual({
+      card: { title: "Card", line: "Visa, Mastercard, Amex or Apple Pay" },
+      paypal: { title: "PayPal", line: "Pay with your PayPal account" },
+      crypto: { title: "Crypto wallet", line: "Pay with USDC" },
+    });
+    expect(COPY.buy.sheetFooter).toBe(
+      "Secure checkout. You become the registered owner as soon as your payment clears.",
+    );
+    expect(COPY.buy.demoNote).toBe("Demo checkout. No real money is charged.");
+    expect(COPY.buy.paying).toBe("Confirming your payment…");
+    expect(COPY.buy.registering).toBe("Registering you as the owner…");
+    expect(`${COPY.buy.successTitle} ${COPY.buy.successBody("Renewal Cream")}`).toBe(
+      "It's yours. Renewal Cream is now registered to you.",
+    );
+    expect(COPY.buy.paymentFailed).toBe(
+      "Payment didn't go through. You haven't been charged. Try again or choose another way to pay.",
+    );
+    expect(COPY.buy.justSold).toBe(
+      "Sorry, this item was just sold or taken off sale. You haven't been charged.",
+    );
+  });
+
+  it("builds the line under the button from the deck's words", () => {
+    const { payBy, or, methodNames } = COPY.buy;
+    expect(`${payBy} ${methodNames.card}, ${methodNames.paypal} ${or} ${methodNames.crypto}`).toBe(
+      "Pay by card, PayPal or crypto wallet",
+    );
+  });
+
+  it("keeps the old crypto wording off the buy flow", () => {
+    expect(JSON.stringify(COPY.buy)).not.toMatch(/gasless|sign in to buy|on base/i);
   });
 });

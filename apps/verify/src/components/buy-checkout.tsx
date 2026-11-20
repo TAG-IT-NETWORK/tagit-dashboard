@@ -18,12 +18,18 @@ export default function BuyCheckout({
   productName,
   price,
   refetchPrice,
+  demo,
+  autoStart,
+  onChooseAnother,
 }: {
   appId: string;
   tokenId: string;
   productName: string;
   price: CanonicalPrice;
   refetchPrice: () => Promise<CanonicalPrice | null>;
+  demo?: boolean;
+  autoStart?: boolean;
+  onChooseAnother?: () => void;
 }) {
   return (
     <PrivyProvider
@@ -46,6 +52,9 @@ export default function BuyCheckout({
         productName={productName}
         price={price}
         refetchPrice={refetchPrice}
+        demo={demo}
+        autoStart={autoStart}
+        onChooseAnother={onChooseAnother}
       />
     </PrivyProvider>
   );
