@@ -509,6 +509,28 @@ export const COPY = {
       "This item was just sold or taken off sale, after your demo payment was sent. Please don't pay again. Report a problem and we'll put it right.",
     failedAfterPayment:
       "Your demo payment was sent, but we couldn't finish registering the item to you. Please don't pay again. Report a problem and we'll put it right.",
+
+    /** Paying by card (TAP-T14): the step before the card page, and the way back from it. */
+    card: {
+      opening: "Opening the secure card page…",
+      /** Under the button while the checkout is a demo: the card that works there. */
+      demoCard:
+        "Demo checkout: pay with the test card 4242 4242 4242 4242, any future date, any CVC.",
+      unavailable:
+        "Card payment isn't available right now. You haven't been charged. Try again or choose another way to pay.",
+      cancelled: "You left the card page before paying. You haven't been charged.",
+      confirming: "Confirming your payment…",
+      receivedTitle: "Payment received.",
+      registering: "Registering you as the owner…",
+      /** Paid, and recorded only: the item was not put on the registry by this order. */
+      recorded: (name: string) => `Your payment for ${name} was received.`,
+      slow: "Your payment is taking longer than usual to confirm. Please don't pay again. Refresh this page in a minute, or report a problem.",
+      problem:
+        "Your payment was received, but we couldn't finish registering the item to you. Please don't pay again. Report a problem and we'll put it right.",
+      expired: "This checkout ran out before a payment was made. You haven't been charged.",
+      unknown:
+        "We couldn't check this order just now. Please don't pay again. Refresh this page in a moment.",
+    },
   },
 
   /** Read out while the record page loads. */

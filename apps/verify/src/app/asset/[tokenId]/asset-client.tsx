@@ -1,13 +1,18 @@
 "use client";
 
+import { useState } from "react";
+
 import { BuyWidget } from "@/components/buy-widget";
+import { OrderReturn } from "@/components/order-return";
+import { orderBlocksBuying, type OrderView } from "@/lib/card-checkout";
 
 /**
  * Client island for /asset/[tokenId].
  *
  * Everything here is deliberately OUTSIDE the server-rendered, crawlable
- * payload. It holds exactly one thing: the "tap to buy" widget, gated on a
- * state code the server already resolved. It performs NO chain read, and —
+ * payload. It holds the "tap to buy" widget, gated on a state code the server
+ * already resolved, and the panel a buyer sees on the way back from a card
+ * payment. It performs NO chain read, and —
  * since META-T17 — it carries NO price either: the widget fetches the
  * canonical price from the server (GET /api/asset/[tokenId]/price) and hides
  * itself when there is no live listing.
@@ -38,8 +43,20 @@ export function AssetClientIsland({
 }) {
   const showBuy = stateCode === 3; // ACTIVATED — in distribution, claimable
 
-  if (!showBuy) return null;
+  // An order the buyer is back from, if any. While it may have taken money,
+  // the item is not offered again (see orderBlocksBuying).
+  const [order, setOrder] = useState<OrderView>({ kind: "none" });
 
-  // No wrapper: when the widget hides itself, nothing is left in the layout.
-  return <BuyWidget tokenId={tokenId} productName={productName} />;
+  // The way back from a card payment (TAP-T14) is shown whatever the state:
+  // once the payment registered the item, it is no longer for sale. Both
+  // render nothing when they have nothing to say, so no wrapper is left in
+  // the layout.
+  return (
+    <>
+      <OrderReturn tokenId={tokenId} productName={productName} onView={setOrder} />
+      {showBuy && !orderBlocksBuying(order) ? (
+        <BuyWidget tokenId={tokenId} productName={productName} />
+      ) : null}
+    </>
+  );
 }

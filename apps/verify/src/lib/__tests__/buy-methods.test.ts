@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   PAY_METHOD_ORDER,
   READY_METHODS,
+  SIGN_IN_METHODS,
   buyFlowReducer,
   isDemoCheckout,
   methodsLine,
@@ -137,20 +138,25 @@ describe("buyFlowReducer", () => {
   });
 
   it("starts a way to pay that this build can take", () => {
-    expect(READY_METHODS).toEqual(["crypto"]);
-    expect(buyFlowReducer(sheet, { type: "choose", method: "crypto" }, ALL)).toEqual({
-      step: "method",
-      method: "crypto",
-    });
+    expect(READY_METHODS).toEqual(["card", "crypto"]);
+    for (const method of ["card", "crypto"] as const) {
+      expect(buyFlowReducer(sheet, { type: "choose", method }, ALL)).toEqual({
+        step: "method",
+        method,
+      });
+    }
   });
 
   it("stays on the sheet, with a plain note, for a way it cannot take yet", () => {
-    for (const method of ["card", "paypal"] as const) {
-      expect(buyFlowReducer(sheet, { type: "choose", method }, ALL)).toEqual({
-        step: "sheet",
-        notice: COPY.buy.methodUnavailable,
-      });
-    }
+    expect(buyFlowReducer(sheet, { type: "choose", method: "paypal" }, ALL)).toEqual({
+      step: "sheet",
+      notice: COPY.buy.methodUnavailable,
+    });
+  });
+
+  it("asks for a sign-in for every way it can take (the item goes to that account)", () => {
+    expect(READY_METHODS.every((method) => SIGN_IN_METHODS.includes(method))).toBe(true);
+    expect(SIGN_IN_METHODS).not.toContain("paypal");
   });
 
   it("ignores a choice that is not on offer, or made while the sheet is shut", () => {
