@@ -140,7 +140,7 @@ describe("/api/team-proxy", () => {
     const { DELETE } = await loadRoutes();
     const res = await DELETE(
       new Request("http://admin.local/api/team-proxy/x", { method: "DELETE" }),
-      { params: { email: "info@tagit.network" } },
+      { params: { email: "last@tagit.network" } },
     );
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ ok: false, error: "LAST_ADMIN" });
@@ -243,5 +243,95 @@ describe("/api/team-proxy — brand sessions", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)["x-business-id"]).toBeUndefined();
     expect(JSON.parse(String(init.body))).toEqual({ businessId: null });
+  });
+});
+
+describe("/api/team-proxy: owner account", () => {
+  const originalEnv = { ...process.env };
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const OWNER = "info@tagit.network";
+  const ctx = (email: string) => ({ params: Promise.resolve({ email }) });
+
+  beforeEach(() => {
+    process.env.SERVICES_API_KEY = TEST_KEY;
+    process.env.SERVICES_URL = "https://services.test";
+    // Another admin, not the owner: the rule holds whoever is signed in.
+    authState.session = { user: { email: "second@tagit.network", role: "admin" } };
+    fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            users: [
+              { email: OWNER, role: "admin", businessId: null },
+              { email: "second@tagit.network", role: "admin", businessId: null },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env = { ...originalEnv };
+  });
+
+  it.each([OWNER, "Info@TagIt.Network", "info%40tagit.network", " info@tagit.network "])(
+    "refuses to remove the owner written as %j, without calling upstream",
+    async (email) => {
+      const { DELETE } = await loadRoutes();
+      const res = await DELETE(
+        new Request("http://admin.local/x", { method: "DELETE" }),
+        ctx(email),
+      );
+      expect(res.status).toBe(409);
+      expect((await res.json()).code).toBe("PROTECTED_ADMIN");
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [{ role: "viewer" }],
+    [{ role: "operator" }],
+    [{ businessId: "biz-a" }],
+    [{ role: "admin", businessId: "biz-a" }],
+    [[]],
+    ["viewer"],
+    [null],
+  ])("refuses the owner change %j, without calling upstream", async (body) => {
+    const { PUT } = await loadRoutes();
+    const res = await PUT(jsonRequest("PUT", body), ctx(OWNER));
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards an owner request that changes nothing", async () => {
+    const { PUT } = await loadRoutes();
+    const res = await PUT(jsonRequest("PUT", { role: "admin", businessId: null }), ctx(OWNER));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still forwards removal and demotion of any other admin", async () => {
+    const { PUT, DELETE } = await loadRoutes();
+    await PUT(jsonRequest("PUT", { role: "viewer" }), ctx("second@tagit.network"));
+    await DELETE(
+      new Request("http://admin.local/x", { method: "DELETE" }),
+      ctx("xinfo@tagit.network"),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks the owner row, and only it, in the roster list", async () => {
+    const { GET } = await loadRoutes();
+    const data = (await (await GET()).json()) as {
+      users: Array<{ email: string; protected: boolean }>;
+    };
+    expect(data.users.map((u) => [u.email, u.protected])).toEqual([
+      [OWNER, true],
+      ["second@tagit.network", false],
+    ]);
   });
 });
