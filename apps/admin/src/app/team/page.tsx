@@ -127,7 +127,11 @@ export default function TeamPage() {
   }
 
   async function remove(email: string) {
-    if (!window.confirm(`Remove ${email} from the admin roster? Their next sign-in will have no access.`)) {
+    if (
+      !window.confirm(
+        `Remove ${email} from the admin roster? Their next sign-in will have no access.`,
+      )
+    ) {
       return;
     }
     setBusyEmail(email);
@@ -155,8 +159,8 @@ export default function TeamPage() {
             Team
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Who can sign in to this dashboard, and with which role. Roles apply at the next
-            sign-in or session refresh.
+            Who can sign in to this dashboard, and with which role. Roles apply at the next sign-in
+            or session refresh.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
@@ -190,7 +194,10 @@ export default function TeamPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(e) => void enroll(e)} className="grid gap-4 sm:grid-cols-[2fr,1fr,1.5fr,auto] items-end">
+          <form
+            onSubmit={(e) => void enroll(e)}
+            className="grid gap-4 sm:grid-cols-[2fr,1fr,1.5fr,auto] items-end"
+          >
             <div className="space-y-1.5">
               <Label htmlFor="team-email">Google email</Label>
               <Input
@@ -227,11 +234,7 @@ export default function TeamPage() {
               />
             </div>
             <Button type="submit" disabled={enrolling || newEmail.trim().length === 0}>
-              {enrolling ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                "Add"
-              )}
+              {enrolling ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Add"}
             </Button>
           </form>
         </CardContent>
@@ -249,9 +252,7 @@ export default function TeamPage() {
               Loading roster…
             </div>
           ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              No team members found.
-            </p>
+            <p className="text-sm text-muted-foreground py-6 text-center">No team members found.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
