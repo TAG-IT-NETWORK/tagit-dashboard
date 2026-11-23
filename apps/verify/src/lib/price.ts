@@ -25,6 +25,12 @@ export interface CanonicalPrice {
     methods?: unknown;
     /** True when the checkout is a demo: no real money moves. */
     demo?: unknown;
+    /**
+     * What the settle route takes as proof for this item (TAP-T15). Read
+     * through takesDemoOrder(): anything but the exact word "demo-order"
+     * means a payment.
+     */
+    proof?: unknown;
   };
 }
 
@@ -37,6 +43,15 @@ export function isPurchasable(price: CanonicalPrice | null | undefined): price i
     !!price.priceUsdc6 &&
     /^\d+$/.test(price.priceUsdc6)
   );
+}
+
+/**
+ * True when this item is taken with a demo order (signed by the buyer, no
+ * payment) and not with a payment. Only the server's exact word counts: a
+ * missing or unknown value means the buyer pays, which is the safe reading.
+ */
+export function takesDemoOrder(price: CanonicalPrice | null | undefined): boolean {
+  return price?.saleState === "listed" && price.purchase?.proof === "demo-order";
 }
 
 /** usdc6 → "$22.00". */

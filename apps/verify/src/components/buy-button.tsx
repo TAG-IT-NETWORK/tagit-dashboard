@@ -1,20 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
+import { usePrivy, useSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth";
 import { encodeFunctionData, type Hex } from "viem";
 import { COPY, isFailureAfterPayment, purchaseFailure, supportMailto } from "@/lib/consumer-copy";
 import { offeredMethods } from "@/lib/buy-methods";
-import { isPurchasable, priceDisplay, type CanonicalPrice } from "@/lib/price";
+import { DEMO_ORDER_LIFETIME_SECONDS, demoOrderMessage, type DemoOrder } from "@/lib/demo-order";
+import { isPurchasable, priceDisplay, takesDemoOrder, type CanonicalPrice } from "@/lib/price";
 
 import { PRIMARY_BUTTON } from "./shared";
 
 // Base Sepolia test USDC (6 decimals).
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const;
 const BASE_SEPOLIA = 84532;
-// When set, the buyer pays USDC (verified on-chain) before claiming. Off by
-// default so the gasless demo keeps working until we flip this on.
-const PAYMENT_ENABLED = process.env.NEXT_PUBLIC_SALE_REQUIRE_PAYMENT === "true";
 // Where a demo buyer gets free test funds for the demo checkout.
 const TEST_FUNDS_URL = "https://faucet.circle.com";
 
@@ -39,6 +37,10 @@ const erc20TransferAbi = [
  * price immediately before charging — a listing that was updated or delisted
  * between page load and tap is caught before any USDC moves. Payment amounts
  * are integer USDC-6 units straight from `priceUsdc6` (no floats).
+ *
+ * PROOF (TAP-T15): the settle route takes a verified USDC payment, or for a
+ * demo item an order signed by the buyer's wallet, and nothing else. Which one
+ * is the server's word (`purchase.proof`); there is no build-time switch.
  *
  * A 409 LISTING_STALE from settle (owner changed off-platform; services
  * auto-delists) surfaces as "just sold or taken off sale" and triggers a
@@ -84,6 +86,7 @@ export function BuyButton({
   const { ready, authenticated, user, login } = usePrivy();
   const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
+  const { signMessage } = useSignMessage();
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
@@ -123,10 +126,38 @@ export function BuyButton({
         return;
       }
 
-      // 1. Payment leg (when enabled): buyer pays USDC to the listing's payTo.
-      //    Gas is sponsored by Privy, so the buyer needs USDC but no ETH.
+      // 1. The proof (TAP-T15). The server takes one of two and says which
+      //    (`purchase.proof`): a USDC payment, or for a demo item an order
+      //    signed by this wallet. Anything but the server's exact word for a
+      //    demo order means the buyer pays.
       let paymentTxHash: Hex | undefined;
-      if (PAYMENT_ENABLED) {
+      let demoOrder: DemoOrder | undefined;
+      if (takesDemoOrder(fresh)) {
+        // No payment: the wallet signs a short text naming the item and
+        // itself. Privy shows that text to the buyer before signing.
+        setPhase("settling");
+        const expires = Math.floor(Date.now() / 1000) + DEMO_ORDER_LIFETIME_SECONDS;
+        try {
+          const { signature } = await signMessage(
+            {
+              message: demoOrderMessage({
+                tokenId,
+                buyer: buyerWallet,
+                chainId: fresh.purchase!.chainId,
+                expires,
+              }),
+            },
+            { address: buyerWallet },
+          );
+          demoOrder = { expires, signature };
+        } catch {
+          setError(purchaseFailure("failed", false));
+          setPhase("error");
+          return;
+        }
+      } else {
+        // The buyer pays USDC to the listing's payTo. Gas is sponsored by
+        // Privy, so the buyer needs USDC but no ETH.
         setPhase("paying");
         const data = encodeFunctionData({
           abi: erc20TransferAbi,
@@ -160,17 +191,18 @@ export function BuyButton({
           tokenId,
           buyerWallet,
           paymentTxHash,
-          priceUsdc: Number(fresh.priceUsdc6) / 1e6,
+          priceUsdc: paymentTxHash ? Number(fresh.priceUsdc6) / 1e6 : undefined,
+          demoOrder,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.status === 409 || data?.code === "LISTING_STALE") {
         setError(purchaseFailure("justSold", paid));
         setPhase("error");
         void refetchPrice(); // widget hides itself once the delist lands
         return;
       }
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data?.ok) {
         setError(purchaseFailure("failed", paid));
         setPhase("error");
         return;
@@ -181,7 +213,7 @@ export function BuyButton({
       setError(purchaseFailure("failed", paid));
       setPhase("error");
     }
-  }, [buyerWallet, tokenId, refetchPrice, sendTransaction]);
+  }, [buyerWallet, tokenId, refetchPrice, sendTransaction, signMessage]);
 
   // Carry on from the sheet (see `autoStart`). The two refs make each step
   // happen once, whatever re-renders in between.
