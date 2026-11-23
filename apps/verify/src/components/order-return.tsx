@@ -57,10 +57,11 @@ export function OrderReturn({
   }, [view, onView]);
 
   useEffect(() => {
-    if (!params || params.cancelled) return;
+    if (!params) return;
     return watchOrder({
       orderId: params.orderId,
       tokenId,
+      cancelled: params.cancelled,
       ask: askOrderFromProxy,
       show: setView,
       onRegistered: () => router.refresh(),

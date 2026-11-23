@@ -124,7 +124,10 @@ export async function startCardCheckout(input: {
 
 export interface OrderReturn {
   orderId: string;
-  /** The buyer pressed "back" on the checkout page. Nothing was paid. */
+  /**
+   * The address says the buyer pressed "back" on the checkout page. A hint
+   * about what to say for an unpaid order, and nothing more (see watchOrder).
+   */
   cancelled: boolean;
 }
 
@@ -186,10 +189,14 @@ export type OrderView =
   /** Asked for the whole time and never got an answer. */
   | { kind: "unknown" };
 
-/** The first thing to show for a return address, before anything is asked. */
+/**
+ * The first thing to show for a return address, before anything is asked.
+ * Never "cancelled": that word in the address is the buyer's browser's, and
+ * an old tab or an edited address can carry it for an order that was paid.
+ * "You haven't been charged" is said only after the server has answered.
+ */
 export function firstOrderView(found: OrderReturn | null): OrderView {
-  if (!found) return { kind: "none" };
-  return found.cancelled ? { kind: "cancelled" } : { kind: "asking" };
+  return found ? { kind: "asking" } : { kind: "none" };
 }
 
 /**
@@ -225,6 +232,8 @@ export const askOrderFromProxy: AskOrder = async (orderId) => {
  *
  *   no such order, or an order for another item   show nothing, stop
  *   registered / problem / expired                show it, stop
+ *   waiting, and the buyer came back "cancelled"  say so, stop: the server
+ *                                                 confirms nothing was paid
  *   waiting / paid                                show it, ask again
  *   no answer                                     keep what is shown, ask again
  *   the limit                                     "slow" if the order was ever
@@ -233,6 +242,8 @@ export const askOrderFromProxy: AskOrder = async (orderId) => {
 export function watchOrder(input: {
   orderId: string;
   tokenId: string;
+  /** The address said the buyer left without paying. Believed only for an order the server calls unpaid. */
+  cancelled?: boolean;
   ask: AskOrder;
   show: (view: OrderView) => void;
   /** Called once, when the order is registered: the page's record is older than the payment. */
@@ -262,6 +273,10 @@ export function watchOrder(input: {
     }
     if (answer) {
       seen = true;
+      if (input.cancelled && answer.state === "waiting") {
+        input.show({ kind: "cancelled" });
+        return;
+      }
       input.show({ kind: "order", order: answer });
       if (isFinalOrderState(answer.state)) {
         if (answer.state === "registered") input.onRegistered?.();

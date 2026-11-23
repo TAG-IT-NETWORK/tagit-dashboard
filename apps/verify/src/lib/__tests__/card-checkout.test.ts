@@ -163,9 +163,9 @@ describe("order ids and return addresses", () => {
     }
   });
 
-  it("starts with what the address alone allows: nothing about a payment", () => {
+  it("starts with what the address alone allows: nothing about a payment, cancelled or not", () => {
     expect(firstOrderView(null)).toEqual({ kind: "none" });
-    expect(firstOrderView({ orderId: ORDER, cancelled: true })).toEqual({ kind: "cancelled" });
+    expect(firstOrderView({ orderId: ORDER, cancelled: true })).toEqual({ kind: "asking" });
     expect(firstOrderView({ orderId: ORDER, cancelled: false })).toEqual({ kind: "asking" });
   });
 });
@@ -324,16 +324,17 @@ describe("watchOrder", () => {
   });
 
   /** Runs a watch with a hand-cranked clock: `tick()` fires the next scheduled question. */
-  function watch(answers: Array<OrderAnswer | "missing" | null>, limit = 5) {
+  function watch(answers: Array<OrderAnswer | "missing" | null>, limit = 5, cancelled = false) {
     const views: OrderView[] = [];
     const pending: Array<() => void> = [];
-    const cancelled: unknown[] = [];
+    const cancelledHandles: unknown[] = [];
     let registered = 0;
     let i = 0;
     const ask: AskOrder = vi.fn(async () => answers[Math.min(i++, answers.length - 1)] ?? null);
     const stop = watchOrder({
       orderId: ORDER,
       tokenId: "62",
+      cancelled,
       ask,
       show: (view) => views.push(view),
       onRegistered: () => (registered += 1),
@@ -343,7 +344,7 @@ describe("watchOrder", () => {
         pending.push(run);
         return pending.length;
       },
-      cancel: (handle) => cancelled.push(handle),
+      cancel: (handle) => cancelledHandles.push(handle),
     });
     const settle = () => new Promise((resolve) => setImmediate(resolve));
     const tick = async () => {
@@ -357,7 +358,7 @@ describe("watchOrder", () => {
       tick,
       settle,
       pending,
-      cancelled,
+      cancelledHandles,
       registered: () => registered,
     };
   }
@@ -428,9 +429,44 @@ describe("watchOrder", () => {
     await w.settle();
     expect(w.pending).toHaveLength(1);
     w.stop();
-    expect(w.cancelled).toHaveLength(1);
+    expect(w.cancelledHandles).toHaveLength(1);
     await w.tick();
     expect(w.views).toHaveLength(1);
+  });
+
+  it("believes 'cancelled' only for an order the server calls unpaid, and then stops", async () => {
+    const w = watch([order("waiting")], 5, true);
+    await w.settle();
+    expect(w.views).toEqual([{ kind: "cancelled" }]);
+    expect(w.pending).toHaveLength(0);
+    expect(w.ask).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["paid", "registered", "problem"] as const)(
+    "shows a %s order as it is, whatever the address says about cancelling",
+    async (state) => {
+      const w = watch([order(state)], 5, true);
+      await w.settle();
+      expect(w.views).toEqual([{ kind: "order", order: order(state) }]);
+      expect(w.views.some((v) => v.kind === "cancelled")).toBe(false);
+    },
+  );
+
+  it("says nothing about a cancelled checkout while the server has not answered", async () => {
+    const w = watch([null], 2, true);
+    await w.settle();
+    expect(w.views).toEqual([]);
+    await w.tick();
+    expect(w.views).toEqual([{ kind: "unknown" }]);
+  });
+
+  it("shows nothing for a 'cancelled' order that does not exist or is another item's", async () => {
+    const missing = watch(["missing"], 5, true);
+    await missing.settle();
+    expect(missing.views).toEqual([{ kind: "none" }]);
+    const other = watch([order("waiting", { tokenId: "63" })], 5, true);
+    await other.settle();
+    expect(other.views).toEqual([{ kind: "none" }]);
   });
 
   it("drops an answer that arrives after it was stopped", async () => {
