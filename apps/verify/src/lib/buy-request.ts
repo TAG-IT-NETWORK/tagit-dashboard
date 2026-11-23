@@ -13,6 +13,7 @@
  */
 
 import type { DemoOrder } from "./demo-order";
+import { parseTokenId } from "./verdict";
 
 export interface BuyRequest {
   tokenId: string;
@@ -26,7 +27,6 @@ export type ParsedBuyRequest =
   | { ok: true; value: BuyRequest }
   | { ok: false; status: 400 | 402; code: "INVALID_REQUEST" | "PAYMENT_REQUIRED" };
 
-const TOKEN_ID = /^\d{1,30}$/;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
 const SIGNATURE = /^0x[0-9a-fA-F]{130}$/;
@@ -44,11 +44,15 @@ export function parseBuyRequest(body: unknown): ParsedBuyRequest {
     return { ok: false, status: 400, code: "INVALID_REQUEST" };
   }
   const raw = body as Record<string, unknown>;
-  const tokenId = typeof raw.tokenId === "string" ? raw.tokenId : "";
+  // The same reading of an item number as everywhere else in this app (any
+  // uint256, as a decimal string). A narrower one here would refuse an item
+  // the page could show, after the buyer had already paid for it.
+  const parsedId = typeof raw.tokenId === "string" ? parseTokenId(raw.tokenId) : null;
   const buyerWallet = typeof raw.buyerWallet === "string" ? raw.buyerWallet : "";
-  if (!TOKEN_ID.test(tokenId) || !ADDRESS.test(buyerWallet)) {
+  if (parsedId === null || !ADDRESS.test(buyerWallet)) {
     return { ok: false, status: 400, code: "INVALID_REQUEST" };
   }
+  const tokenId = parsedId.toString();
 
   // A proof that is present but malformed is a bad request, not a missing one.
   if (raw.paymentTxHash !== undefined && raw.paymentTxHash !== null) {

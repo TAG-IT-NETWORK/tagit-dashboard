@@ -71,10 +71,25 @@ describe("parseBuyRequest", () => {
       { tokenId: 58, buyerWallet: BUYER, paymentTxHash: PAY },
       { tokenId: "58x", buyerWallet: BUYER, paymentTxHash: PAY },
       { tokenId: "58", buyerWallet: "0x123", paymentTxHash: PAY },
-      { tokenId: "9".repeat(31), buyerWallet: BUYER, paymentTxHash: PAY },
+      { tokenId: "9".repeat(79), buyerWallet: BUYER, paymentTxHash: PAY },
+      { tokenId: (2n ** 256n).toString(), buyerWallet: BUYER, paymentTxHash: PAY },
+      { tokenId: "-1", buyerWallet: BUYER, paymentTxHash: PAY },
     ]) {
       expect(parseBuyRequest(body)).toMatchObject({ ok: false, status: 400 });
     }
+  });
+
+  it("takes any item number the registry can hold, and sends it on in one spelling", () => {
+    const largest = (2n ** 256n - 1n).toString();
+    expect(
+      parseBuyRequest({ tokenId: largest, buyerWallet: BUYER, paymentTxHash: PAY }),
+    ).toMatchObject({ ok: true, value: { tokenId: largest } });
+    expect(
+      parseBuyRequest({ tokenId: "9".repeat(40), buyerWallet: BUYER, paymentTxHash: PAY }),
+    ).toMatchObject({ ok: true });
+    expect(
+      parseBuyRequest({ tokenId: "058", buyerWallet: BUYER, paymentTxHash: PAY }),
+    ).toMatchObject({ ok: true, value: { tokenId: "58" } });
   });
 
   it("sends on only what it knows, and the payment alone when both proofs come", () => {
