@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge } from "@tagit/ui";
-import { Loader2, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
+import { Loader2, Lock, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
 
 import { ROLES, type Role } from "@/lib/rbac";
 
@@ -21,6 +21,8 @@ interface AdminUser {
   role: Role;
   businessId: string | null;
   createdAt?: string;
+  /** Owner account: the server refuses to remove, demote or re-home it. */
+  protected?: boolean;
 }
 
 interface RosterResponse {
@@ -127,7 +129,11 @@ export default function TeamPage() {
   }
 
   async function remove(email: string) {
-    if (!window.confirm(`Remove ${email} from the admin roster? Their next sign-in will have no access.`)) {
+    if (
+      !window.confirm(
+        `Remove ${email} from the admin roster? Their next sign-in will have no access.`,
+      )
+    ) {
       return;
     }
     setBusyEmail(email);
@@ -155,8 +161,8 @@ export default function TeamPage() {
             Team
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Who can sign in to this dashboard, and with which role. Roles apply at the next
-            sign-in or session refresh.
+            Who can sign in to this dashboard, and with which role. Roles apply at the next sign-in
+            or session refresh.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
@@ -190,7 +196,10 @@ export default function TeamPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(e) => void enroll(e)} className="grid gap-4 sm:grid-cols-[2fr,1fr,1.5fr,auto] items-end">
+          <form
+            onSubmit={(e) => void enroll(e)}
+            className="grid gap-4 sm:grid-cols-[2fr,1fr,1.5fr,auto] items-end"
+          >
             <div className="space-y-1.5">
               <Label htmlFor="team-email">Google email</Label>
               <Input
@@ -227,11 +236,7 @@ export default function TeamPage() {
               />
             </div>
             <Button type="submit" disabled={enrolling || newEmail.trim().length === 0}>
-              {enrolling ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                "Add"
-              )}
+              {enrolling ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Add"}
             </Button>
           </form>
         </CardContent>
@@ -249,9 +254,7 @@ export default function TeamPage() {
               Loading roster…
             </div>
           ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">
-              No team members found.
-            </p>
+            <p className="text-sm text-muted-foreground py-6 text-center">No team members found.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -266,12 +269,20 @@ export default function TeamPage() {
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.email} className="border-b border-border/50 last:border-0">
-                      <td className="py-3 pr-4 font-medium">{user.email}</td>
+                      <td className="py-3 pr-4 font-medium">
+                        {user.email}
+                        {user.protected && (
+                          <Badge variant="outline" className="ml-2 align-middle">
+                            Owner
+                          </Badge>
+                        )}
+                      </td>
                       <td className="py-3 pr-4">
                         <select
                           aria-label={`Role for ${user.email}`}
                           value={user.role}
-                          disabled={busyEmail === user.email}
+                          disabled={busyEmail === user.email || user.protected === true}
+                          title={user.protected ? "Owner account: the role is fixed" : undefined}
                           onChange={(e) => void changeRole(user.email, e.target.value as Role)}
                           className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                         >
@@ -286,19 +297,29 @@ export default function TeamPage() {
                         {user.businessId ?? <span className="italic">platform</span>}
                       </td>
                       <td className="py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Remove ${user.email}`}
-                          disabled={busyEmail === user.email}
-                          onClick={() => void remove(user.email)}
-                        >
-                          {busyEmail === user.email ? (
-                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
-                          )}
-                        </Button>
+                        {user.protected ? (
+                          <span
+                            className="inline-flex h-9 items-center px-3 text-muted-foreground"
+                            title="Owner account: cannot be removed"
+                          >
+                            <Lock className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Owner account, cannot be removed</span>
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Remove ${user.email}`}
+                            disabled={busyEmail === user.email}
+                            onClick={() => void remove(user.email)}
+                          >
+                            {busyEmail === user.email ? (
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
+                            )}
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}

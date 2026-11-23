@@ -27,10 +27,19 @@ export async function PUT(req: Request, props: RouteContext) {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
   }
-  return proxyTeamRequest({ method: "PUT", path: teamUserPath(params.email), body });
+  return proxyTeamRequest({
+    method: "PUT",
+    path: teamUserPath(params.email),
+    body,
+    target: params.email,
+  });
 }
 
 export async function DELETE(_req: Request, props: RouteContext) {
   const params = await props.params;
-  return proxyTeamRequest({ method: "DELETE", path: teamUserPath(params.email) });
+  return proxyTeamRequest({
+    method: "DELETE",
+    path: teamUserPath(params.email),
+    target: params.email,
+  });
 }
