@@ -12,18 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tagit/auth": "workspace:*",
-    "@tagit/config": "workspace:*",
-    "@tagit/contracts": "workspace:*",
     "@tagit/ui": "workspace:*",
-    "@tanstack/react-query": "^5.62.0",
     "lucide-react": "^0.468.0",
     "next": "^15.5.29",
     "next-auth": "5.0.0-beta.32",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "viem": "^2.21.51",
-    "wagmi": "^2.19.5"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

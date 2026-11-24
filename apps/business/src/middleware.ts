@@ -87,8 +87,8 @@ export const config = {
   //
   // Skipped: Next's own build files, and the files in /public BY NAME. There
   // is no "anything that ends in .png" rule: a page address can end like a
-  // file too (/products/x.png is the products/[id] page), and that must meet
-  // the gate. A file added to /public is gated until it is named here; the
+  // file too (a page with an id in it, opened as /…/x.png), and that must
+  // meet the gate. A file added to /public is gated until it is named here; the
   // unit tests fail until it is.
   matcher: ["/((?!_next/static/|_next/image$|favicon\\.ico$|tagit_logo\\.png$).*)"],
 };

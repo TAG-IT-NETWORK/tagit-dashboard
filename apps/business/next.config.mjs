@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@tagit/ui", "@tagit/contracts", "@tagit/auth", "@tagit/config"],
+  transpilePackages: ["@tagit/ui"],
   async headers() {
     return [
       {

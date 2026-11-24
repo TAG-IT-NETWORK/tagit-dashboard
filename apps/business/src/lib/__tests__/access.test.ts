@@ -109,7 +109,7 @@ describe("evaluateAccess", () => {
   });
 
   it("keeps a brand session out of every path that is not listed", () => {
-    // The old wallet prototype screens are still in the code; none is listed.
+    // The old wallet prototype addresses, and a few look-alikes of /home.
     for (const path of [
       "/dashboard",
       "/products",
@@ -189,7 +189,7 @@ describe("the matcher mirror", () => {
   });
 
   it("gates a page address even when it ends like a file", () => {
-    // /products/[id] and /agents/[id] are real pages: an id may end in .png.
+    // A page address may end like a file (an id such as x.png) and must still be gated.
     for (const path of [
       "/products/anything.png",
       "/agents/anything.svg",
