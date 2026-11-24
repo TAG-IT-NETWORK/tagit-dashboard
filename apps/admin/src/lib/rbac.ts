@@ -140,6 +140,10 @@ export const PATH_ROLES: ReadonlyArray<
   ["/resolve", "admin"],
   ["/team", "admin"],
   ["/api/team-proxy", "admin"],
+  // admin — brand records and "create for a brand" (TAP-T16). Not in
+  // TENANT_PREFIXES: a brand session cannot reach either, whatever its role.
+  ["/brands", "admin"],
+  ["/api/brand-proxy", "admin"],
   // admin — T33 template lifecycle verbs (WB-06): publish snapshots a live
   // version, archive retires it, propagate relayer-broadcasts re-renders
   ["/api/catalog-proxy/templates/*/publish", "admin"],

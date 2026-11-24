@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge } from "@tagit/ui";
 import { Loader2, Lock, RefreshCw, Trash2, UserPlus, UsersRound } from "lucide-react";
 
+import { parseBrands, type Brand } from "@/lib/brands";
 import { ROLES, type Role } from "@/lib/rbac";
 
 /**
@@ -53,6 +54,34 @@ export default function TeamPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("viewer");
   const [newBusinessId, setNewBusinessId] = useState("");
+  // Brands to choose from (TAP-T16). Stays null for anyone who is not a
+  // platform admin: a brand admin adds people to their own brand only, and
+  // the server fills that in.
+  const [brands, setBrands] = useState<Brand[] | null>(null);
+  const [actingBrand, setActingBrand] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [list, who] = await Promise.all([
+          fetch("/api/brand-proxy", { cache: "no-store" }),
+          fetch("/api/brand-proxy/acting", { cache: "no-store" }),
+        ]);
+        if (cancelled || !list.ok) return;
+        const body = (await list.json()) as { businesses?: unknown };
+        const acting = who.ok ? ((await who.json()) as { acting?: unknown }).acting : null;
+        if (cancelled) return;
+        setBrands(parseBrands(body.businesses));
+        setActingBrand(typeof acting === "string" ? acting : null);
+      } catch {
+        // No picker: the member is added where the server puts them.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [enrolling, setEnrolling] = useState(false);
 
   const load = useCallback(async () => {
@@ -90,7 +119,8 @@ export default function TeamPage() {
         body: JSON.stringify({
           email: newEmail.trim(),
           role: newRole,
-          ...(newBusinessId.trim() ? { businessId: newBusinessId.trim() } : {}),
+          // Only a platform admin who is not creating for a brand names one.
+          ...(brands && !actingBrand && newBusinessId ? { businessId: newBusinessId } : {}),
         }),
       });
       const data = (await res.json()) as RosterResponse;
@@ -227,13 +257,33 @@ export default function TeamPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="team-business">Business ID (optional)</Label>
-              <Input
-                id="team-business"
-                placeholder="platform-wide when empty"
-                value={newBusinessId}
-                onChange={(e) => setNewBusinessId(e.target.value)}
-              />
+              <Label htmlFor="team-business">Brand</Label>
+              {actingBrand ? (
+                <p id="team-business" className="flex h-10 items-center text-sm font-mono">
+                  {actingBrand}
+                </p>
+              ) : brands ? (
+                <select
+                  id="team-business"
+                  value={newBusinessId}
+                  onChange={(e) => setNewBusinessId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Platform (all brands)</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p
+                  id="team-business"
+                  className="flex h-10 items-center text-sm text-muted-foreground"
+                >
+                  Your brand
+                </p>
+              )}
             </div>
             <Button type="submit" disabled={enrolling || newEmail.trim().length === 0}>
               {enrolling ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Add"}

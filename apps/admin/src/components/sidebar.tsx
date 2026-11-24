@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@tagit/ui";
 import {
+  Building2,
   LayoutDashboard,
   Package,
   Users,
@@ -107,6 +108,9 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
       // META-T32: admin_users roster CRUD. Visible to everyone; the role
       // middleware sends non-admins to /403.
       { name: "Team", href: "/team", icon: UsersRound },
+      // TAP-T16: brand records and "create for a brand". Platform admins only
+      // (the role middleware sends everyone else to /403).
+      { name: "Brands", href: "/brands", icon: Building2, platformOnly: true },
     ],
   },
   {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getTenant } from "@/lib/actor";
+import { getSessionTenant, getTenantContext } from "@/lib/actor";
 import { Inter } from "next/font/google";
 import { ClientShell } from "./client-shell";
 import "./globals.css";
@@ -17,11 +17,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Tenant-scoped (brand) sessions get the operations menu only; see Sidebar.
-  const tenant = await getTenant();
+  // The menu follows who the user IS, never the brand a platform admin is
+  // creating for (TAP-T16): that one is shown as a banner instead.
+  const tenant = await getSessionTenant();
+  const context = await getTenantContext();
+  const actingBrand = context.acting ? context.tenant : null;
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <ClientShell tenant={tenant}>{children}</ClientShell>
+        <ClientShell tenant={tenant} actingBrand={actingBrand}>
+          {children}
+        </ClientShell>
       </body>
     </html>
   );
