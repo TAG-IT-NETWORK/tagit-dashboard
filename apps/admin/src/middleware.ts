@@ -70,10 +70,12 @@ export default auth((req) => {
 export const config = {
   // MUST stay an inline literal (Next parses it statically). Mirrored by
   // GATE_MATCHER_RE in src/lib/rbac.ts — keep the two in sync (pinned by the
-  // rbac unit tests). Skips Next internals and /public static assets — but
-  // the static-extension exclusion does NOT apply under /api/ (WB-08):
-  // /api/team-proxy/foo.png must hit the gate like any other API call.
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|(?!api/).*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*)",
-  ],
+  // rbac unit tests).
+  //
+  // Skipped: Next's own build files, and the files in /public BY NAME. There
+  // is no "anything that ends in .png" rule: a page address can end like a
+  // file too (/assets/x.png is the assets/[id] page), and that must meet the
+  // gate. A file added to /public is gated until it is named here; the rbac
+  // unit tests fail until it is.
+  matcher: ["/((?!_next/static/|_next/image$|favicon\\.ico$|tagit_logo\\.png$).*)"],
 };

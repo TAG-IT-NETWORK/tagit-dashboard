@@ -248,13 +248,15 @@ export function evaluateAccess(
 /**
  * Mirror of the static `config.matcher` regex in src/middleware.ts — Next.js
  * requires the real matcher to be an inline literal, so the two MUST be kept
- * in sync by hand (the rbac unit tests pin this one). Excluded: Next
- * internals and static assets served from /public. WB-08: the extension
- * exclusion does NOT apply to /api/ paths — an extension-shaped API URL
- * (/api/team-proxy/foo.png) must never skip the gate.
+ * in sync by hand (the rbac unit tests pin both).
+ *
+ * Skipped: Next's own build files, and the files in /public by NAME. There is
+ * deliberately no rule for "anything that ends like a file": a page address
+ * can end in .png too (/assets/x.png is the assets/[id] page), and it must
+ * meet the gate. This also covers WB-08: nothing under /api/ is ever skipped.
  */
 export const GATE_MATCHER_RE =
-  /^\/(?!_next\/static|_next\/image|favicon\.ico|(?!api\/).*\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*/;
+  /^\/(?!_next\/static\/|_next\/image$|favicon\.ico$|tagit_logo\.png$).*/;
 
 /** True when the middleware matcher would run the gate for this path. */
 export function isGatedByMatcher(pathname: string): boolean {
