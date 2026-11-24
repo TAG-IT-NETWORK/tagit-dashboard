@@ -40,9 +40,13 @@ test.describe("P1 landing", () => {
     await expect(page.getByText("Pay as you go")).toBeVisible();
     await expect(page.getByRole("link", { name: "Talk to sales" })).toBeVisible();
 
-    // Conversion CTAs are reachable without a wallet
+    // Conversion CTAs: a demo for newcomers, sign-in for customers. No wallet anywhere.
     await expect(page.getByRole("link", { name: "Request a demo" }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Launch app" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" }).first()).toHaveAttribute(
+      "href",
+      "/signin",
+    );
+    await expect(page.getByRole("button", { name: /launch app|connect wallet/i })).toHaveCount(0);
   });
 
   test("request-access form validates, POSTs the lead, and reaches the success state", async ({
