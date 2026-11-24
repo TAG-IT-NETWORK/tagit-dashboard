@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@tagit/ui";
 import {
+  Building2,
   LayoutDashboard,
   Package,
   Users,
@@ -27,7 +28,9 @@ import {
   BookOpen,
   Nfc,
   ScanLine,
-  Cpu, Sparkles } from "lucide-react";
+  Cpu,
+  Sparkles,
+} from "lucide-react";
 import { useState } from "react";
 
 import type { LucideIcon } from "lucide-react";
@@ -64,7 +67,10 @@ interface NavGroup {
  * Platform-only items (on-chain governance, capabilities, AI agents, test
  * consoles) are hidden for them — the proxies enforce tenant scope server-side.
  */
-export function visibleNavGroups<T extends { items: ReadonlyArray<{ platformOnly?: boolean }> }>(groups: readonly T[], tenant: string | null): T[] {
+export function visibleNavGroups<T extends { items: ReadonlyArray<{ platformOnly?: boolean }> }>(
+  groups: readonly T[],
+  tenant: string | null,
+): T[] {
   if (!tenant) return [...groups];
   return groups
     .map((g) => ({ ...g, items: g.items.filter((it) => !it.platformOnly) }))
@@ -102,6 +108,9 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
       // META-T32: admin_users roster CRUD. Visible to everyone; the role
       // middleware sends non-admins to /403.
       { name: "Team", href: "/team", icon: UsersRound },
+      // TAP-T16: brand records and "create for a brand". Platform admins only
+      // (the role middleware sends everyone else to /403).
+      { name: "Brands", href: "/brands", icon: Building2, platformOnly: true },
     ],
   },
   {
@@ -121,7 +130,12 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     accent: "border-amber-500",
     items: [
       { name: "AI Agents", href: "/agents", icon: BrainCircuit, platformOnly: true },
-      { name: "Agent Catalog", href: "/agents/catalog", icon: Sparkles, match: (p) => p.startsWith("/agents/catalog") },
+      {
+        name: "Agent Catalog",
+        href: "/agents/catalog",
+        icon: Sparkles,
+        match: (p) => p.startsWith("/agents/catalog"),
+      },
       { name: "BD Agent", href: "/adagent", icon: Bot, platformOnly: true },
       { name: "Influencer", href: "/influencer", icon: Megaphone, platformOnly: true },
       { name: "Demo", href: "/demo", icon: Play, platformOnly: true },
@@ -132,7 +146,9 @@ export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     dot: "bg-zinc-500",
     accent: "border-zinc-500",
     muted: true,
-    items: [{ name: "Lifecycle Console", href: "/test/console", icon: FlaskConical, platformOnly: true }],
+    items: [
+      { name: "Lifecycle Console", href: "/test/console", icon: FlaskConical, platformOnly: true },
+    ],
   },
 ];
 
@@ -197,7 +213,10 @@ export function Sidebar({ tenant = null, mobileOpen = false, onMobileClose }: Si
               <div key={group.name} className={cn(gi > 0 && "mt-4", group.muted && "opacity-70")}>
                 {!collapsed || isDrawer ? (
                   <div className="flex items-center gap-2 px-3 pb-1.5">
-                    <span className={cn("h-1.5 w-1.5 rounded-full", group.dot)} aria-hidden="true" />
+                    <span
+                      className={cn("h-1.5 w-1.5 rounded-full", group.dot)}
+                      aria-hidden="true"
+                    />
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {group.name}
                     </span>

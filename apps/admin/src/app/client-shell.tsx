@@ -54,10 +54,19 @@ const ClientShellContent = dynamic(
   {
     ssr: false,
     loading: () => <LoadingScreen />,
-  }
+  },
 );
 
-export function ClientShell({ children, tenant = null }: { children: ReactNode; tenant?: string | null }) {
+export function ClientShell({
+  children,
+  tenant = null,
+  actingBrand = null,
+}: {
+  children: ReactNode;
+  tenant?: string | null;
+  /** The brand a platform admin is creating for, if any (TAP-T16). */
+  actingBrand?: string | null;
+}) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -69,5 +78,9 @@ export function ClientShell({ children, tenant = null }: { children: ReactNode; 
     return <LoadingScreen />;
   }
 
-  return <ClientShellContent tenant={tenant}>{children}</ClientShellContent>;
+  return (
+    <ClientShellContent tenant={tenant} actingBrand={actingBrand}>
+      {children}
+    </ClientShellContent>
+  );
 }

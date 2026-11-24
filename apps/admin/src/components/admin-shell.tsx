@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { useAccount } from "wagmi";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+import { ActingBrandBanner } from "./acting-brand-banner";
 import { Button } from "@tagit/ui";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Wallet, Loader2 } from "lucide-react";
@@ -12,9 +13,11 @@ interface AdminShellProps {
   children: ReactNode;
   /** Tenant id of a business-scoped session (trims the menu); null for platform users. */
   tenant?: string | null;
+  /** The brand a platform admin is creating for, if any (TAP-T16). */
+  actingBrand?: string | null;
 }
 
-export function AdminShell({ children, tenant = null }: AdminShellProps) {
+export function AdminShell({ children, tenant = null, actingBrand = null }: AdminShellProps) {
   const { isConnected, isConnecting } = useAccount();
   const { openConnectModal } = useConnectModal();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -29,6 +32,7 @@ export function AdminShell({ children, tenant = null }: AdminShellProps) {
       <Sidebar tenant={tenant} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header onMenuClick={() => setMobileOpen(true)} />
+        {actingBrand && <ActingBrandBanner brandId={actingBrand} />}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {isConnecting ? (
