@@ -3,6 +3,7 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { baseSepolia } from "viem/chains";
 import { BuyButton } from "./buy-button";
+import { CardButton } from "./card-button";
 import type { CanonicalPrice } from "@/lib/price";
 
 /**
@@ -14,6 +15,7 @@ import type { CanonicalPrice } from "@/lib/price";
  */
 export default function BuyCheckout({
   appId,
+  method = "crypto",
   tokenId,
   productName,
   price,
@@ -23,6 +25,8 @@ export default function BuyCheckout({
   onChooseAnother,
 }: {
   appId: string;
+  /** The way to pay that was chosen in the sheet. Both need the same sign-in. */
+  method?: "card" | "crypto";
   tokenId: string;
   productName: string;
   price: CanonicalPrice;
@@ -47,15 +51,26 @@ export default function BuyCheckout({
         },
       }}
     >
-      <BuyButton
-        tokenId={tokenId}
-        productName={productName}
-        price={price}
-        refetchPrice={refetchPrice}
-        demo={demo}
-        autoStart={autoStart}
-        onChooseAnother={onChooseAnother}
-      />
+      {method === "card" ? (
+        <CardButton
+          tokenId={tokenId}
+          productName={productName}
+          price={price}
+          refetchPrice={refetchPrice}
+          demo={demo}
+          onChooseAnother={onChooseAnother}
+        />
+      ) : (
+        <BuyButton
+          tokenId={tokenId}
+          productName={productName}
+          price={price}
+          refetchPrice={refetchPrice}
+          demo={demo}
+          autoStart={autoStart}
+          onChooseAnother={onChooseAnother}
+        />
+      )}
     </PrivyProvider>
   );
 }

@@ -83,8 +83,15 @@ export type BuyFlowEvent =
   | { type: "choose"; method: PayMethod }
   | { type: "chooseAnother" };
 
-/** The methods this build can take a payment with. Card and PayPal arrive with TAP-T14. */
-export const READY_METHODS: readonly PayMethod[] = ["crypto"];
+/** The methods this build can take a payment with. PayPal is not one yet. */
+export const READY_METHODS: readonly PayMethod[] = ["card", "crypto"];
+
+/**
+ * The methods that need the buyer signed in to their account here: the item is
+ * registered to that account, whichever way it is paid for. Without the
+ * sign-in service configured, these are not offered.
+ */
+export const SIGN_IN_METHODS: readonly PayMethod[] = ["card", "crypto"];
 
 export function buyFlowReducer(
   state: BuyFlow,

@@ -8,6 +8,7 @@ import {
   isDemoCheckout,
   methodsLine,
   offeredMethods,
+  SIGN_IN_METHODS,
   type BuyFlow,
   type BuyFlowEvent,
   type PayMethod,
@@ -35,8 +36,9 @@ import { PRIMARY_BUTTON } from "./shared";
  * PERF: the wallet stack (Privy + wagmi/viem, ~600 KB gzipped) is a lazy
  * chunk (./buy-checkout). It is not asked for until the sheet opens, so a
  * shopper who only checks a product never downloads it, and "Buy now" works
- * the moment the price is known. The crypto wallet needs
- * NEXT_PUBLIC_PRIVY_APP_ID; without it that way is not offered.
+ * the moment the price is known. Card and crypto wallet both need the buyer
+ * signed in (NEXT_PUBLIC_PRIVY_APP_ID): the item is registered to that
+ * account. Without it neither is offered.
  */
 
 const loadCheckout = () => import("./buy-checkout");
@@ -73,7 +75,7 @@ export function BuyWidget(props: { tokenId: string; productName: string }) {
   }, [refetchPrice]);
 
   const offered = useMemo<PayMethod[]>(
-    () => offeredMethods(price).filter((method) => method !== "crypto" || !!appId),
+    () => offeredMethods(price).filter((method) => !SIGN_IN_METHODS.includes(method) || !!appId),
     [price, appId],
   );
 
@@ -94,7 +96,7 @@ export function BuyWidget(props: { tokenId: string; productName: string }) {
 
   const open = useCallback(() => {
     // Start fetching the wallet stack while the shopper reads the sheet.
-    if (offered.includes("crypto")) void loadCheckout();
+    if (offered.some((method) => SIGN_IN_METHODS.includes(method))) void loadCheckout();
     send({ type: "open" });
   }, [offered, send]);
 
@@ -104,10 +106,11 @@ export function BuyWidget(props: { tokenId: string; productName: string }) {
   placeholderDisplay = display;
   const demo = isDemoCheckout(price);
 
-  if (flow.step === "method" && flow.method === "crypto" && appId) {
+  if (flow.step === "method" && SIGN_IN_METHODS.includes(flow.method) && appId) {
     return (
       <BuyCheckout
         appId={appId}
+        method={flow.method === "card" ? "card" : "crypto"}
         tokenId={props.tokenId}
         productName={props.productName}
         price={price}

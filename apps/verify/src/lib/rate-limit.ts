@@ -218,7 +218,10 @@ export function createRateLimitStore(): RateLimitStore {
  * agent's legitimate MCP traffic 429 a human loading /asset/50 in a browser from
  * the same NAT. Different costs, different ceilings, different counters.
  */
-export function clientKey(headers: Headers, scope: "asset" | "mcp" | "buy" = "asset"): string {
+export function clientKey(
+  headers: Headers,
+  scope: "asset" | "mcp" | "buy" | "checkout" | "order" = "asset",
+): string {
   const forwarded = headers.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0]?.trim() || headers.get("x-real-ip")?.trim() || "unknown";
   return `rl:${scope}:${ip}`;
