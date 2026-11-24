@@ -84,7 +84,11 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 export const config = {
   // MUST stay an inline literal (Next reads it statically). Mirrored by
   // GATE_MATCHER_RE in src/lib/access.ts; the unit tests pin that one.
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|(?!api/).*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*)",
-  ],
+  //
+  // Skipped: Next's own build files, and the files in /public BY NAME. There
+  // is no "anything that ends in .png" rule: a page address can end like a
+  // file too (/products/x.png is the products/[id] page), and that must meet
+  // the gate. A file added to /public is gated until it is named here; the
+  // unit tests fail until it is.
+  matcher: ["/((?!_next/static/|_next/image$|favicon\\.ico$|tagit_logo\\.png$).*)"],
 };

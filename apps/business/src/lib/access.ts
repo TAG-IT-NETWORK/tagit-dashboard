@@ -178,12 +178,14 @@ export function safeCallbackPath(value: unknown): string {
 /**
  * Mirror of the static `config.matcher` in src/middleware.ts. Next needs the
  * real one as an inline literal, so the two are kept in step by hand (the
- * unit tests pin this one). Skipped: Next internals and static files from
- * /public. The file-extension rule does NOT apply under /api/: a route
- * address that merely ends in .png must still meet the gate.
+ * unit tests pin both).
+ *
+ * Skipped: Next's own build files, and the files in /public by NAME. There is
+ * deliberately no rule for "anything that ends like a file": a page address
+ * can end in .png too, and it must meet the gate.
  */
 export const GATE_MATCHER_RE =
-  /^\/(?!_next\/static|_next\/image|favicon\.ico|(?!api\/).*\.(?:png|jpg|jpeg|svg|gif|webp|ico|txt|xml|map)$).*/;
+  /^\/(?!_next\/static\/|_next\/image$|favicon\.ico$|tagit_logo\.png$).*/;
 
 export function isGatedByMatcher(pathname: string): boolean {
   return GATE_MATCHER_RE.test(pathname);

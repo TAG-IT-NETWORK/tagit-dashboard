@@ -182,16 +182,47 @@ describe("safeCallbackPath", () => {
 });
 
 describe("the matcher mirror", () => {
-  it("gates pages and every API address, even one that ends like a file", () => {
+  it("gates pages and every API address", () => {
     for (const path of ["/", "/home", "/signin", "/api/x", "/api/x.png", "/api/a/b.svg"]) {
       expect(isGatedByMatcher(path), path).toBe(true);
     }
   });
 
-  it("skips Next internals and static files", () => {
-    for (const path of ["/_next/static/a.js", "/_next/image", "/favicon.ico", "/tagit_logo.png"]) {
+  it("gates a page address even when it ends like a file", () => {
+    // /products/[id] and /agents/[id] are real pages: an id may end in .png.
+    for (const path of [
+      "/products/anything.png",
+      "/agents/anything.svg",
+      "/home/x.ico",
+      "/dashboard.txt",
+      "/a.map",
+      "/x/tagit_logo.png",
+      "/x/favicon.ico",
+      "/favicon.icox",
+      "/tagit_logo.png/x",
+      "/_next/imagex",
+      "/_next/staticx/a.js",
+      "/_next/data/x.json",
+    ]) {
+      expect(isGatedByMatcher(path), path).toBe(true);
+    }
+  });
+
+  it("skips Next's build files and the public files, by name", () => {
+    for (const path of ["/_next/static/chunks/a.js", "/_next/image", "/favicon.ico"]) {
       expect(isGatedByMatcher(path), path).toBe(false);
     }
+  });
+
+  it("skips exactly the files that are in /public, no more and no fewer", async () => {
+    const { readdirSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const dir = fileURLToPath(new URL("../../../public", import.meta.url));
+    const files = readdirSync(dir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+    expect(files).toEqual(["tagit_logo.png"]);
+    for (const name of files) expect(isGatedByMatcher(`/${name}`), name).toBe(false);
   });
 
   it("is the same pattern the middleware file carries", async () => {
@@ -203,14 +234,21 @@ describe("the matcher mirror", () => {
     );
     const literal = source.match(/matcher: \[\s*"(.+)",?\s*\]/)?.[1];
     expect(literal).toBeDefined();
-    const fromFile = new RegExp(`^${JSON.parse(`"${literal}"`)}`);
+    const fromFile = new RegExp(`^${JSON.parse(`"${literal}"`)}$`);
     for (const path of [
       "/",
       "/home",
       "/api/x.png",
+      "/products/anything.png",
+      "/agents/anything.svg",
       "/_next/static/a.js",
+      "/_next/staticx/a.js",
+      "/_next/image",
+      "/_next/imagex",
       "/favicon.ico",
+      "/favicon.icox",
       "/tagit_logo.png",
+      "/x/tagit_logo.png",
       "/a.map",
       "/api/auth/session",
     ]) {
