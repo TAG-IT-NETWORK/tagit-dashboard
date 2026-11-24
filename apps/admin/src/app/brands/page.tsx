@@ -44,10 +44,19 @@ interface Envelope {
   acting?: unknown;
 }
 
+/**
+ * One request to this app's brand routes. Never rejects: a request that could
+ * not be made at all (offline, aborted) comes back as status 0, so every
+ * caller handles it the way it handles a refusal and no button is left busy.
+ */
 async function call(path: string, init?: RequestInit): Promise<{ status: number; body: Envelope }> {
-  const res = await fetch(path, { cache: "no-store", ...init });
-  const body = ((await res.json().catch(() => null)) ?? {}) as Envelope;
-  return { status: res.status, body };
+  try {
+    const res = await fetch(path, { cache: "no-store", ...init });
+    const body = ((await res.json().catch(() => null)) ?? {}) as Envelope;
+    return { status: res.status, body };
+  } catch {
+    return { status: 0, body: {} };
+  }
 }
 
 const json = (method: string, body: unknown): RequestInit => ({
@@ -60,7 +69,8 @@ const FIELD = "space-y-1.5";
 
 export default function BrandsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [unassigned, setUnassigned] = useState<UnassignedTemplate[]>([]);
+  // null: the list could not be loaded. That is not the same as "none".
+  const [unassigned, setUnassigned] = useState<UnassignedTemplate[] | null>([]);
   const [acting, setActing] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,9 +98,9 @@ export default function BrandsPage() {
         setBrands(parseBrands(list.body.businesses));
       }
       setUnassigned(
-        free.status === 200 && Array.isArray(free.body.templates)
+        free.status === 200 && free.body.ok === true && Array.isArray(free.body.templates)
           ? (free.body.templates as UnassignedTemplate[])
-          : [],
+          : null,
       );
       setActing(typeof who.body.acting === "string" ? who.body.acting : null);
     } catch {
@@ -153,7 +163,7 @@ export default function BrandsPage() {
   /** True when the products were handed over; false when it was called off or failed. */
   async function give(brand: Brand, templateIds: string[]): Promise<boolean> {
     if (templateIds.length === 0) return false;
-    const names = unassigned.filter((t) => templateIds.includes(t.id)).map((t) => t.name);
+    const names = (unassigned ?? []).filter((t) => templateIds.includes(t.id)).map((t) => t.name);
     if (
       !window.confirm(
         `Give ${names.join(", ")} to ${brand.name}? Every item made from ${names.length === 1 ? "it" : "them"} moves too. This cannot be undone here.`,
@@ -267,7 +277,8 @@ export default function BrandsPage() {
         </CardContent>
       </Card>
 
-      {loading ? (
+      {/* Cards stay on the page while it refreshes: what is typed in them is kept. */}
+      {loading && brands.length === 0 ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mr-2" aria-hidden="true" />
           Loading brands…
@@ -279,7 +290,17 @@ export default function BrandsPage() {
       ) : (
         brands.map((brand) => (
           <BrandCard
-            key={brand.id}
+            // The card keeps what is typed in it. When the record itself
+            // changes (a save, or an edit made elsewhere), a new key starts
+            // the card again from the record, so stale text can never be
+            // saved over fresh data.
+            key={JSON.stringify([
+              brand.id,
+              brand.name,
+              brand.logoUrl,
+              brand.treasuryWallet,
+              brand.defaultMintRecipient,
+            ])}
             brand={brand}
             acting={acting === brand.id}
             unassigned={unassigned}
@@ -305,7 +326,8 @@ function BrandCard({
 }: {
   brand: Brand;
   acting: boolean;
-  unassigned: UnassignedTemplate[];
+  /** null when the list could not be loaded. */
+  unassigned: UnassignedTemplate[] | null;
   busy: string | null;
   onSave: (patch: Record<string, string | null>) => void;
   onAct: (on: boolean) => void;
@@ -418,7 +440,11 @@ function BrandCard({
 
         <div className="border-t border-border pt-4 space-y-3">
           <h3 className="text-sm font-medium">Give products that have no brand</h3>
-          {unassigned.length === 0 ? (
+          {unassigned === null ? (
+            <p role="alert" className="text-sm text-destructive" data-unassigned-failed>
+              Could not load the products that have no brand. Press Refresh to try again.
+            </p>
+          ) : unassigned.length === 0 ? (
             <p className="text-sm text-muted-foreground">Every product already has a brand.</p>
           ) : (
             <>

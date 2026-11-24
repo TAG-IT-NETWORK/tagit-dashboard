@@ -54,10 +54,22 @@ export default function TeamPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("viewer");
   const [newBusinessId, setNewBusinessId] = useState("");
-  // Brands to choose from (TAP-T16). Stays null for anyone who is not a
-  // platform admin: a brand admin adds people to their own brand only, and
-  // the server fills that in.
-  const [brands, setBrands] = useState<Brand[] | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+
+  // Where a new member can be put (TAP-T16). It must be KNOWN before anyone
+  // is added: a request that names no brand makes a platform-wide user when
+  // it comes from a platform admin, and a member of the brand when it comes
+  // from a brand admin. Until this page knows which of the two it is talking
+  // for, the Add button stays off.
+  //   loading   not known yet
+  //   platform  a platform admin: the brand is chosen from `brands`
+  //   acting    a platform admin creating for `actingBrand`: fixed to it
+  //   brand     a brand admin: the server puts the member in their brand
+  //   unknown   could not find out
+  const [scope, setScope] = useState<"loading" | "platform" | "acting" | "brand" | "unknown">(
+    "loading",
+  );
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [actingBrand, setActingBrand] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,21 +80,43 @@ export default function TeamPage() {
           fetch("/api/brand-proxy", { cache: "no-store" }),
           fetch("/api/brand-proxy/acting", { cache: "no-store" }),
         ]);
-        if (cancelled || !list.ok) return;
-        const body = (await list.json()) as { businesses?: unknown };
-        const acting = who.ok ? ((await who.json()) as { acting?: unknown }).acting : null;
         if (cancelled) return;
+        // The brand routes are a platform admin's. This page is an admin's
+        // already, so a refusal here means a brand admin.
+        if (list.status === 403 && who.status === 403) {
+          setScope("brand");
+          return;
+        }
+        if (!list.ok || !who.ok) {
+          setScope("unknown");
+          return;
+        }
+        const body = (await list.json()) as { ok?: unknown; businesses?: unknown };
+        const acting = ((await who.json()) as { ok?: unknown; acting?: unknown }).acting;
+        if (cancelled) return;
+        if (body.ok !== true || !Array.isArray(body.businesses)) {
+          setScope("unknown");
+          return;
+        }
+        if (typeof acting === "string" && acting.length > 0) {
+          setActingBrand(acting);
+          setScope("acting");
+          return;
+        }
+        if (acting !== null) {
+          setScope("unknown");
+          return;
+        }
         setBrands(parseBrands(body.businesses));
-        setActingBrand(typeof acting === "string" ? acting : null);
+        setScope("platform");
       } catch {
-        // No picker: the member is added where the server puts them.
+        if (!cancelled) setScope("unknown");
       }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
-  const [enrolling, setEnrolling] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,8 +142,12 @@ export default function TeamPage() {
     void load();
   }, [load]);
 
+  // Nobody is added before the page knows where they would land.
+  const scopeKnown = scope === "platform" || scope === "acting" || scope === "brand";
+
   async function enroll(e: React.FormEvent) {
     e.preventDefault();
+    if (!scopeKnown) return;
     setEnrolling(true);
     setError(null);
     try {
@@ -120,7 +158,7 @@ export default function TeamPage() {
           email: newEmail.trim(),
           role: newRole,
           // Only a platform admin who is not creating for a brand names one.
-          ...(brands && !actingBrand && newBusinessId ? { businessId: newBusinessId } : {}),
+          ...(scope === "platform" && newBusinessId ? { businessId: newBusinessId } : {}),
         }),
       });
       const data = (await res.json()) as RosterResponse;
@@ -258,11 +296,11 @@ export default function TeamPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="team-business">Brand</Label>
-              {actingBrand ? (
+              {scope === "acting" ? (
                 <p id="team-business" className="flex h-10 items-center text-sm font-mono">
                   {actingBrand}
                 </p>
-              ) : brands ? (
+              ) : scope === "platform" ? (
                 <select
                   id="team-business"
                   value={newBusinessId}
@@ -276,16 +314,30 @@ export default function TeamPage() {
                     </option>
                   ))}
                 </select>
-              ) : (
+              ) : scope === "brand" ? (
                 <p
                   id="team-business"
                   className="flex h-10 items-center text-sm text-muted-foreground"
                 >
                   Your brand
                 </p>
+              ) : scope === "loading" ? (
+                <p
+                  id="team-business"
+                  className="flex h-10 items-center text-sm text-muted-foreground"
+                >
+                  Loading…
+                </p>
+              ) : (
+                <p id="team-business" role="alert" className="text-sm text-destructive">
+                  Could not load the brands, so nobody can be added yet. Refresh the page.
+                </p>
               )}
             </div>
-            <Button type="submit" disabled={enrolling || newEmail.trim().length === 0}>
+            <Button
+              type="submit"
+              disabled={enrolling || !scopeKnown || newEmail.trim().length === 0}
+            >
               {enrolling ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Add"}
             </Button>
           </form>

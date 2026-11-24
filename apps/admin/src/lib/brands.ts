@@ -104,7 +104,10 @@ export function brandError(code: unknown, status: number): string {
     case "UNAUTHENTICATED":
       return "Your session ended. Sign in again.";
     default:
-      return `Could not reach the brand service (${status}). Try again.`;
+      // 0: the request never left, or never came back.
+      return status === 0
+        ? "Could not reach the brand service. Check your connection and try again."
+        : `Could not reach the brand service (${status}). Try again.`;
   }
 }
 
