@@ -79,10 +79,11 @@ describe("a brand session", () => {
 
   it("reaches the app", async () => {
     expect(passed(await hit("/home"))).toBe(true);
+    expect(passed(await hit("/products"))).toBe(true);
   });
 
   it("is sent home from the landing page, the sign-in page and any page not listed", async () => {
-    for (const path of ["/", "/signin", "/dashboard", "/products/7", "/mesh"]) {
+    for (const path of ["/", "/signin", "/dashboard", "/agents/7", "/mesh"]) {
       const res = await hit(path);
       expect(res.status, path).toBe(307);
       expect(to(res), path).toBe("/home");

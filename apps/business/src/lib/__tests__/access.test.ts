@@ -96,7 +96,15 @@ describe("evaluateAccess", () => {
   });
 
   it("gives staff, unknown and removed accounts the same answer everywhere inside", () => {
-    for (const path of ["/home", "/home/x", "/dashboard", "/api/anything", "/whatever"]) {
+    for (const path of [
+      "/home",
+      "/home/x",
+      "/products",
+      "/products/7",
+      "/dashboard",
+      "/api/anything",
+      "/whatever",
+    ]) {
       for (const who of [staff, unknown, removed]) {
         expect(evaluateAccess(path, who), path).toBe("no-access");
       }
@@ -106,14 +114,18 @@ describe("evaluateAccess", () => {
   it("lets a brand session into the app", () => {
     expect(evaluateAccess("/home", brand)).toBe("allow");
     expect(evaluateAccess("/home/anything", brand)).toBe("allow");
+    expect(evaluateAccess("/products", brand)).toBe("allow");
+    expect(evaluateAccess("/products/7", brand)).toBe("allow");
   });
 
   it("keeps a brand session out of every path that is not listed", () => {
     // The old wallet prototype addresses, and a few look-alikes of /home.
     for (const path of [
       "/dashboard",
-      "/products",
-      "/products/7",
+      "/product",
+      "/productss",
+      "/products-admin",
+      "/Products",
       "/agents",
       "/mesh",
       "/metrics",
@@ -133,6 +145,7 @@ describe("evaluateAccess", () => {
   it("defaults a brand path to viewer", () => {
     expect(requiredRoleFor("/home")).toBe("viewer");
     expect(requiredRoleFor("/home", "POST")).toBe("viewer");
+    expect(requiredRoleFor("/products")).toBe("viewer");
   });
 });
 

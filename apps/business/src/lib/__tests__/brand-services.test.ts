@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BrandServicesError,
   brandFetch,
+  getBrandProducts,
   getBrandProfile,
+  getBrandSummary,
   isServicesPath,
 } from "@/lib/brand-services";
 import { toBrandSession, type BrandSession } from "@/lib/brand-session";
@@ -181,5 +183,61 @@ describe("getBrandProfile", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://services.test/api/v1/admin/businesses/a%2Fb%3Fc");
     expect((init.headers as Record<string, string>)["x-business-id"]).toBe("a/b?c");
+  });
+});
+
+describe("getBrandProducts and getBrandSummary", () => {
+  const product = {
+    id: "tpl_1",
+    name: "Cream",
+    status: "published",
+    priceUsdc6: "5000000",
+    businessId: "acme",
+    itemsCount: 2,
+  };
+  const counts = { items: 4, forSale: 1, byState: { CLAIMED: 2, FLAGGED: 0 } };
+
+  it("ask the two listed routes, under the session's brand, with GET and no body", async () => {
+    fetchMock.mockReturnValueOnce(answer(200, { ok: true, templates: [product] }));
+    fetchMock.mockReturnValueOnce(answer(200, { ok: true, summary: counts }));
+    const list = await getBrandProducts(session);
+    const summary = await getBrandSummary(session);
+    expect(list.products.map((p) => p.id)).toEqual(["tpl_1"]);
+    expect(summary).toEqual({ items: 4, forSale: 1, withCustomers: 2, flagged: 0 });
+
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    expect(calls.map(([url]) => url)).toEqual([
+      "https://services.test/api/v1/admin/templates",
+      "https://services.test/api/v1/admin/catalog/summary",
+    ]);
+    for (const [, init] of calls) {
+      expect(init.method).toBe("GET");
+      expect(init.body).toBeUndefined();
+      expect((init.headers as Record<string, string>)["x-business-id"]).toBe("acme");
+    }
+  });
+
+  it("never show another brand's product, even if services sent one", async () => {
+    fetchMock.mockReturnValue(
+      answer(200, {
+        ok: true,
+        templates: [{ ...product, id: "theirs", businessId: "other" }, product],
+      }),
+    );
+    expect((await getBrandProducts(session)).products.map((p) => p.id)).toEqual(["tpl_1"]);
+  });
+
+  it("say they could not load when services refuses, is down, or has no key", async () => {
+    // A refusal is a refusal even when its body looks like a good answer.
+    fetchMock.mockReturnValueOnce(answer(403, { ok: true, templates: [product] }));
+    expect(await getBrandProducts(session)).toEqual({ loaded: false, products: [] });
+    fetchMock.mockReturnValueOnce(answer(403, { ok: true, summary: counts }));
+    expect(await getBrandSummary(session)).toBeNull();
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await getBrandProducts(session)).toEqual({ loaded: false, products: [] });
+    expect(await getBrandSummary(session)).toBeNull();
+    vi.stubEnv("SERVICES_API_KEY", "");
+    expect(await getBrandProducts(session)).toEqual({ loaded: false, products: [] });
+    expect(await getBrandSummary(session)).toBeNull();
   });
 });

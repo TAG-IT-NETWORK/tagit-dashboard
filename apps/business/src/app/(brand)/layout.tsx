@@ -2,6 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { BrandNav } from "@/components/brand-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SIGN_IN_PATH } from "@/lib/access";
 import { loadBrand } from "@/lib/brand-request";
@@ -51,6 +52,9 @@ export default async function BrandLayout({ children }: { children: ReactNode })
           <SignOutButton />
         </div>
       </header>
+      <nav aria-label="Sections" className="border-b px-4 sm:px-6 md:px-10">
+        <BrandNav />
+      </nav>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
       <footer className="flex h-14 items-center justify-center gap-2 border-t text-xs text-muted-foreground">
         <Image src="/tagit_logo.png" alt="" width={16} height={16} />
