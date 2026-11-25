@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Button, Card, CardContent, ConnectButton, Input, Label, cn } from "@tagit/ui";
+import { Button, Card, CardContent, Input, Label, cn } from "@tagit/ui";
 import {
   ArrowRight,
   Bot,
@@ -16,9 +16,10 @@ import {
 } from "lucide-react";
 
 /**
- * Public, non-wallet-gated marketing + explainer surface for pro.tagit.network.
- * Shown to disconnected visitors. Written for non-crypto SMB owners: plain-English
- * copy, "Request a demo" as the primary CTA, wallet entry demoted to "Launch app".
+ * Public marketing + explainer surface for pro.tagit.network. Shown to anyone
+ * who is not signed in. Written for non-crypto SMB owners: plain-English copy,
+ * "Request a demo" as the primary CTA, and "Sign in" for existing customers
+ * (TAP-T17: no wallet anywhere on this page).
  * Demo requests POST to /api/demo-request (webhook/Notion sinks — see that route
  * for the env contract); real pricing checkout is tracked as a separate P1 task.
  */
@@ -249,7 +250,11 @@ function RequestAccessForm() {
           )}
         </form>
         <p className="text-center text-xs text-muted-foreground">
-          Already using TAG IT? Use &quot;Launch app&quot; above to continue.
+          Already using TAG IT?{" "}
+          <a href="/signin" className="underline underline-offset-4">
+            Sign in
+          </a>
+          .
         </p>
       </CardContent>
     </Card>
@@ -274,14 +279,11 @@ export function MarketingLanding() {
         </nav>
         <div className="flex items-center gap-2">
           <Button asChild size="sm" variant="ghost" className="hidden sm:inline-flex">
-            <a href="https://admin.tagit.network" rel="noopener">Customer sign-in</a>
+            <a href="/signin">Customer sign-in</a>
           </Button>
           <Button asChild size="sm">
             <a href="#get-started">Request a demo</a>
           </Button>
-          <div className="hidden sm:block">
-            <ConnectButton variant="outline" label="Launch app" className="h-8 px-3 text-xs" />
-          </div>
         </div>
       </header>
 
@@ -306,7 +308,9 @@ export function MarketingLanding() {
             <Button asChild className="h-12 px-8 text-base">
               <a href="#get-started">Request a demo</a>
             </Button>
-            <ConnectButton variant="outline" label="Launch app" className="h-12 px-8 text-base" />
+            <Button asChild variant="outline" className="h-12 px-8 text-base">
+              <a href="/signin">Sign in</a>
+            </Button>
           </div>
           <a
             href="#get-started"
@@ -519,7 +523,9 @@ export function MarketingLanding() {
                 ))}
               </ul>
               <div className="pt-2">
-                <ConnectButton variant="outline" label="Launch app" className="h-11 px-6" />
+                <Button asChild variant="outline" className="h-11 px-6">
+                  <a href="/signin">Sign in</a>
+                </Button>
               </div>
             </div>
             <div className="flex justify-center lg:justify-end">

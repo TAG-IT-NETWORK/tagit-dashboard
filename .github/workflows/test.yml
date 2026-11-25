@@ -40,6 +40,9 @@ jobs:
       - name: Run Verify tests
         run: pnpm --filter @tagit/verify test
 
+      - name: Run Business tests
+        run: pnpm --filter @tagit/business test
+
   e2e-tests:
     name: E2E Tests
     # Pinned: `ubuntu-latest` moved to Ubuntu 26.04, and the Playwright version
