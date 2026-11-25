@@ -73,6 +73,13 @@ export function ClientShell({
     setMounted(true);
   }, []);
 
+  // A brand account gets no console frame at all (TAP-T17): no menu, no
+  // header, no wallet prompt. The only page it can reach is /403, which must
+  // be readable without connecting a wallet, so it renders bare.
+  if (tenant) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
+
   // Don't render until we're definitely on the client
   if (!mounted) {
     return <LoadingScreen />;

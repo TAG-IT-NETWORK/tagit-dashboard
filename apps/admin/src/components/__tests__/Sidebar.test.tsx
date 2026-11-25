@@ -195,34 +195,10 @@ describe("Sidebar", () => {
   });
 });
 
-describe("visibleNavGroups (tenant menu)", () => {
-  it("keeps the full menu for platform users and trims platform-only items for a tenant", () => {
+describe("visibleNavGroups (staff-only console)", () => {
+  it("keeps the full menu for staff and shows a brand session no menu at all", () => {
     const all = visibleNavGroups(NAV_GROUPS, null);
     expect(all.map((g) => g.name)).toEqual(NAV_GROUPS.map((g) => g.name));
-    const tenant = visibleNavGroups(NAV_GROUPS, "biz-acme");
-    const names = tenant.flatMap((g) => g.items.map((i) => i.name));
-    expect(names).toEqual(
-      expect.arrayContaining([
-        "Dashboard",
-        "Binding Station",
-        "Verify",
-        "Chip Tools",
-        "Catalog",
-        "Assets",
-        "Team",
-      ]),
-    );
-    for (const hidden of [
-      "Assembly Line",
-      "Users",
-      "Capabilities",
-      "Governance",
-      "Treasury",
-      "AI Agents",
-      "Lifecycle Console",
-    ]) {
-      expect(names).not.toContain(hidden);
-    }
-    expect(tenant.map((g) => g.name)).not.toContain("Token & Governance");
+    expect(visibleNavGroups(NAV_GROUPS, "biz-acme")).toEqual([]);
   });
 });

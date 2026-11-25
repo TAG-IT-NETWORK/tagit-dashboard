@@ -62,19 +62,11 @@ interface NavGroup {
  * governance, AI and testing tools are separated so they stop hiding it.
  */
 /**
- * Brand (tenant-scoped) users get the operations surface only: their catalog,
- * batches, binding, registry, desktop verify/chip tools and their own team.
- * Platform-only items (on-chain governance, capabilities, AI agents, test
- * consoles) are hidden for them — the proxies enforce tenant scope server-side.
+ * Brand (tenant-scoped) sessions get NO menu: the console is for TAG IT staff
+ * and a brand session reaches nothing here but /403 (TAP-T17, lib/rbac.ts).
  */
-export function visibleNavGroups<T extends { items: ReadonlyArray<{ platformOnly?: boolean }> }>(
-  groups: readonly T[],
-  tenant: string | null,
-): T[] {
-  if (!tenant) return [...groups];
-  return groups
-    .map((g) => ({ ...g, items: g.items.filter((it) => !it.platformOnly) }))
-    .filter((g) => g.items.length > 0);
+export function visibleNavGroups<T>(groups: readonly T[], tenant: string | null): T[] {
+  return tenant ? [] : [...groups];
 }
 
 export const NAV_GROUPS: ReadonlyArray<NavGroup> = [
