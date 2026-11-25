@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppProviders } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TAG IT Business",
-  description:
-    "Onboard your business, manage verified products, and deploy autonomous AI agents on Base.",
+  description: "Prove your products are real. Manage your verified products in one place.",
 };
 
 export default function RootLayout({
@@ -18,9 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="motion-safe:scroll-smooth">
-      <body className={inter.className}>
-        <AppProviders>{children}</AppProviders>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

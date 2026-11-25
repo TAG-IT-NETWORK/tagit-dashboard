@@ -6,10 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@tagit/ui": ["../../packages/ui/src"],
-      "@tagit/contracts": ["../../packages/contracts/src"],
-      "@tagit/auth": ["../../packages/auth/src"],
-      "@tagit/config": ["../../packages/config/src"]
+      "@tagit/ui": ["../../packages/ui/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
