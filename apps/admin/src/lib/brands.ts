@@ -173,3 +173,61 @@ export function describeAssign(outcome: AssignOutcome, brandName: string): strin
   }
   return lines;
 }
+
+// ── Logo upload (TAP-T17) ────────────────────────────────────────────────────
+
+/** What the media pipeline accepts. It refuses SVG and HEIC by their contents. */
+export const LOGO_FILE_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
+/**
+ * Vercel refuses request bodies over about 4.5 MB before our proxy runs, so
+ * check the size first and say so in words.
+ */
+export const LOGO_MAX_BYTES = 4.5 * 1024 * 1024;
+
+/** Why this file cannot be uploaded as a logo, or null when it can. */
+export function logoFileProblem(file: { type: string; size: number }): string | null {
+  if (!(LOGO_FILE_TYPES as readonly string[]).includes(file.type)) {
+    return "Use a PNG, JPG or WebP image. A PNG with a clear background works best.";
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return "That image is over 4.5 MB. Export a smaller copy and try again.";
+  }
+  if (file.size === 0) return "That file is empty.";
+  return null;
+}
+
+/**
+ * True for an address the logo preview may load: plain https, no sign-in
+ * details in it. The brand app applies the same rule before it shows a logo.
+ */
+export function isShowableLogo(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 500) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.username === "" && url.password === "";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The logo address out of the media pipeline's answer
+ * ({ ok, media: [{ urls: { orig, lg, md, sm, t } }] }).
+ *
+ * The small copy (400 px wide, shape kept) is the one to use: a logo is shown
+ * at 32 px, and the square thumbnail `t` would cut a wide logo's sides off.
+ * Null when the answer has no usable https address.
+ */
+export function logoUrlFromUpload(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as { ok?: unknown; media?: unknown };
+  if (record.ok !== true || !Array.isArray(record.media)) return null;
+  const first = record.media[0] as { urls?: Record<string, unknown> } | undefined;
+  const urls = first?.urls;
+  if (typeof urls !== "object" || urls === null) return null;
+  for (const size of ["sm", "md", "lg", "orig"] as const) {
+    if (isShowableLogo(urls[size])) return urls[size];
+  }
+  return null;
+}

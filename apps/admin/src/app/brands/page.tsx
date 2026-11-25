@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@tagit/ui";
 import { Building2, Loader2, Plus, RefreshCw } from "lucide-react";
 
+import { BrandLogoField } from "@/components/brand-logo-field";
 import {
   brandError,
   describeAssign,
@@ -370,15 +371,13 @@ function BrandCard({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className={FIELD}>
-            <Label htmlFor={fieldId("logo")}>Logo address (from the media library)</Label>
-            <Input
-              id={fieldId("logo")}
-              placeholder="https://media.tagit.network/…"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
-          </div>
+          <BrandLogoField
+            id={fieldId("logo")}
+            brandName={brand.name}
+            value={logoUrl}
+            disabled={!idle}
+            onChange={setLogoUrl}
+          />
           <div className={FIELD}>
             <Label htmlFor={fieldId("treasury")}>Wallet that receives the brand&apos;s sales</Label>
             <Input
