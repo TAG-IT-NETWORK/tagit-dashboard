@@ -22,12 +22,15 @@ export function BrandLogoField({
   value,
   disabled = false,
   onChange,
+  onUploadingChange,
 }: {
   id: string;
   brandName: string;
   value: string;
   disabled?: boolean;
   onChange: (next: string) => void;
+  /** Told when an upload starts and ends, so the card can hold Save meanwhile. */
+  onUploadingChange?: (uploading: boolean) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -39,6 +42,12 @@ export function BrandLogoField({
   const showable = isShowableLogo(address) && broken !== address;
   const locked = disabled || uploading;
 
+  /** Every change of address clears the "could not load" mark, so it is tried again. */
+  function change(next: string) {
+    setBroken(null);
+    onChange(next);
+  }
+
   async function upload(file: File) {
     const problem = logoFileProblem(file);
     if (problem) {
@@ -46,6 +55,7 @@ export function BrandLogoField({
       return;
     }
     setUploading(true);
+    onUploadingChange?.(true);
     setMessage(null);
     try {
       const body = new FormData();
@@ -62,7 +72,7 @@ export function BrandLogoField({
         });
         return;
       }
-      onChange(url);
+      change(url);
       setMessage({ kind: "done", text: "Logo uploaded. Press Save to keep it." });
     } catch {
       setMessage({
@@ -71,6 +81,7 @@ export function BrandLogoField({
       });
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
     }
   }
 
@@ -132,7 +143,7 @@ export function BrandLogoField({
             variant="ghost"
             disabled={locked}
             onClick={() => {
-              onChange("");
+              change("");
               setMessage({ kind: "done", text: "Logo removed. Press Save to keep it that way." });
             }}
           >
@@ -148,7 +159,7 @@ export function BrandLogoField({
         disabled={locked}
         onChange={(e) => {
           setMessage(null);
-          onChange(e.target.value);
+          change(e.target.value);
         }}
       />
       {address.length > 0 && !isShowableLogo(address) && (

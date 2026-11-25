@@ -173,6 +173,56 @@ describe("BrandLogoField: the address and the preview", () => {
     expect(screen.getByRole("img", { name: "Aurora logo" }).getAttribute("src")).toBe(SM);
   });
 
+  it("tries the same address again after it was removed and typed back", () => {
+    const gone = "https://gone.example/logo.png";
+    render(<Harness start={gone} />);
+    fireEvent.error(screen.getByRole("img", { name: "Aurora logo" }));
+    expect(screen.queryByRole("img")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove/ }));
+    fireEvent.change(screen.getByLabelText("Logo"), { target: { value: gone } });
+    expect(screen.getByRole("img", { name: "Aurora logo" }).getAttribute("src")).toBe(gone);
+    expect(screen.queryByText(/No image could be loaded/)).toBeNull();
+  });
+
+  it("tells the card when an upload starts and when it ends, whatever the outcome", async () => {
+    const seen: boolean[] = [];
+    for (const answer of [
+      () => Promise.resolve(json(GOOD, 201)),
+      () => Promise.resolve(json({ ok: false, error: "X" }, 500)),
+      () => Promise.reject(new TypeError("Failed to fetch")),
+    ]) {
+      seen.length = 0;
+      vi.stubGlobal("fetch", vi.fn(answer));
+      render(
+        <BrandLogoField
+          id="logo"
+          brandName="Aurora"
+          value=""
+          onChange={() => undefined}
+          onUploadingChange={(v) => seen.push(v)}
+        />,
+      );
+      choose(png());
+      await waitFor(() => expect(seen).toEqual([true, false]));
+      cleanup();
+    }
+    // A file that is refused before sending never reports an upload.
+    seen.length = 0;
+    render(
+      <BrandLogoField
+        id="logo"
+        brandName="Aurora"
+        value=""
+        onChange={() => undefined}
+        onUploadingChange={(v) => seen.push(v)}
+      />,
+    );
+    choose(png(10, "image/gif"));
+    await screen.findByRole("alert");
+    expect(seen).toEqual([]);
+  });
+
   it("Remove clears the address and leaves saving to Save", () => {
     render(<Harness start={SM} />);
     fireEvent.click(screen.getByRole("button", { name: /Remove/ }));
