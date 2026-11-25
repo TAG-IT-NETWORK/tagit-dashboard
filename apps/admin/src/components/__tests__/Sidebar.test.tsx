@@ -165,7 +165,13 @@ describe("Sidebar", () => {
 
   it("groups the navigation by workflow with section headers", () => {
     const { ui } = renderDesktop();
-    for (const group of ["Operations", "Identity & Access", "Token & Governance", "AI & Analytics", "Testing"]) {
+    for (const group of [
+      "Operations",
+      "Identity & Access",
+      "Token & Governance",
+      "AI & Analytics",
+      "Testing",
+    ]) {
       expect(ui.getByText(group)).toBeInTheDocument();
     }
   });
@@ -195,8 +201,26 @@ describe("visibleNavGroups (tenant menu)", () => {
     expect(all.map((g) => g.name)).toEqual(NAV_GROUPS.map((g) => g.name));
     const tenant = visibleNavGroups(NAV_GROUPS, "biz-acme");
     const names = tenant.flatMap((g) => g.items.map((i) => i.name));
-    expect(names).toEqual(expect.arrayContaining(["Dashboard", "Binding Station", "Verify", "Chip Tools", "Catalog", "Assets", "Team"]));
-    for (const hidden of ["Assembly Line", "Users", "Capabilities", "Governance", "Treasury", "AI Agents", "Lifecycle Console"]) {
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "Dashboard",
+        "Binding Station",
+        "Verify",
+        "Chip Tools",
+        "Catalog",
+        "Assets",
+        "Team",
+      ]),
+    );
+    for (const hidden of [
+      "Assembly Line",
+      "Users",
+      "Capabilities",
+      "Governance",
+      "Treasury",
+      "AI Agents",
+      "Lifecycle Console",
+    ]) {
       expect(names).not.toContain(hidden);
     }
     expect(tenant.map((g) => g.name)).not.toContain("Token & Governance");

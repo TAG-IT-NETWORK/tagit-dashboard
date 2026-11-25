@@ -28,8 +28,8 @@ export default async function ForbiddenPage() {
               <span className="text-foreground font-medium">{email}</span>{" "}
               {role ? (
                 <>
-                  has the <span className="font-mono">{role}</span> role, which does not cover
-                  this area.
+                  has the <span className="font-mono">{role}</span> role, which does not cover this
+                  area.
                 </>
               ) : (
                 <>is signed in but not enrolled in the admin team roster.</>
