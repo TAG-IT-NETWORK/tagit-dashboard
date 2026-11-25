@@ -19,8 +19,8 @@ export interface Product {
   status: ProductStatus;
   /** Ready to show, e.g. "$29.99", or null when no price is set. */
   price: string | null;
-  /** How many items were made from this product. */
-  items: number;
+  /** How many items were made from this product; null when not known. */
+  items: number | null;
 }
 
 export interface ProductList {
@@ -89,7 +89,8 @@ export function parseProducts(status: number, body: unknown, brandId: string): P
       category: text(row.category),
       status: row.status as ProductStatus,
       price: formatPrice(row.priceUsdc6),
-      items: count(row.itemsCount) ?? 0,
+      // An unknown count stays unknown: it is never shown as zero.
+      items: count(row.itemsCount),
     });
   }
   products.sort(
@@ -139,6 +140,11 @@ export function statusWords(status: ProductStatus): string {
 /** A count for a tile: "1,204", or a dash when it could not be read. */
 export function tileNumber(value: number | null): string {
   return value === null ? "–" : value.toLocaleString("en-US");
+}
+
+/** How many items a product has, in words; a dash when not known. */
+export function itemsWords(items: number | null): string {
+  return items === null ? "–" : countWords(items, "item", "items");
 }
 
 /** "1 item", "3 items", with thousands separators. */

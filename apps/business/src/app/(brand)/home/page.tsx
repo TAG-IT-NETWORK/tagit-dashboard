@@ -21,10 +21,14 @@ function Tile({ label, value, hint }: { label: string; value: string; hint: stri
 
 /** The brand home (TAP-T17, slice 2: the brand's own numbers). */
 export default async function BrandHomePage() {
-  const brand = await loadBrand();
+  // All three reads start together: a slow services answer is waited for once.
+  const [brand, products, counts] = await Promise.all([
+    loadBrand(),
+    loadProducts(),
+    loadItemCounts(),
+  ]);
   if (brand === null) redirect(SIGN_IN_PATH);
   const { session, profile } = brand;
-  const [products, counts] = await Promise.all([loadProducts(), loadItemCounts()]);
 
   const productCount = products ? activeProductCount(products) : null;
   const missing = productCount === null || counts === null;

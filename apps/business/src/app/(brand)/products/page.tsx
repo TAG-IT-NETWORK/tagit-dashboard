@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { SIGN_IN_PATH } from "@/lib/access";
-import { countWords, statusWords, type Product } from "@/lib/brand-catalog";
+import { countWords, itemsWords, statusWords, type Product } from "@/lib/brand-catalog";
 import { loadBrand, loadProducts } from "@/lib/brand-request";
 
 export const metadata: Metadata = { title: "Products · TAG IT Business" };
@@ -39,7 +39,7 @@ function ProductRow({ product }: { product: Product }) {
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Made</dt>
-          <dd className="tabular-nums">{countWords(product.items, "item", "items")}</dd>
+          <dd className="tabular-nums">{itemsWords(product.items)}</dd>
         </div>
       </dl>
     </li>
@@ -48,10 +48,9 @@ function ProductRow({ product }: { product: Product }) {
 
 /** The brand's own products, read only (TAP-T17, slice 2). */
 export default async function BrandProductsPage() {
-  const brand = await loadBrand();
-  if (brand === null) redirect(SIGN_IN_PATH);
-  const list = await loadProducts();
-  if (list === null) redirect(SIGN_IN_PATH);
+  // Both reads start together: a slow services answer is waited for once.
+  const [brand, list] = await Promise.all([loadBrand(), loadProducts()]);
+  if (brand === null || list === null) redirect(SIGN_IN_PATH);
 
   return (
     <div className="space-y-6">

@@ -5,6 +5,9 @@ import { getBrandProducts, getBrandProfile, getBrandSummary } from "@/lib/brand-
 import { getBrandSession, type BrandSession } from "@/lib/brand-session";
 import type { BrandProfile } from "@/lib/brand-view";
 
+/** The session for THIS request, read once however many parts ask. */
+const loadSession = cache(async (): Promise<BrandSession | null> => getBrandSession());
+
 /**
  * The signed-in brand for THIS request: the session and the brand's record,
  * read once and shared by the layout and the page. Null means "not a brand
@@ -12,7 +15,7 @@ import type { BrandProfile } from "@/lib/brand-view";
  */
 export const loadBrand = cache(
   async (): Promise<{ session: BrandSession; profile: BrandProfile } | null> => {
-    const session = await getBrandSession();
+    const session = await loadSession();
     if (session === null) return null;
     return { session, profile: await getBrandProfile(session) };
   },
@@ -24,11 +27,11 @@ export const loadBrand = cache(
  * cannot ask for another brand's. Null means "not a brand session".
  */
 export const loadProducts = cache(async (): Promise<ProductList | null> => {
-  const session = await getBrandSession();
+  const session = await loadSession();
   return session === null ? null : getBrandProducts(session);
 });
 
 export const loadItemCounts = cache(async (): Promise<ItemCounts | null> => {
-  const session = await getBrandSession();
+  const session = await loadSession();
   return session === null ? null : getBrandSummary(session);
 });

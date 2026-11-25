@@ -4,6 +4,7 @@ import {
   activeProductCount,
   countWords,
   formatPrice,
+  itemsWords,
   parseProducts,
   parseSummary,
   statusWords,
@@ -124,9 +125,20 @@ describe("parseProducts", () => {
       sku: null,
       category: null,
       price: null,
-      items: 0,
+      items: null,
     });
-    expect(list.products[1]!.items).toBe(0);
+    // A count that is missing or malformed is unknown, never zero.
+    expect(list.products[1]!.items).toBeNull();
+    const [missing, zero] = parseProducts(
+      200,
+      answer([
+        row({ id: "m", name: "A", itemsCount: undefined }),
+        row({ id: "z", name: "B", itemsCount: 0 }),
+      ]),
+      "acme",
+    ).products;
+    expect(missing!.items).toBeNull();
+    expect(zero!.items).toBe(0);
   });
 
   it("puts live products first, then drafts, then archived, each by name", () => {
@@ -269,5 +281,8 @@ describe("words and numbers", () => {
     expect(countWords(1, "item", "items")).toBe("1 item");
     expect(countWords(0, "item", "items")).toBe("0 items");
     expect(countWords(2500, "item", "items")).toBe("2,500 items");
+    expect(itemsWords(null)).toBe("–");
+    expect(itemsWords(0)).toBe("0 items");
+    expect(itemsWords(1)).toBe("1 item");
   });
 });
