@@ -165,6 +165,27 @@ export function isSessionOnlyPath(pathname: string): boolean {
 }
 
 /**
+ * Read a business id from an untrusted place (a roster answer, a JWT claim).
+ * - null or absent        → valid, no brand: a staff account
+ * - a non-empty string    → valid, that brand
+ * - anything else         → NOT valid (a number, "", an object, a list, a
+ *                           string too long to be an id)
+ *
+ * A claim that is not valid must never be read as "no brand": that would
+ * turn a broken brand record into a staff account. Callers drop the role
+ * instead, so the account can do nothing.
+ */
+export function readBusinessClaim(
+  raw: unknown,
+): { valid: true; businessId: string | null } | { valid: false } {
+  if (raw === null || raw === undefined) return { valid: true, businessId: null };
+  if (typeof raw === "string" && raw.length > 0 && raw.length <= 200) {
+    return { valid: true, businessId: raw };
+  }
+  return { valid: false };
+}
+
+/**
  * True when a session's business id marks it as a brand session. Anything
  * that is not null/undefined/"" counts: a value of an unexpected type is
  * treated as a brand (closed), never as staff.

@@ -33,7 +33,8 @@ export default auth((req) => {
     {
       authenticated: req.auth !== null && req.auth !== undefined,
       role: parseRole(req.auth?.user?.role),
-      // Passed through as it is: the rule decides, and an odd value closes.
+      // The session already drops the role when the business id cannot be
+      // read (lib/admin-role.ts); the rule below closes on an odd value too.
       tenant: req.auth?.user?.businessId as unknown,
     },
     // WB-06: method-scoped PATH_ROLES entries (template create/update).
