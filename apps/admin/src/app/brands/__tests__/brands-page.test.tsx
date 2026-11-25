@@ -165,3 +165,46 @@ describe("/brands: a card never keeps text older than its record", () => {
     expect(field().value).toBe("0x1111");
   });
 });
+
+describe("/brands: Save waits for a logo upload", () => {
+  it("holds Save and the brand switch while the upload runs, then sends the new logo", async () => {
+    const SM = "https://media.tagit.network/i/abc/sm.webp";
+    let finish: (r: Response) => void = () => undefined;
+    const sent: unknown[] = [];
+    serve((url, init) => {
+      if (url === "/api/media-proxy") return new Promise<Response>((resolve) => (finish = resolve));
+      if (url === "/api/brand-proxy/aurora") {
+        sent.push(JSON.parse(String(init?.body)));
+        return json({ ok: true, business: { ...AURORA, name: "Aurora Skin", logoUrl: SM } });
+      }
+      return base()(url);
+    });
+    render(<BrandsPage />);
+    const card = (await screen.findByText("aurora")).closest("[data-brand]") as HTMLElement;
+
+    // Another field is already changed, so Save is on.
+    fireEvent.change(within(card).getByLabelText("Brand name"), {
+      target: { value: "Aurora Skin" },
+    });
+    const save = within(card).getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(false);
+
+    const file = new File(["x"], "logo.png", { type: "image/png" });
+    fireEvent.change(within(card).getByLabelText("Choose a logo image for Aurora"), {
+      target: { files: [file] },
+    });
+    await waitFor(() => expect(save.disabled).toBe(true));
+    expect(
+      (within(card).getByRole("button", { name: "Create for this brand" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(save);
+    expect(sent).toEqual([]);
+
+    finish(json({ ok: true, media: [{ urls: { sm: SM } }] }, 201));
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ name: "Aurora Skin", logoUrl: SM });
+  });
+});

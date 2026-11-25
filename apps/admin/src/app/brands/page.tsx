@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from "@tagit/ui";
 import { Building2, Loader2, Plus, RefreshCw } from "lucide-react";
 
+import { BrandLogoField } from "@/components/brand-logo-field";
 import {
   brandError,
   describeAssign,
@@ -339,6 +340,8 @@ function BrandCard({
   const [treasury, setTreasury] = useState(brand.treasuryWallet ?? "");
   const [recipient, setRecipient] = useState(brand.defaultMintRecipient ?? "");
   const [picked, setPicked] = useState<string[]>([]);
+  // A logo upload is running: Save would send the old address, so it waits.
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const changed =
     name.trim() !== brand.name ||
@@ -347,7 +350,7 @@ function BrandCard({
     recipient.trim() !== (brand.defaultMintRecipient ?? "");
   const valid =
     name.trim().length > 0 && isWalletOrEmpty(treasury.trim()) && isWalletOrEmpty(recipient.trim());
-  const idle = busy === null;
+  const idle = busy === null && !logoUploading;
   const fieldId = (field: string) => `brand-${brand.id}-${field}`;
 
   return (
@@ -370,15 +373,14 @@ function BrandCard({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className={FIELD}>
-            <Label htmlFor={fieldId("logo")}>Logo address (from the media library)</Label>
-            <Input
-              id={fieldId("logo")}
-              placeholder="https://media.tagit.network/…"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
-          </div>
+          <BrandLogoField
+            id={fieldId("logo")}
+            brandName={brand.name}
+            value={logoUrl}
+            disabled={busy !== null}
+            onChange={setLogoUrl}
+            onUploadingChange={setLogoUploading}
+          />
           <div className={FIELD}>
             <Label htmlFor={fieldId("treasury")}>Wallet that receives the brand&apos;s sales</Label>
             <Input
