@@ -277,32 +277,92 @@ describe("matcher mirror (MUST stay in sync with src/middleware.ts config.matche
     }
   });
 
-  it("skips Next internals and static assets", () => {
+  it("skips Next's build files and the public files, by name", () => {
     for (const p of [
       "/_next/static/chunks/main.js",
-      "/_next/image?url=x",
+      "/_next/image",
       "/favicon.ico",
       "/tagit_logo.png",
-      "/og-image.jpg",
-      "/robots.txt",
-      "/sitemap.xml",
     ]) {
       expect(isGatedByMatcher(p)).toBe(false);
     }
   });
 
-  it("WB-08: the extension exclusion does NOT apply under /api/ — no gate bypass", () => {
+  it("gates a page address even when it ends like a file", () => {
+    // /assets/[id], /catalog/[id], /users/[address]… are real pages: the last
+    // part of the address may end in .png and must still meet the gate.
+    for (const p of [
+      "/assets/x.png",
+      "/catalog/x.png",
+      "/users/x.svg",
+      "/resolve/x.ico",
+      "/governance/x.map",
+      "/agents/x.txt",
+      "/og-image.jpg",
+      "/robots.txt",
+      "/sitemap.xml",
+      "/apidocs.png",
+      "/logo.webp",
+      "/x/tagit_logo.png",
+      "/x/favicon.ico",
+      "/favicon.icox",
+      "/tagit_logo.png/x",
+      "/_next/imagex",
+      "/_next/staticx/a.js",
+    ]) {
+      expect(isGatedByMatcher(p), p).toBe(true);
+    }
+  });
+
+  it("WB-08: nothing under /api/ is skipped, whatever it ends in", () => {
     for (const p of [
       "/api/team-proxy/foo.png",
       "/api/media-proxy/x.svg",
       "/api/catalog-proxy/templates/evil.map",
       "/api/mint-proxy/a.txt",
+      "/api/tagit_logo.png",
     ]) {
       expect(isGatedByMatcher(p)).toBe(true);
     }
-    // Non-/api static assets stay excluded.
-    expect(isGatedByMatcher("/apidocs.png")).toBe(false);
-    expect(isGatedByMatcher("/logo.webp")).toBe(false);
+  });
+
+  it("skips exactly the files that are in /public, no more and no fewer", async () => {
+    const { readdirSync } = await import("node:fs");
+    const path = await import("node:path");
+    const files = readdirSync(path.resolve(__dirname, "../../../public"), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+    expect(files).toEqual(["tagit_logo.png"]);
+    for (const name of files) expect(isGatedByMatcher(`/${name}`)).toBe(false);
+  });
+
+  it("is the same pattern the middleware file carries", async () => {
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const source = readFileSync(path.resolve(__dirname, "../../middleware.ts"), "utf8");
+    const literal = source.match(/matcher: \[\s*"(.+)",?\s*\]/)?.[1];
+    expect(literal).toBeDefined();
+    const fromFile = new RegExp(`^${JSON.parse(`"${literal}"`)}$`);
+    for (const p of [
+      "/",
+      "/dashboard",
+      "/assets/x.png",
+      "/api/team-proxy/foo.png",
+      "/_next/static/a.js",
+      "/_next/staticx/a.js",
+      "/_next/image",
+      "/_next/imagex",
+      "/favicon.ico",
+      "/favicon.icox",
+      "/tagit_logo.png",
+      "/x/tagit_logo.png",
+      "/robots.txt",
+    ]) {
+      expect(fromFile.test(p), p).toBe(isGatedByMatcher(p));
+    }
   });
 });
 
