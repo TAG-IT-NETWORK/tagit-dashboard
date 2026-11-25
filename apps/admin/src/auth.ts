@@ -60,7 +60,9 @@ export const { handlers, auth } = NextAuth({
     session({ session, token }) {
       session.user.role = parseRole(token.role);
       session.user.businessId =
-        typeof token.businessId === "string" && token.businessId.length > 0 ? token.businessId : null;
+        typeof token.businessId === "string" && token.businessId.length > 0
+          ? token.businessId
+          : null;
       return session;
     },
   },

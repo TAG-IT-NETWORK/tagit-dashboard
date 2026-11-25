@@ -42,10 +42,13 @@ describe("fetchAdminRole", () => {
     process.env.SERVICES_URL = "https://services.test";
     fetchMock = vi.fn(
       async () =>
-        new Response(JSON.stringify({ ok: true, user: { email: "ops@tagit.network", role: "operator" } }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
+        new Response(
+          JSON.stringify({ ok: true, user: { email: "ops@tagit.network", role: "operator" } }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
     );
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -65,7 +68,9 @@ describe("fetchAdminRole", () => {
   it("canonicalizes the email: trims, lowercases, URL-encodes", async () => {
     await fetchAdminRole("  Ops+Team@TagIt.Network ");
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toBe("https://services.test/api/v1/admin/users/by-email/ops%2Bteam%40tagit.network");
+    expect(url).toBe(
+      "https://services.test/api/v1/admin/users/by-email/ops%2Bteam%40tagit.network",
+    );
   });
 
   it("resolves null for an unenrolled email (404)", async () => {
@@ -99,9 +104,16 @@ describe("fetchAdminRole", () => {
 
 describe("parseRosterResponse", () => {
   it("carries the tenant scope next to the role, null for platform users", () => {
-    expect(parseRosterResponse(200, { ok: true, user: { role: "operator", businessId: "biz-acme" } })).toEqual({ role: "operator", businessId: "biz-acme" });
-    expect(parseRosterResponse(200, { ok: true, user: { role: "admin", businessId: null } })).toEqual({ role: "admin", businessId: null });
-    expect(parseRosterResponse(200, { ok: true, user: { role: "viewer" } })).toEqual({ role: "viewer", businessId: null });
+    expect(
+      parseRosterResponse(200, { ok: true, user: { role: "operator", businessId: "biz-acme" } }),
+    ).toEqual({ role: "operator", businessId: "biz-acme" });
+    expect(
+      parseRosterResponse(200, { ok: true, user: { role: "admin", businessId: null } }),
+    ).toEqual({ role: "admin", businessId: null });
+    expect(parseRosterResponse(200, { ok: true, user: { role: "viewer" } })).toEqual({
+      role: "viewer",
+      businessId: null,
+    });
     expect(parseRosterResponse(404, { ok: false })).toEqual({ role: null, businessId: null });
   });
 });
