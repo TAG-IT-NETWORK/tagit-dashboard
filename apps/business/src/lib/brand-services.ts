@@ -1,4 +1,10 @@
 import type { BrandSession } from "@/lib/brand-session";
+import {
+  parseProducts,
+  parseSummary,
+  type ItemCounts,
+  type ProductList,
+} from "@/lib/brand-catalog";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -95,5 +101,25 @@ export async function getBrandProfile(session: BrandSession): Promise<BrandProfi
     return parseBrandProfile(answer.status, answer.body, session.brandId);
   } catch {
     return parseBrandProfile(0, null, session.brandId);
+  }
+}
+
+/** The signed-in brand's products. Never throws: the page says it could not load. */
+export async function getBrandProducts(session: BrandSession): Promise<ProductList> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/templates");
+    return parseProducts(answer.status, answer.body, session.brandId);
+  } catch {
+    return parseProducts(0, null, session.brandId);
+  }
+}
+
+/** The signed-in brand's item counts, or null when they could not be read. */
+export async function getBrandSummary(session: BrandSession): Promise<ItemCounts | null> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/catalog/summary");
+    return parseSummary(answer.status, answer.body);
+  } catch {
+    return null;
   }
 }

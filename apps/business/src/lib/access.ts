@@ -52,7 +52,7 @@ const OPEN_PREFIXES = ["/api/auth", "/api/demo-request", "/no-access"] as const;
 const PUBLIC_PAGES = ["/", "/signin"] as const;
 
 /** Everything a brand session may reach. */
-const BRAND_PREFIXES = ["/home"] as const;
+const BRAND_PREFIXES = ["/home", "/products"] as const;
 
 /** Where a brand session lands. */
 export const BRAND_HOME = "/home";
