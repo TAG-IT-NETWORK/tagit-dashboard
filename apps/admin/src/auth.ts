@@ -1,8 +1,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-import { fetchAdminRoster } from "@/lib/admin-role";
-import { parseRole } from "@/lib/rbac";
+import { fetchAdminRoster, sessionIdentity } from "@/lib/admin-role";
 import { SESSION_MAX_AGE_SECONDS, shouldRefreshRole } from "@/lib/role-refresh";
 
 /**
@@ -58,9 +57,9 @@ export const { handlers, auth } = NextAuth({
       return token;
     },
     session({ session, token }) {
-      session.user.role = parseRole(token.role);
-      session.user.businessId =
-        typeof token.businessId === "string" && token.businessId.length > 0 ? token.businessId : null;
+      const identity = sessionIdentity(token);
+      session.user.role = identity.role;
+      session.user.businessId = identity.businessId;
       return session;
     },
   },

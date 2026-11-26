@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BRAND_APP_URL,
+  isBrandTenant,
   evaluateAccess,
   hasRole,
   isApiPath,
@@ -366,87 +368,111 @@ describe("matcher mirror (MUST stay in sync with src/middleware.ts config.matche
   });
 });
 
-// ── TAP-T02: brand (tenant) sessions ─────────────────────────────────────────
+// ── TAP-T17: brand (tenant) sessions are closed out of the console ──────────
 
-describe("evaluateAccess — brand sessions are denied by default outside the brand surface", () => {
-  const brand = (role: Role) => ({ authenticated: true, role, tenant: "biz-a" });
+describe("evaluateAccess — a brand session reaches nothing in the console", () => {
+  const brand = (role: Role | null, tenant: unknown = "biz-a") => ({
+    authenticated: true,
+    role,
+    tenant,
+  });
   const platform = (role: Role) => ({ authenticated: true, role, tenant: null });
 
-  const PLATFORM_ONLY_PAGES = [
+  // What a brand session could reach before the brand app existed, the
+  // staff-only pages, and addresses nobody has written yet.
+  const EVERYWHERE = [
+    "/",
+    "/dashboard",
+    "/station",
+    "/verify",
+    "/chip-tools",
+    "/catalog",
+    "/catalog/tpl_1/batch/bind",
+    "/assets",
+    "/assets/55",
+    "/assets/new",
+    "/team",
+    "/agents/catalog",
+    "/brands",
     "/lifecycle",
     "/assembly-line",
     "/users",
-    "/users/0xabc",
-    "/badges",
-    "/capabilities",
     "/governance",
-    "/governance/new",
     "/treasury",
-    "/treasury/spend",
-    "/tokenomics",
-    "/resolve",
     "/resolve/7",
     "/agents",
-    "/agents/register",
-    "/agents/12",
-    "/adagent",
-    "/influencer",
-    "/demo",
     "/test/console",
-    "/test/lifecycle",
+    "/some-new-page",
+    "/api/dashboard-stats",
+    "/api/catalog-proxy/templates",
+    "/api/catalog-proxy/batches/bat_1",
+    "/api/catalog-proxy/binding/bind",
+    "/api/media-proxy",
+    "/api/mint-proxy",
+    "/api/team-proxy",
+    "/api/brand-proxy",
+    "/api/brand-proxy/acting",
+    "/api/a2a",
+    "/api/some-new-proxy",
   ];
+  const METHODS = [undefined, "GET", "POST", "PUT", "DELETE"];
 
-  it.each(PLATFORM_ONLY_PAGES)("a brand admin is refused %s", (path) => {
-    expect(evaluateAccess(path, brand("admin"))).toBe("forbidden");
-  });
-
-  it.each(PLATFORM_ONLY_PAGES)("a platform admin still reaches %s", (path) => {
-    expect(evaluateAccess(path, platform("admin"))).toBe("allow");
-  });
-
-  it("a page or API nobody listed is refused for a brand session (default deny)", () => {
-    expect(evaluateAccess("/some-new-platform-page", brand("admin"))).toBe("forbidden");
-    expect(evaluateAccess("/api/some-new-proxy", brand("admin"), "POST")).toBe("forbidden");
-    expect(evaluateAccess("/agents/catalogue-admin", brand("admin"))).toBe("forbidden");
-  });
-
-  it("the brand surface stays open, with the usual role rules on top", () => {
-    for (const path of [
-      "/dashboard",
-      "/station",
-      "/verify",
-      "/chip-tools",
-      "/catalog",
-      "/catalog/tpl_1/batch/bind",
-      "/assets",
-      "/assets/55",
-      "/agents/catalog",
-      "/api/dashboard-stats",
-      "/api/catalog-proxy/templates",
-      "/api/catalog-proxy/batches/bat_1",
-    ]) {
-      expect(evaluateAccess(path, brand("viewer"), "GET")).toBe("allow");
+  it.each(EVERYWHERE)("refuses %s to a brand session of every role, on every method", (path) => {
+    for (const role of [...ROLES, null]) {
+      for (const method of METHODS) {
+        expect(evaluateAccess(path, brand(role), method), `${role} ${method}`).toBe("forbidden");
+      }
     }
-    // role rules still apply inside the brand surface
-    expect(evaluateAccess("/team", brand("viewer"))).toBe("forbidden");
-    expect(evaluateAccess("/team", brand("admin"))).toBe("allow");
-    expect(evaluateAccess("/api/team-proxy", brand("admin"), "PUT")).toBe("allow");
-    expect(evaluateAccess("/api/media-proxy", brand("viewer"), "POST")).toBe("forbidden");
-    expect(evaluateAccess("/api/media-proxy", brand("operator"), "POST")).toBe("allow");
-    expect(evaluateAccess("/api/mint-proxy", brand("operator"), "POST")).toBe("allow");
-    expect(evaluateAccess("/api/a2a", brand("viewer"), "POST")).toBe("allow");
   });
 
-  it("the root sends a brand session to its own home instead of a platform page", () => {
-    expect(evaluateAccess("/", brand("viewer"))).toBe("home");
-    expect(evaluateAccess("/", platform("viewer"))).toBe("allow");
+  it.each(EVERYWHERE)("still lets a platform admin reach %s", (path) => {
+    expect(evaluateAccess(path, platform("admin"), "GET")).toBe("allow");
+  });
+
+  it("never sends a brand session anywhere but the refusal: there is no brand home here", () => {
+    const decisions = new Set(
+      EVERYWHERE.flatMap((path) => METHODS.map((m) => evaluateAccess(path, brand("admin"), m))),
+    );
+    expect([...decisions]).toEqual(["forbidden"]);
   });
 
   it("the 403 page still renders for a brand session (no redirect loop)", () => {
     expect(evaluateAccess("/403", brand("viewer"))).toBe("allow");
+    expect(evaluateAccess("/403", brand(null))).toBe("allow");
   });
 
-  it("a session with no tenant field behaves as a platform session (unchanged callers)", () => {
+  it("the sign-in handlers stay reachable, so a brand user can sign out", () => {
+    expect(evaluateAccess("/api/auth/signout", brand("admin"), "POST")).toBe("allow");
+    expect(evaluateAccess("/api/auth/session", brand("admin"), "GET")).toBe("allow");
+  });
+
+  it("treats any business id as a brand, including values of the wrong type", () => {
+    for (const tenant of ["biz-a", " ", "0", "null", 0, 1, true, false, {}, [], ["biz-a"]]) {
+      expect(isBrandTenant(tenant), JSON.stringify(tenant)).toBe(true);
+      expect(evaluateAccess("/dashboard", brand("admin", tenant)), JSON.stringify(tenant)).toBe(
+        "forbidden",
+      );
+    }
+  });
+
+  it("treats only no business id as staff", () => {
+    for (const tenant of [null, undefined, ""]) {
+      expect(isBrandTenant(tenant), String(tenant)).toBe(false);
+      expect(evaluateAccess("/dashboard", { authenticated: true, role: "admin", tenant })).toBe(
+        "allow",
+      );
+    }
+    // A session with no tenant field at all is a platform session.
     expect(evaluateAccess("/governance", { authenticated: true, role: "admin" })).toBe("allow");
+  });
+
+  it("a brand session with no session at all is still asked to sign in first", () => {
+    expect(
+      evaluateAccess("/dashboard", { authenticated: false, role: null, tenant: "biz-a" }),
+    ).toBe("signin");
+  });
+
+  it("names the brand app as an https address", () => {
+    expect(BRAND_APP_URL).toBe("https://pro.tagit.network");
   });
 });

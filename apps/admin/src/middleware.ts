@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { isE2EAuthBypass } from "@/lib/e2e-auth";
-import { evaluateAccess, isApiPath, parseRole, TENANT_HOME } from "@/lib/rbac";
+import { evaluateAccess, isApiPath, parseRole } from "@/lib/rbac";
 
 /**
  * Session + role gate for every admin route (META-T32). This replaces the
@@ -15,20 +15,14 @@ import { evaluateAccess, isApiPath, parseRole, TENANT_HOME } from "@/lib/rbac";
  *               APIs:  401 JSON (a proxy caller can't follow a redirect)
  *   forbidden → pages: redirect to /403
  *               APIs:  403 JSON
- *   home      → redirect a brand session from the root to its own home
  *
- * A brand session (one with a business id) is held to the brand surface —
- * see TENANT_PREFIXES in src/lib/rbac.ts (TAP-T02).
+ * A brand session (one with a business id) reaches nothing here but /403,
+ * which points it to the brand app (TAP-T17, see src/lib/rbac.ts).
  *
  * Defense in depth: the key-holding proxies ALSO re-check the session
  * server-side (see /api/team-proxy) — the middleware is the first gate, not
  * the only one.
  */
-/** The session's business id, or null for a platform user. */
-function tenantOf(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 export default auth((req) => {
   // CI-only Playwright seam (dead in production builds) — see lib/e2e-auth.ts.
   if (isE2EAuthBypass()) return NextResponse.next();
@@ -39,17 +33,15 @@ export default auth((req) => {
     {
       authenticated: req.auth !== null && req.auth !== undefined,
       role: parseRole(req.auth?.user?.role),
-      tenant: tenantOf(req.auth?.user?.businessId),
+      // The session already drops the role when the business id cannot be
+      // read (lib/admin-role.ts); the rule below closes on an odd value too.
+      tenant: req.auth?.user?.businessId as unknown,
     },
     // WB-06: method-scoped PATH_ROLES entries (template create/update).
     req.method,
   );
 
   if (decision === "allow") return NextResponse.next();
-
-  if (decision === "home") {
-    return NextResponse.redirect(new URL(TENANT_HOME, req.nextUrl.origin));
-  }
 
   if (decision === "signin") {
     if (isApiPath(pathname)) {

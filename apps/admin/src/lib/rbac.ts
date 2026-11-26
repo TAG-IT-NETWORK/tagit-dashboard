@@ -45,34 +45,17 @@ export function hasRole(role: Role | null, required: Role): boolean {
 const PUBLIC_PREFIXES = ["/api/auth", "/api/farcaster-manifest"] as const;
 
 /**
- * Everything a BRAND session may reach (TAP-T02). A brand user is a roster
- * user with a business id; they get the operations surface for their own
- * business and nothing else. This is an allow-list on purpose: a page or
- * proxy added later is closed to brand sessions until someone lists it here.
- * The role rules below still apply on top, and the proxies still send the
- * brand to tagit-services, which scopes the data.
+ * BRAND sessions are closed out of this console (TAP-T17, slice 3). A brand
+ * user is a roster user with a business id. Brands have their own app at
+ * {@link BRAND_APP_URL}; this console is for TAG IT staff only. A brand
+ * session can sign in here but reaches nothing except /403, which points it
+ * to the brand app. There is no allow-list any more: nothing a page or proxy
+ * adds later can open to a brand session by accident.
+ *
+ * Staff still work FOR a brand by choosing it on /brands (TAP-T16); that is
+ * a platform session and is not affected.
  */
-const TENANT_PREFIXES = [
-  // pages (the brand menu — see visibleNavGroups in components/sidebar.tsx)
-  "/dashboard",
-  "/station",
-  "/verify",
-  "/chip-tools",
-  "/catalog",
-  "/assets",
-  "/team",
-  "/agents/catalog",
-  // the proxies those pages call
-  "/api/catalog-proxy",
-  "/api/media-proxy",
-  "/api/mint-proxy",
-  "/api/team-proxy",
-  "/api/dashboard-stats",
-  "/api/a2a",
-] as const;
-
-/** Where a brand session lands when it asks for the root. */
-export const TENANT_HOME = "/dashboard";
+export const BRAND_APP_URL = "https://pro.tagit.network";
 
 /**
  * Signed-in but role-EXEMPT paths. /403 must render for a user whose email is
@@ -140,8 +123,8 @@ export const PATH_ROLES: ReadonlyArray<
   ["/resolve", "admin"],
   ["/team", "admin"],
   ["/api/team-proxy", "admin"],
-  // admin — brand records and "create for a brand" (TAP-T16). Not in
-  // TENANT_PREFIXES: a brand session cannot reach either, whatever its role.
+  // admin — brand records and "create for a brand" (TAP-T16). A brand
+  // session cannot reach either, whatever its role (it reaches nothing).
   ["/brands", "admin"],
   ["/api/brand-proxy", "admin"],
   // admin — T33 template lifecycle verbs (WB-06): publish snapshots a live
@@ -181,9 +164,34 @@ export function isSessionOnlyPath(pathname: string): boolean {
   return SESSION_ONLY_PATHS.some((p) => matchesPrefix(pathname, p));
 }
 
-/** True when a brand session may reach this path (before the role rules). */
-export function isTenantPath(pathname: string): boolean {
-  return TENANT_PREFIXES.some((p) => matchesPrefix(pathname, p));
+/**
+ * Read a business id from an untrusted place (a roster answer, a JWT claim).
+ * - null or absent        → valid, no brand: a staff account
+ * - a non-empty string    → valid, that brand
+ * - anything else         → NOT valid (a number, "", an object, a list, a
+ *                           string too long to be an id)
+ *
+ * A claim that is not valid must never be read as "no brand": that would
+ * turn a broken brand record into a staff account. Callers drop the role
+ * instead, so the account can do nothing.
+ */
+export function readBusinessClaim(
+  raw: unknown,
+): { valid: true; businessId: string | null } | { valid: false } {
+  if (raw === null || raw === undefined) return { valid: true, businessId: null };
+  if (typeof raw === "string" && raw.length > 0 && raw.length <= 200) {
+    return { valid: true, businessId: raw };
+  }
+  return { valid: false };
+}
+
+/**
+ * True when a session's business id marks it as a brand session. Anything
+ * that is not null/undefined/"" counts: a value of an unexpected type is
+ * treated as a brand (closed), never as staff.
+ */
+export function isBrandTenant(tenant: unknown): boolean {
+  return tenant !== null && tenant !== undefined && tenant !== "";
 }
 
 export function isApiPath(pathname: string): boolean {
@@ -211,15 +219,14 @@ export function requiredRoleFor(pathname: string, method?: string): Role {
 
 // ── Middleware decision table ────────────────────────────────────────────────
 
-export type AccessDecision = "allow" | "signin" | "forbidden" | "home";
+export type AccessDecision = "allow" | "signin" | "forbidden";
 
 /**
  * The complete middleware decision, as a pure function:
  * - public path                    → allow
  * - no session                     → signin   (redirect / 401 for APIs)
  * - /403 itself                    → allow    (any signed-in user, even role-less)
- * - brand session, the root        → home     (redirect to TENANT_HOME)
- * - brand session, not its surface → forbidden
+ * - brand session, anything else   → forbidden (whatever its role or the path)
  * - role below the path's need     → forbidden (redirect to /403 / 403 for APIs)
  *
  * `tenant` is the session's business id: a non-empty string for a brand
@@ -230,16 +237,14 @@ export type AccessDecision = "allow" | "signin" | "forbidden" | "home";
  */
 export function evaluateAccess(
   pathname: string,
-  session: { authenticated: boolean; role: Role | null; tenant?: string | null },
+  session: { authenticated: boolean; role: Role | null; tenant?: unknown },
   method?: string,
 ): AccessDecision {
   if (isPublicPath(pathname)) return "allow";
   if (!session.authenticated) return "signin";
   if (isSessionOnlyPath(pathname)) return "allow";
-  if (session.tenant) {
-    if (pathname === "/") return "home";
-    if (!isTenantPath(pathname)) return "forbidden";
-  }
+  // Any business id closes the console, before any role rule.
+  if (isBrandTenant(session.tenant)) return "forbidden";
   return hasRole(session.role, requiredRoleFor(pathname, method)) ? "allow" : "forbidden";
 }
 

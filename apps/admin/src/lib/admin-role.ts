@@ -1,4 +1,4 @@
-import { parseRole, type Role } from "@/lib/rbac";
+import { parseRole, type Role, readBusinessClaim } from "@/lib/rbac";
 
 /**
  * Server-side role lookup against the tagit-services admin_users roster
@@ -37,8 +37,21 @@ export function parseRosterResponse(status: number, body: unknown): RosterIdenti
   const role = parseRoleResponse(status, body);
   if (role === null) return { role: null, businessId: null };
   const record = body as { user?: { businessId?: unknown } };
-  const raw = record.user?.businessId;
-  return { role, businessId: typeof raw === "string" && raw.length > 0 ? raw : null };
+  // A business id that cannot be read drops the role: a broken brand record
+  // must not come out as a staff account (see readBusinessClaim).
+  const claim = readBusinessClaim(record.user?.businessId);
+  if (!claim.valid) return { role: null, businessId: null };
+  return { role, businessId: claim.businessId };
+}
+
+/**
+ * The session's role and brand from the JWT claims, with the same rule: an
+ * unreadable business id leaves the session with no role at all.
+ */
+export function sessionIdentity(token: Readonly<Record<string, unknown>>): RosterIdentity {
+  const claim = readBusinessClaim(token.businessId);
+  if (!claim.valid) return { role: null, businessId: null };
+  return { role: parseRole(token.role), businessId: claim.businessId };
 }
 
 /**
