@@ -140,7 +140,7 @@ describe("/team: where a new member lands", () => {
     const picker = (await screen.findByLabelText("Brand")) as HTMLSelectElement;
     await waitFor(() => expect(picker.tagName).toBe("SELECT"));
     typeEmail();
-    fireEvent.change(picker, { target: { value: "aurora" } });
+    fireEvent.change(picker, { target: { value: "brand:aurora" } });
     fireEvent.click(addButton());
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]!.body).toEqual({
@@ -148,6 +148,70 @@ describe("/team: where a new member lands", () => {
       role: "viewer",
       businessId: "aurora",
     });
+  });
+
+  it("starts with nothing chosen: a platform admin cannot add anyone until they choose", async () => {
+    serve(BRANDS, NOT_ACTING);
+    render(<TeamPage />);
+    const picker = (await screen.findByLabelText("Brand")) as HTMLSelectElement;
+    await waitFor(() => expect(picker.tagName).toBe("SELECT"));
+    // The box opens on "Choose…", which cannot be picked again once left.
+    expect(picker.value).toBe("");
+    expect((picker.options[0] as HTMLOptionElement).disabled).toBe(true);
+    expect([...picker.options].map((o) => o.textContent)).toEqual([
+      "Choose…",
+      "Aurora",
+      "TAG IT staff (all brands)",
+    ]);
+    typeEmail();
+    expect(addButton().disabled).toBe(true);
+    // Not even by submitting the form without its button.
+    fireEvent.submit(addButton().closest("form")!);
+    expect(calls).toEqual([]);
+  });
+
+  it("makes a staff account only when staff is chosen, and says so in the request", async () => {
+    serve(BRANDS, NOT_ACTING);
+    render(<TeamPage />);
+    const picker = (await screen.findByLabelText("Brand")) as HTMLSelectElement;
+    await waitFor(() => expect(picker.tagName).toBe("SELECT"));
+    typeEmail();
+    fireEvent.change(picker, { target: { value: "staff" } });
+    expect(addButton().disabled).toBe(false);
+    fireEvent.click(addButton());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    // An explicit null, never a missing field.
+    expect(calls[0]!.body).toEqual({ email: "new@x.example", role: "viewer", businessId: null });
+    expect("businessId" in (calls[0]!.body as object)).toBe(true);
+  });
+
+  it("goes back to nothing chosen after each add, so the next person is chosen for too", async () => {
+    serve(BRANDS, NOT_ACTING);
+    render(<TeamPage />);
+    const picker = (await screen.findByLabelText("Brand")) as HTMLSelectElement;
+    await waitFor(() => expect(picker.tagName).toBe("SELECT"));
+    typeEmail();
+    fireEvent.change(picker, { target: { value: "staff" } });
+    fireEvent.click(addButton());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await waitFor(() => expect(picker.value).toBe(""));
+    typeEmail();
+    expect(addButton().disabled).toBe(true);
+  });
+
+  it("a brand whose id looks like the staff choice is still a brand", async () => {
+    serve(
+      { status: 200, body: { ok: true, businesses: [{ id: "staff", name: "Staff Co" }] } },
+      NOT_ACTING,
+    );
+    render(<TeamPage />);
+    const picker = (await screen.findByLabelText("Brand")) as HTMLSelectElement;
+    await waitFor(() => expect(picker.options.length).toBe(3));
+    typeEmail();
+    fireEvent.change(picker, { target: { value: "brand:staff" } });
+    fireEvent.click(addButton());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect((calls[0]!.body as { businessId: unknown }).businessId).toBe("staff");
   });
 
   it("a brand admin (both brand routes refused) adds to their own brand, naming none", async () => {

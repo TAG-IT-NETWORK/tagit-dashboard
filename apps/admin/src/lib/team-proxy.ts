@@ -49,6 +49,20 @@ function weakensOwner(method: TeamProxyRequest["method"], body: unknown): boolea
   return patch.businessId !== undefined && patch.businessId !== null;
 }
 
+/**
+ * Adding someone as a platform admin (no brand session, not creating for a
+ * brand) must SAY where they go: `businessId` is a brand's id, or an explicit
+ * null for a TAG IT staff account that sees every brand. A body with no
+ * `businessId` at all used to mean "staff" too, which made a staff account
+ * the result of simply not choosing. That is now refused.
+ */
+export function enrollNamesItsPlace(body: unknown): boolean {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return false;
+  // A missing field reads as undefined, which is neither of the two answers.
+  const value = (body as { businessId: unknown }).businessId;
+  return value === null || (typeof value === "string" && value.trim().length > 0);
+}
+
 const DEFAULT_SERVICES_URL = "https://api.tagit.network";
 
 export interface TeamProxyRequest {
@@ -84,6 +98,17 @@ export async function proxyTeamRequest({ method, path, body, target }: TeamProxy
   const tenant = await getTenant();
   if (tenant !== null && namesAnotherBusiness(body, tenant)) {
     return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  }
+  // The roster list is the only POST without a target: it adds someone.
+  if (method === "POST" && target === undefined && tenant === null && !enrollNamesItsPlace(body)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Choose where this person belongs: a brand, or TAG IT staff.",
+        code: "BRAND_CHOICE_REQUIRED",
+      },
+      { status: 400 },
+    );
   }
 
   const apiKey = process.env.SERVICES_API_KEY;

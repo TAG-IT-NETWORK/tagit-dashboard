@@ -32,6 +32,18 @@ interface RosterResponse {
   error?: string;
 }
 
+/**
+ * The Brand box's values. A brand is "brand:<id>" and staff is "staff", so no
+ * brand id, whatever it is, can be mistaken for the staff choice. "" means
+ * nothing has been chosen yet.
+ */
+const STAFF_CHOICE = "staff";
+const brandChoice = (id: string) => `brand:${id}`;
+/** The `businessId` a choice stands for: a brand's id, or null for staff. */
+function placeOf(choice: string): string | null {
+  return choice.startsWith("brand:") ? choice.slice("brand:".length) : null;
+}
+
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
   viewer: "read-only pages",
   operator: "+ drafts, media, batches, binding",
@@ -53,6 +65,7 @@ export default function TeamPage() {
   // Enroll form
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("viewer");
+  // "" = nothing chosen yet (the Add button stays off); see STAFF_CHOICE.
   const [newBusinessId, setNewBusinessId] = useState("");
   const [enrolling, setEnrolling] = useState(false);
 
@@ -145,9 +158,13 @@ export default function TeamPage() {
   // Nobody is added before the page knows where they would land.
   const scopeKnown = scope === "platform" || scope === "acting" || scope === "brand";
 
+  // A platform admin must choose: a brand, or staff. Not choosing is not "staff".
+  const placeChosen =
+    scope !== "platform" || newBusinessId === STAFF_CHOICE || newBusinessId.startsWith("brand:");
+
   async function enroll(e: React.FormEvent) {
     e.preventDefault();
-    if (!scopeKnown) return;
+    if (!scopeKnown || !placeChosen) return;
     setEnrolling(true);
     setError(null);
     try {
@@ -157,8 +174,9 @@ export default function TeamPage() {
         body: JSON.stringify({
           email: newEmail.trim(),
           role: newRole,
-          // Only a platform admin who is not creating for a brand names one.
-          ...(scope === "platform" && newBusinessId ? { businessId: newBusinessId } : {}),
+          // Only a platform admin who is not creating for a brand names the
+          // place, and always does: a brand's id, or null for staff.
+          ...(scope === "platform" ? { businessId: placeOf(newBusinessId) } : {}),
         }),
       });
       const data = (await res.json()) as RosterResponse;
@@ -307,12 +325,15 @@ export default function TeamPage() {
                   onChange={(e) => setNewBusinessId(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="">Platform (all brands)</option>
+                  <option value="" disabled>
+                    Choose…
+                  </option>
                   {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
+                    <option key={brand.id} value={brandChoice(brand.id)}>
                       {brand.name}
                     </option>
                   ))}
+                  <option value={STAFF_CHOICE}>TAG IT staff (all brands)</option>
                 </select>
               ) : scope === "brand" ? (
                 <p
@@ -336,7 +357,7 @@ export default function TeamPage() {
             </div>
             <Button
               type="submit"
-              disabled={enrolling || !scopeKnown || newEmail.trim().length === 0}
+              disabled={enrolling || !scopeKnown || !placeChosen || newEmail.trim().length === 0}
             >
               {enrolling ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : "Add"}
             </Button>
