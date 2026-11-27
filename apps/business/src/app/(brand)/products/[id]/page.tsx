@@ -13,6 +13,7 @@ import {
   PRODUCT_FIELDS,
   stateWords,
 } from "@/lib/brand-product-form";
+import { canMakeItems } from "@/lib/brand-make-items";
 import { loadBrand } from "@/lib/brand-request";
 import { getBrandProduct } from "@/lib/brand-services";
 
@@ -59,6 +60,15 @@ export default async function ProductPage({
           <Link href={`/products/${product.id}/items`} className="underline">
             See this product&apos;s items
           </Link>
+          {canMakeItems(role) &&
+          (product.state === "live" || product.state === "live-with-changes") ? (
+            <>
+              {" · "}
+              <Link href={`/products/${product.id}/make`} className="underline">
+                Make items
+              </Link>
+            </>
+          ) : null}
         </p>
       </div>
 

@@ -14,6 +14,16 @@ import {
   type ProductDetail,
 } from "@/lib/brand-product-form";
 import { ITEMS_PER_PAGE, parseCursor, parseItems, type ItemPage } from "@/lib/brand-items";
+import {
+  bodyForRun,
+  parseCreatedRun,
+  parseQuantity,
+  parseRun,
+  parseRunId,
+  parseStart,
+  type ItemRun,
+  type StartResult,
+} from "@/lib/brand-make-items";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -249,5 +259,68 @@ export async function getBrandProductItems(
     return parseItems(answer.status, answer.body, id);
   } catch {
     return parseItems(0, null, id);
+  }
+}
+
+// ── Making items (TAP-T17) ───────────────────────────────────────────────────
+// Like product editing: the role rule lives in the server actions
+// (app/(brand)/products/[id]/make/actions.ts), and none of these throws.
+
+/**
+ * Set up a run of `quantity` items of one of the signed-in brand's products.
+ * Nothing is made yet. The run's id, or null. tagit-services refuses a
+ * product of another brand and one that is not published.
+ */
+export async function createBrandRun(
+  session: BrandSession,
+  productId: string,
+  quantity: number,
+): Promise<string | null> {
+  const id = parseProductId(productId);
+  if (id === null || parseQuantity(String(quantity)) !== quantity) return null;
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/batches", {
+      method: "POST",
+      body: bodyForRun(id, quantity),
+    });
+    return parseCreatedRun(answer.status, answer.body, id, quantity);
+  } catch {
+    return null;
+  }
+}
+
+/** One run of one of the signed-in brand's products, or null. */
+export async function getBrandRun(
+  session: BrandSession,
+  productId: string,
+  runId: string,
+): Promise<ItemRun | null> {
+  const product = parseProductId(productId);
+  const run = parseRunId(runId);
+  if (product === null || run === null) return null;
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/batches/${run}`);
+    return parseRun(answer.status, answer.body, run, product);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Start a run: its items are made. NOTHING is sent with the request; where
+ * the items go is decided by tagit-services from the brand's record. Starting
+ * a run twice makes nothing more.
+ */
+export async function startBrandRun(session: BrandSession, runId: string): Promise<StartResult> {
+  const run = parseRunId(runId);
+  if (run === null) return { kind: "failed" };
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/batches/${run}/execute`, {
+      method: "POST",
+      body: {},
+    });
+    return parseStart(answer.status, answer.body, run);
+  } catch {
+    return { kind: "failed" };
   }
 }
