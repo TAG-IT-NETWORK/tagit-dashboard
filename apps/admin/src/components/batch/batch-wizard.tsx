@@ -75,6 +75,11 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
   const [statusError, setStatusError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(initialBatchId !== null);
   const [templateName, setTemplateName] = useState<string | null>(null);
+  // The product's brand (TAP-T17): a brand's batch is minted to the brand's
+  // own wallet, so the mint step asks for no address. Three states, and they
+  // must not be mixed up: a brand's id; null = read, and it has no brand;
+  // undefined = not read (yet, or the read failed), so nothing may be minted.
+  const [templateBrand, setTemplateBrand] = useState<string | null | undefined>(undefined);
   // Whether a new batch may carry lot / made-on / best-before (TAP-T09):
   // the API must know facts, and the category the items will be minted with
   // must be cosmetics. False until the template has loaded.
@@ -154,6 +159,8 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
         if (!cancelled && res.ok && data.ok && data.template?.name) {
           const versions = Array.isArray(data.versions) ? data.versions : [];
           setTemplateName(data.template.name as string);
+          const brand: unknown = data.template.businessId;
+          setTemplateBrand(typeof brand === "string" && brand.length > 0 ? brand : null);
           setBatchFactsAvailable(
             factsSupported(data.template) &&
               takesProductFacts(mintCategory(data.template, versions)),
@@ -334,6 +341,7 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
               failure={failure}
               block={mintBlock({ size: batch.size, hasTx: Boolean(batch.txHash) }, readiness)}
               onRecheck={recheckTemplate}
+              brandId={templateBrand}
             />
           ) : batch !== null ? (
             <StepExport templateId={templateId} batch={batch} progress={progress} />
