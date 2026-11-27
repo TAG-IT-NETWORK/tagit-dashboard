@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { SIGN_IN_PATH } from "@/lib/access";
 import { loadBrand } from "@/lib/brand-request";
 import {
+  bodyForCreate,
+  bodyForEdit,
   canEditProducts,
   canPublishProducts,
   listWords,
@@ -50,6 +52,8 @@ export interface PublishState {
 }
 
 const NOT_ALLOWED = "Your account can view products but not change them.";
+const BRAND_NOT_LOADED =
+  "Your brand's details could not be loaded just now. Nothing was saved. Try again in a moment.";
 const NOT_SAVED = "That could not be saved just now. Nothing was changed. Try again in a moment.";
 
 /** A real, non-empty file from the form, or null. */
@@ -65,7 +69,7 @@ export async function saveProduct(
   if (brand === null) redirect(SIGN_IN_PATH);
   const { session, profile } = brand;
 
-  const form = parseProductForm((field) => formData.get(field), profile.name);
+  const form = parseProductForm((field) => formData.get(field));
   if (!canEditProducts(session.role)) {
     return { values: form.values, errors: {}, problem: NOT_ALLOWED };
   }
@@ -86,6 +90,12 @@ export async function saveProduct(
   if (editing && (current === null || current.state === "archived")) {
     return { values: form.values, errors: {}, problem: "This product cannot be edited." };
   }
+  // A new product is saved under the brand's real name. When the brand's
+  // record could not be read just now there is only a stand-in to show, and
+  // that must not be stored as the name.
+  if (current === null && !profile.nameKnown) {
+    return { values: form.values, errors: {}, problem: BRAND_NOT_LOADED };
+  }
 
   let photoUrl: string | null = null;
   if (photo !== null) {
@@ -102,18 +112,19 @@ export async function saveProduct(
   let savedId: string;
   if (current !== null) {
     const saved = await updateBrandProduct(session, current.id, {
-      ...form.body,
+      ...bodyForEdit(form.body, form.values, current, profile.nameKnown ? profile.name : null),
       // Sent only when the photo changed; every other stored row is kept.
       ...(photoUrl !== null ? { attributes: withHeroPhoto(current.attributes, photoUrl) } : {}),
     });
     if (!saved) return { values: form.values, errors: {}, problem: NOT_SAVED };
     savedId = current.id;
   } else {
-    const createdId = await createBrandProduct(session, form.body);
+    const createBody = bodyForCreate(form.body, profile.name);
+    const createdId = await createBrandProduct(session, createBody);
     if (createdId === null) return { values: form.values, errors: {}, problem: NOT_SAVED };
     if (photoUrl !== null) {
       const withPhoto = await updateBrandProduct(session, createdId, {
-        ...form.body,
+        ...createBody,
         attributes: withHeroPhoto([], photoUrl),
       });
       // The product exists; only its photo did not attach. Say so on its page.

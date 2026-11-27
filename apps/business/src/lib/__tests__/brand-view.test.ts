@@ -38,14 +38,19 @@ describe("parseBrandProfile", () => {
   it("reads the brand's own record", () => {
     expect(parseBrandProfile(200, good, "acme")).toEqual({
       name: "Acme Goods",
+      nameKnown: true,
       logoUrl: "https://m.example/a.png",
     });
   });
   it("never shows a record that is about another brand", () => {
-    expect(parseBrandProfile(200, good, "other")).toEqual({ name: "other", logoUrl: null });
+    expect(parseBrandProfile(200, good, "other")).toEqual({
+      name: "other",
+      nameKnown: false,
+      logoUrl: null,
+    });
   });
   it("opens under the brand id when the record cannot be read", () => {
-    const fallback = { name: "acme", logoUrl: null };
+    const fallback = { name: "acme", nameKnown: false, logoUrl: null };
     expect(parseBrandProfile(404, { ok: false }, "acme")).toEqual(fallback);
     expect(parseBrandProfile(500, good, "acme")).toEqual(fallback);
     expect(parseBrandProfile(0, null, "acme")).toEqual(fallback);
@@ -59,7 +64,7 @@ describe("parseBrandProfile", () => {
         { ok: true, business: { id: "acme", name: "  ", logoUrl: "javascript:1" } },
         "acme",
       ),
-    ).toEqual({ name: "acme", logoUrl: null });
+    ).toEqual({ name: "acme", nameKnown: false, logoUrl: null });
     expect(
       parseBrandProfile(200, { ok: true, business: { id: "acme", name: 7 } }, "acme").name,
     ).toBe("acme");
@@ -110,6 +115,36 @@ describe("toBrandSession", () => {
       { ...full, businessId: ["acme"] },
     ]) {
       expect(toBrandSession(bad)).toBeNull();
+    }
+  });
+});
+
+describe("parseBrandProfile: is the name the brand's real one?", () => {
+  it("says so only when the name was read from the brand's own record", () => {
+    const record = (name: unknown, id = "acme") => ({
+      ok: true,
+      business: { id, name, logoUrl: null },
+    });
+    expect(parseBrandProfile(200, record("Acme"), "acme").nameKnown).toBe(true);
+    // A brand whose real name happens to equal its id is still known.
+    expect(parseBrandProfile(200, record("acme"), "acme")).toMatchObject({
+      name: "acme",
+      nameKnown: true,
+    });
+    for (const [status, body] of [
+      [200, record("  ")],
+      [200, record(null)],
+      [200, record(7)],
+      [200, record("Acme", "other")],
+      [404, record("Acme")],
+      [500, record("Acme")],
+      [0, null],
+      [200, { ok: false, business: { id: "acme", name: "Acme" } }],
+    ] as Array<[number, unknown]>) {
+      expect(parseBrandProfile(status, body, "acme"), JSON.stringify(body)).toMatchObject({
+        name: "acme",
+        nameKnown: false,
+      });
     }
   });
 });

@@ -168,7 +168,11 @@ describe("getBrandProfile", () => {
     fetchMock.mockReturnValue(
       answer(200, { ok: true, business: { id: "acme", name: "Acme", logoUrl: null } }),
     );
-    await expect(getBrandProfile(session)).resolves.toEqual({ name: "Acme", logoUrl: null });
+    await expect(getBrandProfile(session)).resolves.toEqual({
+      name: "Acme",
+      nameKnown: true,
+      logoUrl: null,
+    });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://services.test/api/v1/admin/businesses/acme");
     expect((init.headers as Record<string, string>)["x-business-id"]).toBe("acme");
@@ -176,15 +180,27 @@ describe("getBrandProfile", () => {
 
   it("still gives a name when services is down or the key is missing", async () => {
     fetchMock.mockRejectedValueOnce(new Error("network"));
-    await expect(getBrandProfile(session)).resolves.toEqual({ name: "acme", logoUrl: null });
+    await expect(getBrandProfile(session)).resolves.toEqual({
+      name: "acme",
+      nameKnown: false,
+      logoUrl: null,
+    });
     vi.stubEnv("SERVICES_API_KEY", "");
-    await expect(getBrandProfile(session)).resolves.toEqual({ name: "acme", logoUrl: null });
+    await expect(getBrandProfile(session)).resolves.toEqual({
+      name: "acme",
+      nameKnown: false,
+      logoUrl: null,
+    });
   });
 
   it("escapes a brand id that carries path characters", async () => {
     const odd = toBrandSession({ email: "j@a.co", role: "viewer", businessId: "a/b?c" })!;
     fetchMock.mockReturnValue(answer(404, { ok: false }));
-    await expect(getBrandProfile(odd)).resolves.toEqual({ name: "a/b?c", logoUrl: null });
+    await expect(getBrandProfile(odd)).resolves.toEqual({
+      name: "a/b?c",
+      nameKnown: false,
+      logoUrl: null,
+    });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://services.test/api/v1/admin/businesses/a%2Fb%3Fc");
     expect((init.headers as Record<string, string>)["x-business-id"]).toBe("a/b?c");

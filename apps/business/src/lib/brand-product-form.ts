@@ -85,16 +85,20 @@ export const EMPTY_PRODUCT: ProductValues = {
   price: "",
 };
 
-/** What is sent to tagit-services for a create or an edit. Exactly these keys. */
+/**
+ * What is sent to tagit-services for a create or an edit. Exactly these keys.
+ * `brand` and `priceUsdc6` are left out of an edit that does not change them,
+ * so what is stored stays exactly as it was ({@link bodyForEdit}).
+ */
 export interface ProductBody {
   name: string;
-  brand: string;
+  brand?: string;
   model: string | null;
   sku: string | null;
   category: string | null;
   origin: string | null;
   description: string | null;
-  priceUsdc6: string | null;
+  priceUsdc6?: string | null;
 }
 
 export type FormResult =
@@ -125,12 +129,10 @@ export function parsePrice(text: string): string | null {
 /**
  * Read a submitted form. `get` returns the raw value of a field (a FormData
  * getter in production). Anything that is not text reads as empty. The
- * `brandName` is the signed-in brand's own name, from the server.
+ * brand's name is NOT part of the form: the server adds it
+ * ({@link bodyForCreate}, {@link bodyForEdit}).
  */
-export function parseProductForm(
-  get: (field: ProductField) => unknown,
-  brandName: string,
-): FormResult {
+export function parseProductForm(get: (field: ProductField) => unknown): FormResult {
   const values = { ...EMPTY_PRODUCT };
   const errors: Partial<Record<ProductField, string>> = {};
 
@@ -165,7 +167,6 @@ export function parseProductForm(
     values,
     body: {
       name: values.name,
-      brand: brandName,
       model: orNull(values.model),
       sku: orNull(values.sku),
       category: orNull(values.category),
@@ -173,6 +174,35 @@ export function parseProductForm(
       description: orNull(values.description),
       priceUsdc6: price,
     },
+  };
+}
+
+/** A new product carries the brand's real name, read from its record on the server. */
+export function bodyForCreate(body: ProductBody, brandName: string): ProductBody {
+  return { ...body, brand: brandName };
+}
+
+/**
+ * An edit changes only what the person changed:
+ * - the price is sent only when the form's price differs from the one the
+ *   form was given. A stored price can be finer than the form shows (six
+ *   decimals against two); sending it back unchanged would round it.
+ * - the brand name is never overwritten. It is filled in only when the
+ *   product has none and the brand's real name is known.
+ */
+export function bodyForEdit(
+  body: ProductBody,
+  submitted: ProductValues,
+  stored: Pick<ProductDetail, "values" | "hasBrandName">,
+  brandName: string | null,
+): ProductBody {
+  const rest: ProductBody = { ...body };
+  delete rest.priceUsdc6;
+  delete rest.brand;
+  return {
+    ...rest,
+    ...(submitted.price !== stored.values.price ? { priceUsdc6: body.priceUsdc6 ?? null } : {}),
+    ...(!stored.hasBrandName && brandName !== null ? { brand: brandName } : {}),
   };
 }
 
@@ -245,6 +275,8 @@ export interface ProductDetail {
   values: ProductValues;
   state: ProductState;
   photoUrl: string | null;
+  /** Whether the product already carries a brand name (needed to publish). */
+  hasBrandName: boolean;
   /** Kept for a later save: see {@link withHeroPhoto}. */
   attributes: Attribute[];
   /** What a publish still needs, in plain words. Empty when complete. */
@@ -261,6 +293,8 @@ export function priceForForm(value: unknown): string {
   const minor = BigInt(value);
   if (minor === 0n) return "";
   const cents = (minor + 5_000n) / 10_000n;
+  // Less than half a cent shows as no price; an untouched form leaves it stored.
+  if (cents === 0n) return "";
   return `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`;
 }
 
@@ -320,6 +354,7 @@ export function parseProductDetail(
     values,
     state,
     photoUrl,
+    hasBrandName: text(row.brand, 200).length > 0,
     attributes,
     missing: missingParts(values, photoUrl),
   };

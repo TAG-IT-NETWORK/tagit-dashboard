@@ -33,7 +33,7 @@ const EMPTY = { values: {} as never, errors: {}, problem: null };
 const signedIn = (role: "viewer" | "operator" | "admin" | null, brandId = "acme") =>
   request.loadBrand.mockResolvedValue({
     session: { email: "jane@acme.test", role, brandId },
-    profile: { name: "Acme", logoUrl: null },
+    profile: { name: "Acme", nameKnown: true, logoUrl: null },
   });
 
 const fields = (over: Record<string, string | Blob> = {}) => {
@@ -52,9 +52,18 @@ const stored = (over: Record<string, unknown> = {}) => ({
   id: "tpl_1",
   state: "draft",
   photoUrl: null,
+  hasBrandName: true,
   attributes: [{ trait_type: "Size", value: "50 ml" }],
   missing: [],
-  values: {},
+  values: {
+    name: "Day Cream",
+    model: "M",
+    sku: "",
+    category: "",
+    origin: "",
+    description: "",
+    price: "29.99",
+  },
   ...over,
 });
 const outcome = async (run: Promise<unknown>) => {
@@ -228,6 +237,60 @@ describe("saveProduct", () => {
     expect(services.getBrandProduct.mock.calls[0]![0].brandId).toBe("acme");
     expect(services.updateBrandProduct.mock.calls[0]![0].brandId).toBe("acme");
     expect(JSON.stringify(services.updateBrandProduct.mock.calls[0]![2])).not.toContain("other");
+  });
+});
+
+describe("saveProduct: what an edit leaves alone", () => {
+  it("does not send the price or the brand name when neither was changed", async () => {
+    signedIn("operator");
+    await outcome(saveProduct(EMPTY, fields({ productId: "tpl_1", model: "New model" })));
+    const body = services.updateBrandProduct.mock.calls[0]![2];
+    expect(body.model).toBe("New model");
+    expect("priceUsdc6" in body).toBe(false);
+    expect("brand" in body).toBe(false);
+  });
+
+  it("sends the price when it was changed", async () => {
+    signedIn("operator");
+    await outcome(saveProduct(EMPTY, fields({ productId: "tpl_1", price: "31" })));
+    expect(services.updateBrandProduct.mock.calls[0]![2].priceUsdc6).toBe("31.00");
+  });
+
+  it("fills in the brand name of a product that has none", async () => {
+    signedIn("operator");
+    services.getBrandProduct.mockResolvedValue(stored({ hasBrandName: false }));
+    await outcome(saveProduct(EMPTY, fields({ productId: "tpl_1" })));
+    expect(services.updateBrandProduct.mock.calls[0]![2].brand).toBe("Acme");
+  });
+});
+
+describe("saveProduct: when the brand's record could not be read", () => {
+  const standIn = (role: "operator" | "admin") =>
+    request.loadBrand.mockResolvedValue({
+      session: { email: "jane@acme.test", role, brandId: "acme" },
+      // The header shows the brand id as a stand-in; it is not the brand's name.
+      profile: { name: "acme", nameKnown: false, logoUrl: null },
+    });
+
+  it("creates nothing, stores no photo, and says so", async () => {
+    standIn("operator");
+    const state = (await saveProduct(EMPTY, fields({ photo: png() }))) as { problem: string };
+    expect(state.problem).toContain("could not be loaded");
+    noWrites();
+  });
+
+  it("still saves an edit, without touching the product's brand name", async () => {
+    standIn("admin");
+    expect(await outcome(saveProduct(EMPTY, fields({ productId: "tpl_1", model: "X" })))).toBe(
+      "REDIRECT /products/tpl_1?saved=1",
+    );
+    expect("brand" in services.updateBrandProduct.mock.calls[0]![2]).toBe(false);
+    // Even a product with no brand name is not given the stand-in.
+    vi.clearAllMocks();
+    services.updateBrandProduct.mockResolvedValue(true);
+    services.getBrandProduct.mockResolvedValue(stored({ hasBrandName: false }));
+    await outcome(saveProduct(EMPTY, fields({ productId: "tpl_1" })));
+    expect("brand" in services.updateBrandProduct.mock.calls[0]![2]).toBe(false);
   });
 });
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bodyForCreate,
+  bodyForEdit,
   canEditProducts,
   canPublishProducts,
   heroPhoto,
@@ -25,7 +27,7 @@ import {
 const SHA = "a".repeat(64);
 const PHOTO = `https://media.tagit.network/i/${SHA}/lg.webp`;
 const form = (fields: Partial<Record<ProductField, unknown>>) =>
-  parseProductForm((field) => fields[field], "Acme");
+  parseProductForm((field) => fields[field]);
 
 describe("who may do what", () => {
   it("lets Editors and Managers edit, and only Managers publish", () => {
@@ -141,7 +143,7 @@ describe("parsePrice", () => {
 });
 
 describe("parseProductForm", () => {
-  it("builds exactly the body tagit-services takes, with the brand's name from the server", () => {
+  it("builds exactly the body tagit-services takes, with no brand name in it", () => {
     const result = form({
       name: "  Day Cream ",
       model: "Anti-Wrinkle",
@@ -155,7 +157,6 @@ describe("parseProductForm", () => {
     if (!result.ok) return;
     expect(result.body).toEqual({
       name: "Day Cream",
-      brand: "Acme",
       model: "Anti-Wrinkle",
       sku: "232501",
       category: "Cosmetics",
@@ -175,13 +176,15 @@ describe("parseProductForm", () => {
       slug: "x",
       createdBy: "me",
     };
-    const result = parseProductForm((field) => posted[field], "Acme");
+    const result = parseProductForm((field) => posted[field]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(Object.keys(result.body).sort()).toEqual(
-      ["brand", "category", "description", "model", "name", "origin", "priceUsdc6", "sku"].sort(),
+      ["category", "description", "model", "name", "origin", "priceUsdc6", "sku"].sort(),
     );
-    expect(result.body.brand).toBe("Acme");
+    // The brand name is added by the server, never read from the form.
+    expect("brand" in result.body).toBe(false);
+    expect(bodyForCreate(result.body, "Acme").brand).toBe("Acme");
   });
 
   it("turns empty fields into nothing, and needs a name", () => {
@@ -432,5 +435,125 @@ describe("a product read back", () => {
     expect(parseCreatedProduct(200, created(), "acme")).toBeNull();
     expect(parseCreatedProduct(400, created(), "acme")).toBeNull();
     expect(parseCreatedProduct(201, null, "acme")).toBeNull();
+  });
+});
+
+describe("what an edit sends", () => {
+  const body = {
+    name: "Cream",
+    model: null,
+    sku: null,
+    category: null,
+    origin: null,
+    description: null,
+    priceUsdc6: "1.23",
+  };
+  const values = {
+    name: "Cream",
+    model: "",
+    sku: "",
+    category: "",
+    origin: "",
+    description: "",
+    price: "1.23",
+  };
+  const stored = (price: string, hasBrandName = true) => ({
+    values: { ...values, price },
+    hasBrandName,
+  });
+
+  it("leaves the price out when the person did not change it, so a finer stored price is kept", () => {
+    // Stored 1.234567 shows as 1.23; saving another field must not round it.
+    expect(priceForForm("1234567")).toBe("1.23");
+    const sent = bodyForEdit(body, values, stored("1.23"), "Acme");
+    expect("priceUsdc6" in sent).toBe(false);
+  });
+
+  it("sends the price when it was changed, set or cleared", () => {
+    expect(
+      bodyForEdit(
+        { ...body, priceUsdc6: "2.00" },
+        { ...values, price: "2" },
+        stored("1.23"),
+        "Acme",
+      ).priceUsdc6,
+    ).toBe("2.00");
+    expect(bodyForEdit(body, values, stored(""), "Acme").priceUsdc6).toBe("1.23");
+    const cleared = bodyForEdit(
+      { ...body, priceUsdc6: null },
+      { ...values, price: "" },
+      stored("1.23"),
+      "Acme",
+    );
+    expect(cleared.priceUsdc6).toBeNull();
+    expect("priceUsdc6" in cleared).toBe(true);
+  });
+
+  it("leaves a price below half a cent stored when the form is saved untouched", () => {
+    const sent = bodyForEdit(
+      { ...body, priceUsdc6: null },
+      { ...values, price: "" },
+      stored(priceForForm("4999")),
+      "Acme",
+    );
+    expect("priceUsdc6" in sent).toBe(false);
+  });
+
+  it("never overwrites a product's brand name", () => {
+    expect("brand" in bodyForEdit(body, values, stored("1.23", true), "Acme")).toBe(false);
+    expect(
+      "brand" in bodyForEdit({ ...body, brand: "Sneaked" }, values, stored("1.23", true), "Acme"),
+    ).toBe(false);
+  });
+
+  it("fills in a missing brand name only when the brand's real name is known", () => {
+    expect(bodyForEdit(body, values, stored("1.23", false), "Acme").brand).toBe("Acme");
+    expect("brand" in bodyForEdit(body, values, stored("1.23", false), null)).toBe(false);
+    expect(
+      bodyForEdit({ ...body, brand: "Sneaked" }, values, stored("1.23", false), "Acme").brand,
+    ).toBe("Acme");
+  });
+
+  it("keeps every other field of the form", () => {
+    const sent = bodyForEdit(
+      { ...body, model: "M", description: "D" },
+      values,
+      stored("1.23"),
+      "Acme",
+    );
+    expect(sent).toEqual({
+      name: "Cream",
+      model: "M",
+      sku: null,
+      category: null,
+      origin: null,
+      description: "D",
+    });
+  });
+});
+
+describe("whether a product carries a brand name", () => {
+  const read = (brand: unknown) =>
+    parseProductDetail(
+      200,
+      {
+        ok: true,
+        template: {
+          id: "tpl_1",
+          businessId: "acme",
+          status: "draft",
+          version: 0,
+          name: "Cream",
+          brand,
+          attributes: [],
+        },
+      },
+      "tpl_1",
+      "acme",
+    )!.hasBrandName;
+  it("is true only for real text", () => {
+    expect(read("Acme")).toBe(true);
+    for (const none of [null, undefined, "", "   ", 7])
+      expect(read(none), String(none)).toBe(false);
   });
 });
