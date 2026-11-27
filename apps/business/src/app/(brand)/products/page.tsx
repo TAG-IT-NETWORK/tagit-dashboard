@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SIGN_IN_PATH } from "@/lib/access";
 import { countWords, itemsWords, statusWords, type Product } from "@/lib/brand-catalog";
+import { canEditProducts } from "@/lib/brand-product-form";
 import { loadBrand, loadProducts } from "@/lib/brand-request";
 
 export const metadata: Metadata = { title: "Products · TAG IT Business" };
@@ -21,7 +23,11 @@ function ProductRow({ product }: { product: Product }) {
     <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="break-words font-medium">{product.name}</h2>
+          <h2 className="break-words font-medium">
+            <Link href={`/products/${product.id}`} className="underline-offset-4 hover:underline">
+              {product.name}
+            </Link>
+          </h2>
           <span
             className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[product.status]}`}
           >
@@ -46,21 +52,32 @@ function ProductRow({ product }: { product: Product }) {
   );
 }
 
-/** The brand's own products, read only (TAP-T17, slice 2). */
+/** The brand's own products (TAP-T17). Editors and Managers can add one. */
 export default async function BrandProductsPage() {
   // Both reads start together: a slow services answer is waited for once.
   const [brand, list] = await Promise.all([loadBrand(), loadProducts()]);
   if (brand === null || list === null) redirect(SIGN_IN_PATH);
+  const canAdd = canEditProducts(brand.session.role);
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
-        <p className="text-sm text-muted-foreground">
-          {list.loaded
-            ? `${countWords(list.products.length, "product", "products")} in ${brand.profile.name}'s catalog.`
-            : "Your catalog."}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
+          <p className="text-sm text-muted-foreground">
+            {list.loaded
+              ? `${countWords(list.products.length, "product", "products")} in ${brand.profile.name}'s catalog.`
+              : "Your catalog."}
+          </p>
+        </div>
+        {canAdd ? (
+          <Link
+            href="/products/new"
+            className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            New product
+          </Link>
+        ) : null}
       </div>
 
       {!list.loaded ? (
@@ -69,8 +86,9 @@ export default async function BrandProductsPage() {
         </p>
       ) : list.products.length === 0 ? (
         <p className="rounded-xl border p-6 text-sm text-muted-foreground">
-          No products yet. Your TAG IT contact adds your first product with you, and it will appear
-          here.
+          {canAdd
+            ? "No products yet. Add your first one with New product."
+            : "No products yet. An Editor or Manager of your brand can add the first one."}
         </p>
       ) : (
         <ul className="divide-y rounded-xl border">

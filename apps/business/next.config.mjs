@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@tagit/ui"],
+  experimental: {
+    // A product photo travels in the save action (up to 4 MB, checked there).
+    // Other origins are refused by Next for every server action.
+    serverActions: { bodySizeLimit: "5mb" },
+  },
   async headers() {
     return [
       {

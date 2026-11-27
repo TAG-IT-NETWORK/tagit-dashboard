@@ -63,11 +63,18 @@ export const NO_ACCESS_PATH = "/no-access";
  * Minimum role per brand path: longest matching prefix wins, default viewer.
  * An entry may carry a METHOD list and then applies to those methods only;
  * when the caller cannot name the method, method-scoped entries still apply
- * (fail closed). Empty today: slice 1 has no writes.
+ * (fail closed).
  */
 export const PATH_ROLES: ReadonlyArray<
   readonly [prefix: string, role: Role, methods?: readonly string[]]
-> = [];
+> = [
+  // Product editing: the New product page, and every write under /products
+  // (the save and publish actions post to the page they are on), need an
+  // Editor. Publishing needs a Manager; that is checked in the action
+  // itself, which is the check that counts (app/(brand)/products/actions.ts).
+  ["/products/new", "operator"],
+  ["/products", "operator", ["POST", "PUT", "PATCH", "DELETE"]],
+];
 
 /** Prefix match on whole path segments: /home, /home/x, but not /homes. */
 function matchesPrefix(pathname: string, prefix: string): boolean {

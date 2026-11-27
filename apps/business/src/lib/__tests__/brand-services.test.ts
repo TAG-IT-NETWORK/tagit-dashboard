@@ -3,8 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BrandServicesError,
   brandFetch,
+  createBrandProduct,
+  getBrandProduct,
   getBrandProducts,
   getBrandProfile,
+  publishBrandProduct,
+  updateBrandProduct,
+  uploadBrandPhoto,
   getBrandSummary,
   isServicesPath,
 } from "@/lib/brand-services";
@@ -239,5 +244,128 @@ describe("getBrandProducts and getBrandSummary", () => {
     vi.stubEnv("SERVICES_API_KEY", "");
     expect(await getBrandProducts(session)).toEqual({ loaded: false, products: [] });
     expect(await getBrandSummary(session)).toBeNull();
+  });
+});
+
+describe("product editing calls", () => {
+  const SHA = "c".repeat(64);
+  const PHOTO = `https://media.tagit.network/i/${SHA}/lg.webp`;
+  const body = {
+    name: "Cream",
+    brand: "Acme",
+    model: null,
+    sku: null,
+    category: null,
+    origin: null,
+    description: null,
+    priceUsdc6: null,
+  };
+  const template = {
+    id: "tpl_1",
+    businessId: "acme",
+    status: "draft",
+    version: 0,
+    name: "Cream",
+    attributes: [],
+  };
+  const last = () => fetchMock.mock.calls.at(-1) as [string, RequestInit];
+  const headersOf = (init: RequestInit) => init.headers as Record<string, string>;
+
+  it("each go to one listed route, under the session's brand and user", async () => {
+    fetchMock.mockReturnValueOnce(answer(200, { ok: true, template }));
+    expect((await getBrandProduct(session, "tpl_1"))?.id).toBe("tpl_1");
+    expect(last()[0]).toBe("https://services.test/api/v1/admin/templates/tpl_1");
+    expect(last()[1].method).toBe("GET");
+
+    fetchMock.mockReturnValueOnce(answer(201, { ok: true, template }));
+    expect(await createBrandProduct(session, body)).toBe("tpl_1");
+    expect(last()[0]).toBe("https://services.test/api/v1/admin/templates");
+    expect(last()[1].method).toBe("POST");
+    expect(JSON.parse(last()[1].body as string)).toEqual(body);
+
+    fetchMock.mockReturnValueOnce(answer(200, { ok: true, template }));
+    expect(await updateBrandProduct(session, "tpl_1", body)).toBe(true);
+    expect(last()[0]).toBe("https://services.test/api/v1/admin/templates/tpl_1");
+    expect(last()[1].method).toBe("PUT");
+
+    fetchMock.mockReturnValueOnce(answer(201, { ok: true }));
+    expect(await publishBrandProduct(session, "tpl_1")).toBe(true);
+    expect(last()[0]).toBe("https://services.test/api/v1/admin/templates/tpl_1/publish");
+    expect(last()[1].method).toBe("POST");
+
+    for (const [, init] of fetchMock.mock.calls as Array<[string, RequestInit]>) {
+      expect(headersOf(init)["x-business-id"]).toBe("acme");
+      expect(headersOf(init)["x-actor"]).toBe("jane@acme.com");
+      expect(headersOf(init).authorization).toBe("Bearer test-key");
+    }
+  });
+
+  it("never ask tagit-services about an id that is not a product id", async () => {
+    for (const bad of [
+      "../businesses/other",
+      "tpl_1/publish",
+      "tpl_1?x=1",
+      "tpl_",
+      "",
+      "x",
+      "tpl_a b",
+    ]) {
+      expect(await getBrandProduct(session, bad), bad).toBeNull();
+      expect(await updateBrandProduct(session, bad, body), bad).toBe(false);
+      expect(await publishBrandProduct(session, bad), bad).toBe(false);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("show nothing for another brand's product, even if tagit-services sent it", async () => {
+    fetchMock.mockReturnValue(
+      answer(200, { ok: true, template: { ...template, businessId: "other" } }),
+    );
+    expect(await getBrandProduct(session, "tpl_1")).toBeNull();
+    fetchMock.mockReturnValue(
+      answer(201, { ok: true, template: { ...template, businessId: "other" } }),
+    );
+    expect(await createBrandProduct(session, body)).toBeNull();
+  });
+
+  it("report a refusal or an outage as not done, and never throw", async () => {
+    for (const status of [400, 403, 404, 409, 500]) {
+      fetchMock.mockReturnValue(answer(status, { ok: true, template }));
+      expect(await getBrandProduct(session, "tpl_1"), String(status)).toBeNull();
+      expect(await createBrandProduct(session, body), String(status)).toBeNull();
+      expect(await updateBrandProduct(session, "tpl_1", body), String(status)).toBe(false);
+      expect(await publishBrandProduct(session, "tpl_1"), String(status)).toBe(false);
+      expect(await uploadBrandPhoto(session, new Blob(["x"])), String(status)).toBeNull();
+    }
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await createBrandProduct(session, body)).toBeNull();
+    expect(await updateBrandProduct(session, "tpl_1", body)).toBe(false);
+    expect(await publishBrandProduct(session, "tpl_1")).toBe(false);
+    expect(await uploadBrandPhoto(session, new Blob(["x"]))).toBeNull();
+    // A 200 whose body says it failed is not a success either.
+    fetchMock.mockReset();
+    fetchMock.mockReturnValue(answer(200, { ok: false }));
+    expect(await updateBrandProduct(session, "tpl_1", body)).toBe(false);
+  });
+
+  it("upload a photo as one file in the field tagit-services reads, under the same headers", async () => {
+    fetchMock.mockReturnValue(answer(201, { ok: true, media: [{ urls: { lg: PHOTO } }] }));
+    expect(await uploadBrandPhoto(session, new Blob(["img"], { type: "image/png" }))).toBe(PHOTO);
+    const [url, init] = last();
+    expect(url).toBe("https://services.test/api/v1/media");
+    expect(init.method).toBe("POST");
+    const form = init.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect([...form.keys()]).toEqual(["files"]);
+    // fetch sets the multipart content type itself.
+    expect(headersOf(init)["content-type"]).toBeUndefined();
+    expect(headersOf(init)["x-business-id"]).toBe("acme");
+  });
+
+  it("take a stored photo's address only when it is one of ours", async () => {
+    fetchMock.mockReturnValue(
+      answer(201, { ok: true, media: [{ urls: { lg: "https://evil.example/x.webp" } }] }),
+    );
+    expect(await uploadBrandPhoto(session, new Blob(["img"]))).toBeNull();
   });
 });
