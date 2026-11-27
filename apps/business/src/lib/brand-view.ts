@@ -6,7 +6,14 @@ import type { Role } from "@/lib/access";
  */
 
 export interface BrandProfile {
+  /** The brand's name, or its id when the record could not be read. */
   name: string;
+  /**
+   * True only when `name` is the brand's real name, read from its record.
+   * False means `name` is a stand-in for display: fine in a header, never
+   * to be SAVED anywhere as the brand's name.
+   */
+  nameKnown: boolean;
   /** An https address safe to put in an <img>, or null. */
   logoUrl: string | null;
 }
@@ -33,7 +40,7 @@ export function safeLogoUrl(value: unknown): string | null {
  * be read (no record yet, an error) the page still opens, under the brand id.
  */
 export function parseBrandProfile(status: number, body: unknown, brandId: string): BrandProfile {
-  const fallback: BrandProfile = { name: brandId, logoUrl: null };
+  const fallback: BrandProfile = { name: brandId, nameKnown: false, logoUrl: null };
   if (status !== 200 || typeof body !== "object" || body === null) return fallback;
   const record = body as {
     ok?: unknown;
@@ -42,11 +49,9 @@ export function parseBrandProfile(status: number, body: unknown, brandId: string
   // An answer about a DIFFERENT brand is never shown, whatever it says.
   if (record.ok !== true || record.business?.id !== brandId) return fallback;
   const rawName = record.business.name;
-  const name =
-    typeof rawName === "string" && rawName.trim().length > 0
-      ? rawName.trim().slice(0, 200)
-      : brandId;
-  return { name, logoUrl: safeLogoUrl(record.business.logoUrl) };
+  const nameKnown = typeof rawName === "string" && rawName.trim().length > 0;
+  const name = nameKnown ? rawName.trim().slice(0, 200) : brandId;
+  return { name, nameKnown, logoUrl: safeLogoUrl(record.business.logoUrl) };
 }
 
 /** The role in plain words. */

@@ -114,8 +114,37 @@ describe("evaluateAccess", () => {
   it("lets a brand session into the app", () => {
     expect(evaluateAccess("/home", brand)).toBe("allow");
     expect(evaluateAccess("/home/anything", brand)).toBe("allow");
-    expect(evaluateAccess("/products", brand)).toBe("allow");
-    expect(evaluateAccess("/products/7", brand)).toBe("allow");
+    expect(evaluateAccess("/products", brand, "GET")).toBe("allow");
+    expect(evaluateAccess("/products/7", brand, "GET")).toBe("allow");
+  });
+
+  it("lets every role read products, and only Editors and Managers write them", () => {
+    const as = (role: "viewer" | "operator" | "admin") => ({ ...brand, role });
+    for (const path of ["/products", "/products/tpl_1"]) {
+      for (const role of ["viewer", "operator", "admin"] as const) {
+        expect(evaluateAccess(path, as(role), "GET"), `${role} GET ${path}`).toBe("allow");
+      }
+      for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+        expect(evaluateAccess(path, as("viewer"), method), `viewer ${method} ${path}`).toBe(
+          "forbidden",
+        );
+        expect(evaluateAccess(path, as("operator"), method), `operator ${method} ${path}`).toBe(
+          "allow",
+        );
+        expect(evaluateAccess(path, as("admin"), method), `admin ${method} ${path}`).toBe("allow");
+      }
+      // A caller that cannot name its method is held to the write rule.
+      expect(evaluateAccess(path, as("viewer")), path).toBe("forbidden");
+    }
+    // The New product page is closed to a View-only account on every method.
+    for (const method of ["GET", "POST", undefined]) {
+      expect(evaluateAccess("/products/new", as("viewer"), method), String(method)).toBe(
+        "forbidden",
+      );
+      expect(evaluateAccess("/products/new", as("operator"), method), String(method)).toBe("allow");
+    }
+    // Home has no writes and stays open to all three.
+    expect(evaluateAccess("/home", as("viewer"), "POST")).toBe("allow");
   });
 
   it("keeps a brand session out of every path that is not listed", () => {
@@ -145,7 +174,12 @@ describe("evaluateAccess", () => {
   it("defaults a brand path to viewer", () => {
     expect(requiredRoleFor("/home")).toBe("viewer");
     expect(requiredRoleFor("/home", "POST")).toBe("viewer");
-    expect(requiredRoleFor("/products")).toBe("viewer");
+    expect(requiredRoleFor("/products", "GET")).toBe("viewer");
+    expect(requiredRoleFor("/products/tpl_1", "GET")).toBe("viewer");
+    expect(requiredRoleFor("/products", "POST")).toBe("operator");
+    expect(requiredRoleFor("/products/tpl_1", "POST")).toBe("operator");
+    expect(requiredRoleFor("/products/new", "GET")).toBe("operator");
+    expect(requiredRoleFor("/products")).toBe("operator");
   });
 });
 

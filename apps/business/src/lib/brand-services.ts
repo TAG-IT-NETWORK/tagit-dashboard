@@ -5,6 +5,14 @@ import {
   type ItemCounts,
   type ProductList,
 } from "@/lib/brand-catalog";
+import {
+  parseCreatedProduct,
+  parseProductDetail,
+  parseProductId,
+  parseUploadedPhoto,
+  type ProductBody,
+  type ProductDetail,
+} from "@/lib/brand-product-form";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -36,6 +44,11 @@ export interface BrandCall {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   /** Sent as JSON. */
   body?: unknown;
+  /**
+   * One file, sent as a multipart upload in the field tagit-services reads
+   * ("files"). Not together with `body`.
+   */
+  file?: Blob;
 }
 
 /** The path must be a plain /api/v1/ path: no host, no dot segments, no tricks. */
@@ -77,12 +90,21 @@ export async function brandFetch(
     "x-actor": session.email,
   };
   const hasBody = call.body !== undefined;
-  if (hasBody) headers["content-type"] = "application/json";
+  let payload: string | FormData | undefined;
+  if (call.file !== undefined) {
+    // The multipart boundary is set by fetch; a content-type here would break it.
+    const form = new FormData();
+    form.append("files", call.file, "photo");
+    payload = form;
+  } else if (hasBody) {
+    headers["content-type"] = "application/json";
+    payload = JSON.stringify(call.body);
+  }
 
   const res = await fetch(`${base}${path}`, {
     method: call.method ?? "GET",
     headers,
-    body: hasBody ? JSON.stringify(call.body) : undefined,
+    body: payload,
     cache: "no-store",
     redirect: "error",
     signal: AbortSignal.timeout(SERVICES_TIMEOUT_MS),
@@ -119,6 +141,87 @@ export async function getBrandSummary(session: BrandSession): Promise<ItemCounts
   try {
     const answer = await brandFetch(session, "/api/v1/admin/catalog/summary");
     return parseSummary(answer.status, answer.body);
+  } catch {
+    return null;
+  }
+}
+
+// ── Product editing (TAP-T17) ────────────────────────────────────────────────
+// None of these checks WHO is asking beyond "a brand session": the role rule
+// lives in the server actions that call them (app/(brand)/products/actions.ts).
+// None of them throws: a failure is a null or a false the caller turns into
+// plain words.
+
+/** One of the signed-in brand's products, or null (also for another brand's id). */
+export async function getBrandProduct(
+  session: BrandSession,
+  productId: string,
+): Promise<ProductDetail | null> {
+  const id = parseProductId(productId);
+  if (id === null) return null;
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/templates/${id}`);
+    return parseProductDetail(answer.status, answer.body, id, session.brandId);
+  } catch {
+    return null;
+  }
+}
+
+/** Create a draft product for the signed-in brand. Its id, or null. */
+export async function createBrandProduct(
+  session: BrandSession,
+  body: ProductBody,
+): Promise<string | null> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/templates", { method: "POST", body });
+    return parseCreatedProduct(answer.status, answer.body, session.brandId);
+  } catch {
+    return null;
+  }
+}
+
+/** Save an edit. `attributes` is sent only when the photo changed. */
+export async function updateBrandProduct(
+  session: BrandSession,
+  productId: string,
+  body: ProductBody & { attributes?: Array<{ trait_type: string; value: string }> },
+): Promise<boolean> {
+  const id = parseProductId(productId);
+  if (id === null) return false;
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/templates/${id}`, {
+      method: "PUT",
+      body,
+    });
+    return answer.status === 200 && (answer.body as { ok?: unknown } | null)?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Publish the product: its saved state becomes the live one. */
+export async function publishBrandProduct(
+  session: BrandSession,
+  productId: string,
+): Promise<boolean> {
+  const id = parseProductId(productId);
+  if (id === null) return false;
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/templates/${id}/publish`, {
+      method: "POST",
+      body: {},
+    });
+    return answer.status === 201 && (answer.body as { ok?: unknown } | null)?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Store a photo in our media storage. Its address, or null. */
+export async function uploadBrandPhoto(session: BrandSession, file: Blob): Promise<string | null> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/media", { method: "POST", file });
+    return parseUploadedPhoto(answer.status, answer.body);
   } catch {
     return null;
   }

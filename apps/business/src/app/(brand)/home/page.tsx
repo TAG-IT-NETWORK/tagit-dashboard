@@ -78,17 +78,15 @@ export default async function BrandHomePage() {
         <h2 className="text-lg font-semibold">Your products</h2>
         <p className="mt-2 max-w-prose text-sm text-muted-foreground">
           {nothingYet
-            ? "Nothing is set up yet. Your TAG IT contact adds your first product with you, and it will appear here."
+            ? "Nothing is set up yet. Add your first product on the Products page."
             : "See every product in your catalog, its price and how many items were made."}
         </p>
-        {nothingYet ? null : (
-          <Link
-            href="/products"
-            className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-          >
-            View products
-          </Link>
-        )}
+        <Link
+          href="/products"
+          className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >
+          View products
+        </Link>
       </section>
     </div>
   );
