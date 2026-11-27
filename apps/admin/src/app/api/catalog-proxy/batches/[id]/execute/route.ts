@@ -15,8 +15,9 @@ import { batchesUpstream } from "@/lib/server/batches-upstream";
  * statusUrl} (T21/T25 async pattern — poll the status proxy); 200 when the
  * batch already minted (idempotent re-execute).
  *
- * Body: { to: 0x…, chainId?: number } — `to` is the treasury/admin address
- * holding the whole batch pre-bind (executeSchema, batch-router.ts).
+ * Body: { to?: 0x…, chainId?: number } — `to` is the address holding the
+ * whole batch pre-bind. It is needed for a batch with no brand and left out
+ * for a brand's batch, which goes to the brand's mint wallet (TAP-T17).
  */
 
 export const runtime = "nodejs";
@@ -42,12 +43,22 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   } catch {
     return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
   }
-  const to = String(body.to ?? "");
-  if (!ADDR_RE.test(to)) {
-    return NextResponse.json(
-      { ok: false, error: "to must be an EVM address (mint recipient holding the batch pre-bind)" },
-      { status: 400 },
-    );
+  // `to` may be left out (TAP-T17): tagit-services sends a brand's batch to
+  // the brand's own mint wallet and needs no address for it. For a batch
+  // with no brand it answers with a 400 of its own when the address is
+  // missing. When an address IS sent it must look like one.
+  let to: string | undefined;
+  if (body.to !== undefined && body.to !== null) {
+    if (typeof body.to !== "string" || !ADDR_RE.test(body.to)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "to must be an EVM address (mint recipient holding the batch pre-bind)",
+        },
+        { status: 400 },
+      );
+    }
+    to = body.to;
   }
   let chainId: number | undefined;
   if (body.chainId !== undefined) {
@@ -63,7 +74,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   const res = await batchesUpstream(`/api/v1/admin/batches/${params.id}/execute`, {
     method: "POST",
     relayer: true,
-    json: { to, ...(chainId !== undefined ? { chainId } : {}) },
+    json: { ...(to !== undefined ? { to } : {}), ...(chainId !== undefined ? { chainId } : {}) },
   });
   return NextResponse.json(res.body, { status: res.status });
 }

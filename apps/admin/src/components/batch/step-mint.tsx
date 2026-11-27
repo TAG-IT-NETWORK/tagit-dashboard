@@ -26,7 +26,9 @@ import {
   basescanTxUrl,
   canExecuteBatch,
   canUnstickBatch,
+  executeBody,
   isBatchInFlight,
+  mintRecipientFor,
   type MintBlock,
 } from "@/lib/catalog/batch-logic";
 import { describeBatchFacts } from "@/lib/catalog/product-facts";
@@ -57,6 +59,8 @@ interface StepMintProps {
   block?: MintBlock | null;
   /** Read the template again, for the notice's "Check again". */
   onRecheck?: () => void;
+  /** The product's brand, or null for a product with no brand (TAP-T17). */
+  brandId?: string | null;
 }
 
 export function StepMint({
@@ -68,6 +72,7 @@ export function StepMint({
   failure = null,
   block = null,
   onRecheck,
+  brandId = null,
 }: StepMintProps) {
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState<"execute" | "unstick" | null>(null);
@@ -88,21 +93,28 @@ export function StepMint({
   const msSinceUpdate = Date.now() - Date.parse(batch.updatedAt);
   const unstickable = canUnstickBatch(role, batch.state, msSinceUpdate);
 
+  // A brand's batch goes to the brand's own mint wallet: the server picks it,
+  // so no address is asked for or sent (TAP-T17).
+  const recipient = mintRecipientFor(brandId);
+  const body = executeBody(recipient, to);
+
   const execute = async () => {
-    if (!executable || busy !== null || !ADDR_RE.test(to)) return;
+    if (!executable || busy !== null || body === null) return;
     setBusy("execute");
     setError(null);
     setUnstickNote(null);
-    try {
-      localStorage.setItem(MINT_TO_STORAGE_KEY, to);
-    } catch {
-      // best-effort convenience only
+    if (recipient.kind === "typed") {
+      try {
+        localStorage.setItem(MINT_TO_STORAGE_KEY, to);
+      } catch {
+        // best-effort convenience only
+      }
     }
     try {
       const res = await fetch(`/api/catalog-proxy/batches/${batch.id}/execute`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ to }),
+        body: JSON.stringify(body),
       });
       const data = (await res.json()) as BatchExecuteResponse;
       if (!res.ok || !data.ok) {
@@ -159,19 +171,32 @@ export function StepMint({
       {/* Execute controls */}
       {canExecuteBatch(batch.state) && (
         <div className="space-y-2 max-w-lg">
-          <Label htmlFor="mint-to">
-            Mint recipient (treasury/admin address holding the batch pre-bind)
-          </Label>
+          {recipient.kind === "brand" ? (
+            <p
+              className="rounded-md border bg-muted/40 px-3 py-2 text-sm"
+              data-testid="mint-to-brand"
+            >
+              These items go to the mint wallet of{" "}
+              <span className="font-medium">{recipient.brandId}</span>. It is set on the Brands
+              page; there is no address to type here.
+            </p>
+          ) : (
+            <Label htmlFor="mint-to">
+              Mint recipient (treasury/admin address holding the batch pre-bind)
+            </Label>
+          )}
           <div className="flex gap-2">
-            <Input
-              id="mint-to"
-              placeholder="0x…"
-              value={to}
-              onChange={(e) => setTo(e.target.value.trim())}
-              disabled={!executable || busy !== null}
-              className="font-mono"
-            />
-            <Button onClick={execute} disabled={!executable || busy !== null || !ADDR_RE.test(to)}>
+            {recipient.kind === "typed" && (
+              <Input
+                id="mint-to"
+                placeholder="0x…"
+                value={to}
+                onChange={(e) => setTo(e.target.value.trim())}
+                disabled={!executable || busy !== null}
+                className="font-mono"
+              />
+            )}
+            <Button onClick={execute} disabled={!executable || busy !== null || body === null}>
               {busy === "execute" ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -185,7 +210,7 @@ export function StepMint({
               )}
             </Button>
           </div>
-          {to.length > 0 && !ADDR_RE.test(to) && (
+          {recipient.kind === "typed" && to.length > 0 && !ADDR_RE.test(to) && (
             <p className="text-xs text-destructive">Must be a 0x EVM address.</p>
           )}
           <p className="text-xs text-muted-foreground">

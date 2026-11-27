@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  executeBody,
+  mintRecipientFor,
   BATCH_ID_RE,
   BATCH_SIZE_ADVICE,
   MAX_BATCH_SIZE,
@@ -407,5 +409,33 @@ describe("mintBlock: can this batch be created or minted? (TAP-T19)", () => {
   it("while the template is unknown nothing is blocked: the API decides", () => {
     expect(mintBlock(fresh, null)).toBeNull();
     expect(mintBlock({ size: 5, hasTx: false }, null)).toBeNull();
+  });
+});
+
+// ── TAP-T17: who receives a batch ────────────────────────────────────────────
+
+describe("who receives a batch", () => {
+  const ADDR = "0x8aE1E82C00145d5e08b8E63DF35cA455F0aabe23";
+
+  it("a product with a brand goes to that brand's wallet; any other asks for an address", () => {
+    expect(mintRecipientFor("aura-skin")).toEqual({ kind: "brand", brandId: "aura-skin" });
+    for (const none of [null, undefined, "", "   ", 7, {}, ["aura-skin"]]) {
+      expect(mintRecipientFor(none), JSON.stringify(none)).toEqual({ kind: "typed" });
+    }
+  });
+
+  it("sends no address for a brand's batch, whatever is in the field", () => {
+    const brand = mintRecipientFor("aura-skin");
+    expect(executeBody(brand, "")).toEqual({});
+    expect(executeBody(brand, ADDR)).toEqual({});
+    expect(executeBody(brand, "junk")).toEqual({});
+  });
+
+  it("needs a real address for a batch with no brand", () => {
+    const typed = mintRecipientFor(null);
+    expect(executeBody(typed, ADDR)).toEqual({ to: ADDR });
+    for (const bad of ["", "0x", "0x123", `${ADDR}00`, ` ${ADDR}`, "aura-skin"]) {
+      expect(executeBody(typed, bad), bad).toBeNull();
+    }
   });
 });

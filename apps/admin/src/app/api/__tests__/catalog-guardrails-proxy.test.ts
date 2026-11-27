@@ -166,4 +166,61 @@ describe("catalog proxies and the cream-run guardrails (TAP-T19)", () => {
       expect(await res.json()).toEqual(status);
     });
   });
+
+  // TAP-T17: a brand's batch needs no address; tagit-services picks the wallet.
+  describe("the mint recipient on execute", () => {
+    const ADDR = "0x8aE1E82C00145d5e08b8E63DF35cA455F0aabe23";
+    const execute = (body: unknown) =>
+      call("../catalog-proxy/batches/[id]/execute/route", "POST", body, { id: BAT });
+    const sent = () =>
+      JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+
+    it("forwards an execute with no address, sending none upstream", async () => {
+      upstreamAnswers({ ok: true, batchId: BAT, status: "minting" }, 202);
+      const res = await execute({});
+      expect(res.status).toBe(202);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(sent()).toEqual({});
+      expect("to" in sent()).toBe(false);
+    });
+
+    it("still forwards an address when one is sent", async () => {
+      upstreamAnswers({ ok: true, batchId: BAT, status: "minting" }, 202);
+      await execute({ to: ADDR, chainId: 84532 });
+      expect(sent()).toEqual({ to: ADDR, chainId: 84532 });
+    });
+
+    it("refuses something that is not an address, and forwards nothing", async () => {
+      for (const to of ["", "0x123", "aura-skin", 7, {}, [ADDR], `${ADDR}00`]) {
+        const res = await execute({ to });
+        expect(res.status, JSON.stringify(to)).toBe(400);
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("passes on the refusals tagit-services writes about the wallet, as they were sent", async () => {
+      for (const refusal of [
+        {
+          error: "MINT_RECIPIENT_MISMATCH",
+          message:
+            "A brand's items are minted to the brand's mint wallet. Leave the recipient out, or send the brand's own.",
+        },
+        {
+          error: "BRAND_MINT_WALLET_MISSING",
+          message: "This brand has no mint wallet yet. Set it on the Brands page, then mint again.",
+        },
+      ]) {
+        upstreamAnswers(refusal, 409);
+        const res = await execute({});
+        expect(res.status).toBe(409);
+        expect(await res.json()).toEqual(refusal);
+      }
+    });
+
+    it("still needs a signed-in operator", async () => {
+      authState.session = { user: { email: "v@tagit.network", role: "viewer", businessId: null } };
+      expect((await execute({})).status).toBe(403);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
