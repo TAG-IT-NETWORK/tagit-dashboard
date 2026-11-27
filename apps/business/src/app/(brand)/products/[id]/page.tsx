@@ -55,6 +55,11 @@ export default async function ProductPage({
       <div className="space-y-2">
         <h1 className="break-words text-3xl font-semibold tracking-tight">{product.values.name}</h1>
         <p className="text-sm text-muted-foreground">{stateWords(product.state)}</p>
+        <p className="text-sm">
+          <Link href={`/products/${product.id}/items`} className="underline">
+            See this product&apos;s items
+          </Link>
+        </p>
       </div>
 
       {saved ? (

@@ -13,6 +13,7 @@ import {
   type ProductBody,
   type ProductDetail,
 } from "@/lib/brand-product-form";
+import { ITEMS_PER_PAGE, parseCursor, parseItems, type ItemPage } from "@/lib/brand-items";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -224,5 +225,29 @@ export async function uploadBrandPhoto(session: BrandSession, file: Blob): Promi
     return parseUploadedPhoto(answer.status, answer.body);
   } catch {
     return null;
+  }
+}
+
+/**
+ * One page of the items of one of the signed-in brand's products. Never
+ * throws. `after` is where the page starts (from the previous page's `next`).
+ * The caller loads the product itself first ({@link getBrandProduct}), which
+ * is refused for another brand's product.
+ */
+export async function getBrandProductItems(
+  session: BrandSession,
+  productId: string,
+  after: string | null,
+): Promise<ItemPage> {
+  const id = parseProductId(productId);
+  if (id === null) return parseItems(0, null, productId);
+  // A position that is not plain digits is dropped, not sent.
+  const cursor = parseCursor(after);
+  const query = `limit=${ITEMS_PER_PAGE}${cursor !== null ? `&cursor=${cursor}` : ""}`;
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/templates/${id}/items?${query}`);
+    return parseItems(answer.status, answer.body, id);
+  } catch {
+    return parseItems(0, null, id);
   }
 }
