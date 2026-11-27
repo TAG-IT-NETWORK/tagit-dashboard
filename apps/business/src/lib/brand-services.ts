@@ -13,15 +13,25 @@ import {
   type ProductBody,
   type ProductDetail,
 } from "@/lib/brand-product-form";
-import { ITEMS_PER_PAGE, parseCursor, parseItems, type ItemPage } from "@/lib/brand-items";
+import {
+  dayWords,
+  ITEMS_PER_PAGE,
+  parseCursor,
+  parseItems,
+  type ItemPage,
+} from "@/lib/brand-items";
 import {
   bodyForRun,
   parseCreatedRun,
   parseQuantity,
   parseRun,
   parseRunId,
+  parseRuns,
   parseStart,
+  RUNS_SHOWN,
   type ItemRun,
+  type RunFacts,
+  type RunSummary,
   type StartResult,
 } from "@/lib/brand-make-items";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
@@ -275,15 +285,34 @@ export async function createBrandRun(
   session: BrandSession,
   productId: string,
   quantity: number,
+  facts: RunFacts | null = null,
 ): Promise<string | null> {
   const id = parseProductId(productId);
   if (id === null || parseQuantity(String(quantity)) !== quantity) return null;
   try {
     const answer = await brandFetch(session, "/api/v1/admin/batches", {
       method: "POST",
-      body: bodyForRun(id, quantity),
+      body: bodyForRun(id, quantity, facts),
     });
     return parseCreatedRun(answer.status, answer.body, id, quantity);
+  } catch {
+    return null;
+  }
+}
+
+/** The runs of one of the signed-in brand's products, newest first, or null. */
+export async function getBrandRuns(
+  session: BrandSession,
+  productId: string,
+): Promise<RunSummary[] | null> {
+  const id = parseProductId(productId);
+  if (id === null) return null;
+  try {
+    const answer = await brandFetch(
+      session,
+      `/api/v1/admin/batches?templateId=${id}&limit=${RUNS_SHOWN}`,
+    );
+    return parseRuns(answer.status, answer.body, id, dayWords);
   } catch {
     return null;
   }

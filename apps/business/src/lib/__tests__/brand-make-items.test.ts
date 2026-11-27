@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   bodyForRun,
   canMakeItems,
+  isCalendarDay,
+  parseRunFacts,
+  parseRuns,
+  readRunFacts,
+  runStateWords,
+  takesRunFacts,
   parseCreatedRun,
   parseQuantity,
   parseRun,
@@ -10,7 +16,8 @@ import {
   parseStart,
   startProblem,
 } from "@/lib/brand-make-items";
-import { createBrandRun, getBrandRun, startBrandRun } from "@/lib/brand-services";
+import { dayWords } from "@/lib/brand-items";
+import { createBrandRun, getBrandRun, getBrandRuns, startBrandRun } from "@/lib/brand-services";
 import { toBrandSession } from "@/lib/brand-session";
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
@@ -140,18 +147,20 @@ describe("parseRun", () => {
     parseRun(200, { ok: true, batch: batch(b), progress }, RUN, TPL);
 
   it("reads each state in plain terms, with nothing but id, size, state and count", () => {
-    expect(read({})).toEqual({ id: RUN, size: 25, state: "waiting", made: 0 });
+    expect(read({})).toEqual({ id: RUN, size: 25, state: "waiting", made: 0, facts: null });
     expect(read({ state: "minting" }, { expected: 25, minted: 10 })).toEqual({
       id: RUN,
       size: 25,
       state: "making",
       made: 10,
+      facts: null,
     });
     expect(read({ state: "minted" }, { minted: 25 })).toEqual({
       id: RUN,
       size: 25,
       state: "made",
       made: 25,
+      facts: null,
     });
     expect(read({ state: "mint_failed" })?.state).toBe("failed");
   });
@@ -263,6 +272,167 @@ describe("startProblem", () => {
   });
 });
 
+// ── lot and dates ────────────────────────────────────────────────────────────
+
+describe("lot and dates", () => {
+  const form = (values: Record<string, unknown>) => parseRunFacts((field) => values[field]);
+
+  it("are offered only for the cosmetics category", () => {
+    expect(takesRunFacts("cosmetics")).toBe(true);
+    expect(takesRunFacts("  Cosmetics ")).toBe(true);
+    for (const other of ["Cosnetic", "skincare", "", "cosmetics/x", null, undefined, 5]) {
+      expect(takesRunFacts(other), String(other)).toBe(false);
+    }
+  });
+
+  it("all empty means none, and empty fields are left out", () => {
+    expect(form({})).toEqual({ ok: true, facts: null });
+    expect(form({ lot: "  ", madeOn: "", bestBefore: null })).toEqual({ ok: true, facts: null });
+    expect(form({ lot: " L-2026/11 #4 " })).toEqual({ ok: true, facts: { lot: "L-2026/11 #4" } });
+    expect(form({ lot: "A1", madeOn: "2026-11-01", bestBefore: "2028-11-01" })).toEqual({
+      ok: true,
+      facts: { lot: "A1", madeOn: "2026-11-01", bestBefore: "2028-11-01" },
+    });
+    // Same day is fine.
+    expect(form({ madeOn: "2026-11-01", bestBefore: "2026-11-01" }).ok).toBe(true);
+  });
+
+  it("refuses a lot that is too long or carries markup or hidden characters", () => {
+    const rtl = String.fromCodePoint(0x202e);
+    for (const lot of [
+      "x".repeat(61),
+      "<b>1</b>",
+      "a\nb",
+      `a${rtl}b`,
+      "-lead",
+      "a;b",
+      'a"b',
+      "a&b",
+    ]) {
+      const result = form({ lot });
+      expect(result.ok, JSON.stringify(lot)).toBe(false);
+    }
+    expect(form({ lot: "x".repeat(60) }).ok).toBe(true);
+  });
+
+  it("refuses dates that are not real, and a best-before earlier than made-on", () => {
+    for (const day of [
+      "2026-02-30",
+      "2026-13-01",
+      "1999-12-31",
+      "2101-01-01",
+      "26-11-01",
+      "2026/11/01",
+      "tomorrow",
+      "2026-11-01T00:00",
+    ]) {
+      expect(isCalendarDay(day), day).toBe(false);
+      expect(form({ madeOn: day }), day).toEqual({
+        ok: false,
+        errors: { madeOn: "Choose a real date." },
+      });
+      expect(form({ bestBefore: day }).ok, day).toBe(false);
+    }
+    expect(isCalendarDay("2028-02-29")).toBe(true);
+    expect(form({ madeOn: "2026-11-02", bestBefore: "2026-11-01" })).toEqual({
+      ok: false,
+      errors: { bestBefore: "Best before cannot be earlier than the day it was made." },
+    });
+  });
+
+  it("go into the body under facts, with only the three known keys", () => {
+    expect(bodyForRun(TPL, 7, null)).toEqual({ templateId: TPL, quantity: 7 });
+    const sneaky = { lot: "A1", bestBefore: "2028-01-01", to: "0x1", price: 1 } as never;
+    expect(bodyForRun(TPL, 7, sneaky)).toEqual({
+      templateId: TPL,
+      quantity: 7,
+      facts: { lot: "A1", bestBefore: "2028-01-01" },
+    });
+  });
+
+  it("are read back from a run only when they still pass the same checks", () => {
+    expect(readRunFacts({ lot: "A1", madeOn: "2026-11-01", bestBefore: "2028-11-01" })).toEqual({
+      lot: "A1",
+      madeOn: "2026-11-01",
+      bestBefore: "2028-11-01",
+    });
+    expect(readRunFacts({ lot: "<script>", madeOn: "soon", bestBefore: 5 })).toBeNull();
+    expect(readRunFacts({ lot: "<script>", madeOn: "2026-11-01" })).toEqual({
+      madeOn: "2026-11-01",
+    });
+    expect(readRunFacts(null)).toBeNull();
+    expect(readRunFacts("x")).toBeNull();
+    expect(
+      parseRun(200, { ok: true, batch: batch({ facts: { lot: "A1" } }) }, RUN, TPL)?.facts,
+    ).toEqual({
+      lot: "A1",
+    });
+  });
+});
+
+// ── run history ──────────────────────────────────────────────────────────────
+
+describe("parseRuns", () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: "bat_A1",
+    templateId: TPL,
+    state: "minted",
+    quantity: 25,
+    minted: 25,
+    actor: "mia@acme.com",
+    createdAt: "2026-11-27T10:00:00.000Z",
+    ...over,
+  });
+  const read = (batches: unknown) => parseRuns(200, { ok: true, batches }, TPL, dayWords);
+
+  it("reads each run in plain terms, in the order sent", () => {
+    expect(read([row(), row({ id: "bat_A2", state: "validated", quantity: 3 })])).toEqual([
+      { id: "bat_A1", size: 25, state: "made", day: "Nov 27, 2026", by: "mia@acme.com" },
+      { id: "bat_A2", size: 3, state: "waiting", day: "Nov 27, 2026", by: "mia@acme.com" },
+    ]);
+    expect(runStateWords("waiting")).toBe("Not started");
+    expect(runStateWords("made")).toBe("Made");
+    expect(runStateWords("failed")).toBe("Not made");
+    expect(runStateWords("making")).toBe("Being made");
+  });
+
+  it("drops a run of another product, a repeated run and a row it cannot read", () => {
+    expect(
+      read([
+        row({ templateId: "tpl_OTHER", id: "bat_X1" }),
+        row(),
+        row(),
+        row({ id: "bat_a/b" }),
+        row({ id: "bat_A3", state: "constructor" }),
+        row({ id: "bat_A4", quantity: 0 }),
+        row({ id: "bat_A5", quantity: 500 }),
+        null,
+        "x",
+      ])?.map((r) => r.id),
+    ).toEqual(["bat_A1"]);
+  });
+
+  it("shows who only when it looks like an email, and no date rather than a wrong one", () => {
+    expect(read([row({ actor: "api-key", createdAt: "never" })])).toEqual([
+      { id: "bat_A1", size: 25, state: "made", day: null, by: null },
+    ]);
+    expect(read([row({ actor: 5 })])?.[0]?.by).toBeNull();
+  });
+
+  it("says it could not load rather than 'no runs'", () => {
+    expect(parseRuns(500, { ok: true, batches: [] }, TPL, dayWords)).toBeNull();
+    expect(parseRuns(200, { ok: false, batches: [] }, TPL, dayWords)).toBeNull();
+    expect(parseRuns(200, { ok: true }, TPL, dayWords)).toBeNull();
+    expect(parseRuns(403, null, TPL, dayWords)).toBeNull();
+    expect(read([])).toEqual([]);
+  });
+
+  it("shows at most 50", () => {
+    const many = Array.from({ length: 80 }, (_, i) => row({ id: `bat_N${i}` }));
+    expect(read(many)).toHaveLength(50);
+  });
+});
+
 // ── the calls ────────────────────────────────────────────────────────────────
 
 describe("the calls to tagit-services", () => {
@@ -311,6 +481,48 @@ describe("the calls to tagit-services", () => {
       "x-actor",
       "x-business-id",
     ]);
+  });
+
+  it("send a lot and dates under facts when given, and list a product's runs with GET", async () => {
+    fetchMock.mockReturnValue(answer(201, { ok: true, batch: batch({ size: 7 }) }));
+    await createBrandRun(manager, TPL, 7, { lot: "A1", madeOn: "2026-11-01" });
+    expect(JSON.parse(String(sent().body))).toEqual({
+      templateId: TPL,
+      quantity: 7,
+      facts: { lot: "A1", madeOn: "2026-11-01" },
+    });
+
+    fetchMock.mockReset();
+    fetchMock.mockReturnValue(
+      answer(200, {
+        ok: true,
+        batches: [
+          {
+            id: RUN,
+            templateId: TPL,
+            state: "minted",
+            quantity: 7,
+            actor: "mia@acme.com",
+            createdAt: "2026-11-27T10:00:00Z",
+          },
+          { id: "bat_THEIRS", templateId: "tpl_OTHER", state: "minted", quantity: 9 },
+        ],
+      }),
+    );
+    expect(await getBrandRuns(manager, TPL)).toEqual([
+      { id: RUN, size: 7, state: "made", day: "Nov 27, 2026", by: "mia@acme.com" },
+    ]);
+    expect(sent().url).toBe(
+      `https://services.test/api/v1/admin/batches?templateId=${TPL}&limit=50`,
+    );
+    expect(sent().method).toBe("GET");
+    expect(sent().headers["x-business-id"]).toBe("acme");
+
+    fetchMock.mockReset();
+    expect(await getBrandRuns(manager, "tpl_a/b")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRejectedValue(new Error("down"));
+    expect(await getBrandRuns(manager, TPL)).toBeNull();
   });
 
   it("never ask to set a run up for a bad product id or a bad number", async () => {
