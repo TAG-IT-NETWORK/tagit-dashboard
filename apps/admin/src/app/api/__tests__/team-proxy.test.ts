@@ -92,7 +92,7 @@ describe("/api/team-proxy", () => {
 
   it("POST forwards the enroll body verbatim as JSON", async () => {
     const { POST } = await loadRoutes();
-    const body = { email: "new@tagit.network", role: "viewer" };
+    const body = { email: "new@tagit.network", role: "viewer", businessId: null };
     await POST(jsonRequest("POST", body));
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -100,6 +100,39 @@ describe("/api/team-proxy", () => {
     expect(init.method).toBe("POST");
     expect((init.headers as Record<string, string>)["content-type"]).toBe("application/json");
     expect(JSON.parse(String(init.body))).toEqual(body);
+  });
+
+  it("POST refuses an add that does not say where the person belongs, without calling upstream", async () => {
+    const { POST } = await loadRoutes();
+    for (const body of [
+      { email: "new@tagit.network", role: "viewer" },
+      { email: "new@tagit.network", role: "admin" },
+      { email: "new@tagit.network", role: "viewer", businessId: undefined },
+      { email: "new@tagit.network", role: "viewer", businessId: "" },
+      { email: "new@tagit.network", role: "viewer", businessId: "   " },
+      { email: "new@tagit.network", role: "viewer", businessId: 7 },
+      { email: "new@tagit.network", role: "viewer", businessId: false },
+      { email: "new@tagit.network", role: "viewer", businessId: ["aurora"] },
+      [],
+      "x",
+    ]) {
+      const res = await POST(jsonRequest("POST", body));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect((await res.json()).code, JSON.stringify(body)).toBe("BRAND_CHOICE_REQUIRED");
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("POST forwards an add that names a brand, and one that says staff", async () => {
+    const { POST } = await loadRoutes();
+    for (const businessId of ["aurora", null]) {
+      fetchMock.mockClear();
+      const body = { email: "new@tagit.network", role: "viewer", businessId };
+      expect((await POST(jsonRequest("POST", body))).status).not.toBe(400);
+      expect(
+        JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)),
+      ).toEqual(body);
+    }
   });
 
   it("POST 400s malformed JSON without calling upstream", async () => {
