@@ -21,7 +21,8 @@ const batch = {
 
 let fetchMock: ReturnType<typeof vi.fn>;
 const onRefresh = vi.fn();
-const show = (brandId: string | null) =>
+const onRecheck = vi.fn();
+const show = (brandId: string | null | undefined) =>
   render(
     <StepMint
       batch={batch}
@@ -29,6 +30,7 @@ const show = (brandId: string | null) =>
       role="operator"
       canExecute
       onRefresh={onRefresh}
+      onRecheck={onRecheck}
       brandId={brandId}
     />,
   );
@@ -37,6 +39,7 @@ const sentBody = () =>
 
 beforeEach(() => {
   onRefresh.mockClear();
+  onRecheck.mockClear();
   localStorage.clear();
   fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 202 }));
   vi.stubGlobal("fetch", fetchMock);
@@ -100,5 +103,29 @@ describe("StepMint: who receives the batch", () => {
     await userEvent.click(screen.getByRole("button", { name: /Mint batch/ }));
     expect(await screen.findByText(/This brand has no mint wallet yet/)).toBeInTheDocument();
     expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("while the product has not been read: no address field, no minting, and a way to check again", async () => {
+    // An address remembered from an earlier batch must not make this mintable.
+    localStorage.setItem("tagit.admin.batch.mintTo", ADDR);
+    show(undefined);
+    expect(screen.getByTestId("mint-to-unknown")).toHaveTextContent("brand is not known");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByTestId("mint-to-brand")).toBeNull();
+    const button = screen.getByRole("button", { name: /Mint batch/ });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(onRecheck).toHaveBeenCalledTimes(1);
+  });
+
+  it("with no brand given at all it is not known, never 'no brand'", () => {
+    render(
+      <StepMint batch={batch} progress={null} role="operator" canExecute onRefresh={onRefresh} />,
+    );
+    expect(screen.getByTestId("mint-to-unknown")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mint batch/ })).toBeDisabled();
   });
 });

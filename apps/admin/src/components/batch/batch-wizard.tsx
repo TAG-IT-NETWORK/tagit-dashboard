@@ -76,8 +76,10 @@ export function BatchWizard({ templateId, role, initialBatchId }: BatchWizardPro
   const [loadingStatus, setLoadingStatus] = useState(initialBatchId !== null);
   const [templateName, setTemplateName] = useState<string | null>(null);
   // The product's brand (TAP-T17): a brand's batch is minted to the brand's
-  // own wallet, so the mint step asks for no address. Null until loaded.
-  const [templateBrand, setTemplateBrand] = useState<string | null>(null);
+  // own wallet, so the mint step asks for no address. Three states, and they
+  // must not be mixed up: a brand's id; null = read, and it has no brand;
+  // undefined = not read (yet, or the read failed), so nothing may be minted.
+  const [templateBrand, setTemplateBrand] = useState<string | null | undefined>(undefined);
   // Whether a new batch may carry lot / made-on / best-before (TAP-T09):
   // the API must know facts, and the category the items will be minted with
   // must be cosmetics. False until the template has loaded.

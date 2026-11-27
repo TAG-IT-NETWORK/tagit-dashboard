@@ -392,6 +392,8 @@ describe("batch step 2: why a mint failed, and when it cannot start", () => {
         role="admin"
         canExecute
         onRefresh={onRefresh}
+        // A product with no brand: the step asks for a mint address (TAP-T17).
+        brandId={null}
         {...props}
       />,
     );

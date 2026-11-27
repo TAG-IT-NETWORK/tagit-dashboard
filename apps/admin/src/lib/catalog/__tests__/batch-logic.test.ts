@@ -419,9 +419,17 @@ describe("who receives a batch", () => {
 
   it("a product with a brand goes to that brand's wallet; any other asks for an address", () => {
     expect(mintRecipientFor("aura-skin")).toEqual({ kind: "brand", brandId: "aura-skin" });
-    for (const none of [null, undefined, "", "   ", 7, {}, ["aura-skin"]]) {
+    for (const none of [null, "", "   ", 7, {}, ["aura-skin"]]) {
       expect(mintRecipientFor(none), JSON.stringify(none)).toEqual({ kind: "typed" });
     }
+  });
+
+  it("a product that has not been read is neither: nothing can be sent for it", () => {
+    // undefined = not read. It must never be taken for "no brand".
+    expect(mintRecipientFor(undefined)).toEqual({ kind: "unknown" });
+    const unknown = mintRecipientFor(undefined);
+    expect(executeBody(unknown, "")).toBeNull();
+    expect(executeBody(unknown, ADDR)).toBeNull();
   });
 
   it("sends no address for a brand's batch, whatever is in the field", () => {

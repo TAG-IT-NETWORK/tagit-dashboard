@@ -59,7 +59,11 @@ interface StepMintProps {
   block?: MintBlock | null;
   /** Read the template again, for the notice's "Check again". */
   onRecheck?: () => void;
-  /** The product's brand, or null for a product with no brand (TAP-T17). */
+  /**
+   * The product's brand (TAP-T17): its id, or null for a product with no
+   * brand. Left out (undefined) while the product has not been read: then
+   * nothing can be minted, because nobody knows where the items would go.
+   */
   brandId?: string | null;
 }
 
@@ -72,7 +76,7 @@ export function StepMint({
   failure = null,
   block = null,
   onRecheck,
-  brandId = null,
+  brandId,
 }: StepMintProps) {
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState<"execute" | "unstick" | null>(null);
@@ -171,7 +175,20 @@ export function StepMint({
       {/* Execute controls */}
       {canExecuteBatch(batch.state) && (
         <div className="space-y-2 max-w-lg">
-          {recipient.kind === "brand" ? (
+          {recipient.kind === "unknown" ? (
+            <div
+              className="rounded-md border bg-muted/40 px-3 py-2 text-sm"
+              data-testid="mint-to-unknown"
+            >
+              This product has not loaded yet, so its brand is not known. Minting is off until it
+              is.
+              {onRecheck && (
+                <button type="button" onClick={onRecheck} className="ml-2 underline">
+                  Check again
+                </button>
+              )}
+            </div>
+          ) : recipient.kind === "brand" ? (
             <p
               className="rounded-md border bg-muted/40 px-3 py-2 text-sm"
               data-testid="mint-to-brand"

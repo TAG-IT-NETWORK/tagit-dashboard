@@ -86,12 +86,22 @@ export function canExecuteBatch(state: string | null | undefined): boolean {
  * any other address; a batch with no brand goes where the operator says.
  * So the wizard asks for an address only when there is no brand.
  */
-export type MintRecipient = { kind: "brand"; brandId: string } | { kind: "typed" };
+export type MintRecipient =
+  | { kind: "brand"; brandId: string }
+  | { kind: "typed" }
+  // The product has not been read (yet, or the read failed): nobody knows
+  // whether it has a brand, so nothing can be minted until it is known.
+  | { kind: "unknown" };
 
 const MINT_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-/** `businessId` is the product's brand as tagit-services returned it. */
+/**
+ * `businessId` is the product's brand as tagit-services returned it: a
+ * brand's id, or null for a product with no brand. `undefined` means the
+ * product has not been read, which is NOT the same as "no brand".
+ */
 export function mintRecipientFor(businessId: unknown): MintRecipient {
+  if (businessId === undefined) return { kind: "unknown" };
   return typeof businessId === "string" && businessId.trim().length > 0
     ? { kind: "brand", brandId: businessId }
     : { kind: "typed" };
@@ -103,6 +113,7 @@ export function mintRecipientFor(businessId: unknown): MintRecipient {
  * picks the wallet, and a stale typed address would only be refused.
  */
 export function executeBody(recipient: MintRecipient, typed: string): { to?: string } | null {
+  if (recipient.kind === "unknown") return null;
   if (recipient.kind === "brand") return {};
   return MINT_ADDRESS_RE.test(typed) ? { to: typed } : null;
 }
