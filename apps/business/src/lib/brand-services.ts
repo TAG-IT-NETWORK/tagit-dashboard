@@ -34,6 +34,13 @@ import {
   type RunSummary,
   type StartResult,
 } from "@/lib/brand-make-items";
+import {
+  parseItemNumber,
+  parseSaleAnswer,
+  saleBody,
+  type SaleIntent,
+  type SaleResult,
+} from "@/lib/brand-selling";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -349,6 +356,34 @@ export async function startBrandRun(session: BrandSession, runId: string): Promi
       body: {},
     });
     return parseStart(answer.status, answer.body, run);
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
+// ── Selling (TAP-T17) ────────────────────────────────────────────────────────
+
+/**
+ * Put one of the signed-in brand's items on sale, change its price or take
+ * it off. Only an action and a price are sent; the API pays the brand's own
+ * sale wallet and refuses an item that is not the brand's to sell. Never
+ * throws. The role rule lives in the server actions.
+ */
+export async function setBrandItemSale(
+  session: BrandSession,
+  itemNumber: string,
+  intent: SaleIntent,
+  price: string | null,
+): Promise<SaleResult> {
+  const number = parseItemNumber(itemNumber);
+  const body = saleBody(intent, price);
+  if (number === null || body === null) return { kind: "failed" };
+  try {
+    const answer = await brandFetch(session, `/api/v1/assets/${number}/price`, {
+      method: "PUT",
+      body,
+    });
+    return parseSaleAnswer(answer.status, answer.body, number, intent);
   } catch {
     return { kind: "failed" };
   }
