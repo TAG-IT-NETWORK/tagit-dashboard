@@ -281,6 +281,31 @@ export interface ProductDetail {
   attributes: Attribute[];
   /** What a publish still needs, in plain words. Empty when complete. */
   missing: string[];
+  /**
+   * The category of the latest PUBLISHED version, or null when there is none.
+   * Items are made from that version, not from unpublished edits.
+   */
+  publishedCategory: string | null;
+}
+
+/** The category in the newest published version of a product answer, or null. */
+function publishedCategoryOf(versions: unknown): string | null {
+  if (!Array.isArray(versions)) return null;
+  let newest: { version: number; category: string } | null = null;
+  for (const raw of versions) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const row = raw as { version?: unknown; snapshot?: unknown };
+    if (typeof row.version !== "number" || !Number.isInteger(row.version)) continue;
+    const snapshot = row.snapshot;
+    const category =
+      typeof snapshot === "object" && snapshot !== null
+        ? text((snapshot as { category?: unknown }).category, MAX_LENGTH.category)
+        : "";
+    if (newest === null || row.version > newest.version) {
+      newest = { version: row.version, category };
+    }
+  }
+  return newest === null ? null : newest.category;
 }
 
 function text(value: unknown, max: number): string {
@@ -328,7 +353,7 @@ export function parseProductDetail(
   brandId: string,
 ): ProductDetail | null {
   if (status !== 200 || typeof body !== "object" || body === null) return null;
-  const answer = body as { ok?: unknown; template?: unknown };
+  const answer = body as { ok?: unknown; template?: unknown; versions?: unknown };
   if (answer.ok !== true || typeof answer.template !== "object" || answer.template === null) {
     return null;
   }
@@ -357,6 +382,7 @@ export function parseProductDetail(
     hasBrandName: text(row.brand, 200).length > 0,
     attributes,
     missing: missingParts(values, photoUrl),
+    publishedCategory: publishedCategoryOf(answer.versions),
   };
 }
 

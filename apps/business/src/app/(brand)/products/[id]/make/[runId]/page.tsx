@@ -5,8 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { StartButton, WatchRun } from "@/components/make-items";
 import { SIGN_IN_PATH } from "@/lib/access";
 import { countWords } from "@/lib/brand-catalog";
-import { dayWords } from "@/lib/brand-items";
-import { canMakeItems, parseRunId } from "@/lib/brand-make-items";
+import { canMakeItems, factDayWords, parseRunId } from "@/lib/brand-make-items";
 import { parseProductId } from "@/lib/brand-product-form";
 import { loadBrand } from "@/lib/brand-request";
 import { getBrandProduct, getBrandRun } from "@/lib/brand-services";
@@ -34,8 +33,8 @@ export default async function ItemRunPage({
   const items = countWords(run.size, "item", "items");
   const facts = [
     run.facts?.lot ? `Lot ${run.facts.lot}` : null,
-    run.facts?.madeOn ? `Made on ${dayWords(run.facts.madeOn)}` : null,
-    run.facts?.bestBefore ? `Best before ${dayWords(run.facts.bestBefore)}` : null,
+    run.facts?.madeOn ? `Made on ${factDayWords(run.facts.madeOn)}` : null,
+    run.facts?.bestBefore ? `Best before ${factDayWords(run.facts.bestBefore)}` : null,
   ].filter((line): line is string => line !== null);
 
   return (

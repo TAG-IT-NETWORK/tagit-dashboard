@@ -40,7 +40,9 @@ export function parseRunId(value: unknown): string | null {
 /**
  * What every item of a run shares, shown on each item's public record: a lot
  * code, the day it was made and its best-before day. All optional. Only for
- * products in the cosmetics category (tagit-services refuses them elsewhere).
+ * products whose PUBLISHED version is in the cosmetics category
+ * (tagit-services refuses them elsewhere, and items are made from that
+ * version, not from unpublished edits).
  */
 export interface RunFacts {
   lot?: string;
@@ -57,7 +59,22 @@ export function takesRunFacts(category: unknown): boolean {
   return typeof category === "string" && category.trim().toLowerCase() === "cosmetics";
 }
 
-const LOT_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._/#-]*$/u;
+// The same rule tagit-services holds a lot to: one line of plain text, no
+// control, line-break or text-direction characters (and nothing unassigned).
+const LOT_FORBIDDEN_RE = /[\p{C}\p{Zl}\p{Zp}]/u;
+const isLot = (value: string): boolean =>
+  value.length >= 1 &&
+  value.length <= LOT_MAX &&
+  value === value.trim() &&
+  !LOT_FORBIDDEN_RE.test(value);
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A checked YYYY-MM-DD day in plain words, e.g. "Dec 1, 2019". */
+export function factDayWords(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return `${MONTHS[(month ?? 1) - 1]} ${date}, ${year}`;
+}
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** A day that exists on the calendar, 2000 to 2100, as YYYY-MM-DD. */
@@ -90,8 +107,8 @@ export function parseRunFacts(get: (field: RunFactField) => unknown): RunFactsRe
   const madeOn = read("madeOn");
   const bestBefore = read("bestBefore");
   const errors: Partial<Record<RunFactField, string>> = {};
-  if (lot !== "" && (lot.length > LOT_MAX || !LOT_RE.test(lot))) {
-    errors.lot = `Use up to ${LOT_MAX} letters, numbers, spaces and . _ / # - only.`;
+  if (lot !== "" && !isLot(lot)) {
+    errors.lot = `Use up to ${LOT_MAX} characters on one line, with no hidden characters.`;
   }
   if (madeOn !== "" && !isCalendarDay(madeOn)) errors.madeOn = "Choose a real date.";
   if (bestBefore !== "" && !isCalendarDay(bestBefore)) errors.bestBefore = "Choose a real date.";
@@ -117,7 +134,7 @@ export function parseRunFacts(get: (field: RunFactField) => unknown): RunFactsRe
 export function readRunFacts(value: unknown): RunFacts | null {
   if (!isRecord(value)) return null;
   const facts: RunFacts = {};
-  if (typeof value.lot === "string" && value.lot.length <= LOT_MAX && LOT_RE.test(value.lot)) {
+  if (typeof value.lot === "string" && isLot(value.lot)) {
     facts.lot = value.lot;
   }
   if (isCalendarDay(value.madeOn)) facts.madeOn = value.madeOn;

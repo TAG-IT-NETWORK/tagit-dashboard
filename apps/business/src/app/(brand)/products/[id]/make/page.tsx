@@ -73,7 +73,7 @@ export default async function MakeItemsPage({ params }: { params: Promise<{ id: 
           <QuantityForm
             productId={product.id}
             max={MAX_ITEMS_PER_RUN}
-            withFacts={takesRunFacts(product.values.category)}
+            withFacts={takesRunFacts(product.publishedCategory)}
           />
         </>
       )}

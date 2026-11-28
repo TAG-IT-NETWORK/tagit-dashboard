@@ -9,6 +9,7 @@ import {
   readRunFacts,
   runStateWords,
   takesRunFacts,
+  factDayWords,
   parseCreatedRun,
   parseQuantity,
   parseRun,
@@ -297,22 +298,36 @@ describe("lot and dates", () => {
     expect(form({ madeOn: "2026-11-01", bestBefore: "2026-11-01" }).ok).toBe(true);
   });
 
-  it("refuses a lot that is too long or carries markup or hidden characters", () => {
+  it("refuses a lot that is too long, spans lines or carries hidden characters", () => {
     const rtl = String.fromCodePoint(0x202e);
+    const lineSep = String.fromCodePoint(0x2028);
+    const isolate = String.fromCodePoint(0x2066);
+    const del = String.fromCodePoint(0x7f);
     for (const lot of [
       "x".repeat(61),
-      "<b>1</b>",
       "a\nb",
+      "a\tb",
       `a${rtl}b`,
-      "-lead",
-      "a;b",
-      'a"b',
-      "a&b",
+      `a${lineSep}b`,
+      `a${isolate}b`,
+      `a${del}b`,
     ]) {
       const result = form({ lot });
       expect(result.ok, JSON.stringify(lot)).toBe(false);
     }
     expect(form({ lot: "x".repeat(60) }).ok).toBe(true);
+    // Real lot codes carry punctuation; the page escapes whatever it shows.
+    for (const lot of ["#A-12 (EU), rev.2", "L/2026;11", "Lot <3>", "批次 12"]) {
+      expect(form({ lot }), lot).toEqual({ ok: true, facts: { lot } });
+      expect(readRunFacts({ lot })).toEqual({ lot });
+    }
+  });
+
+  it("writes every day it accepts in plain words, old years included", () => {
+    expect(factDayWords("2019-12-01")).toBe("Dec 1, 2019");
+    expect(factDayWords("2000-01-31")).toBe("Jan 31, 2000");
+    expect(factDayWords("2100-12-31")).toBe("Dec 31, 2100");
+    expect(factDayWords("2028-02-29")).toBe("Feb 29, 2028");
   });
 
   it("refuses dates that are not real, and a best-before earlier than made-on", () => {
@@ -356,8 +371,8 @@ describe("lot and dates", () => {
       madeOn: "2026-11-01",
       bestBefore: "2028-11-01",
     });
-    expect(readRunFacts({ lot: "<script>", madeOn: "soon", bestBefore: 5 })).toBeNull();
-    expect(readRunFacts({ lot: "<script>", madeOn: "2026-11-01" })).toEqual({
+    expect(readRunFacts({ lot: "a\nb", madeOn: "soon", bestBefore: 5 })).toBeNull();
+    expect(readRunFacts({ lot: " padded ", madeOn: "2026-11-01" })).toEqual({
       madeOn: "2026-11-01",
     });
     expect(readRunFacts(null)).toBeNull();

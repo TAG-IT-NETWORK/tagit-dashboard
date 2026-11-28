@@ -62,7 +62,7 @@ export async function prepareItems(_previous: MakeState, formData: FormData): Pr
   // Lot and dates: only for a product whose category takes them. For any
   // other product whatever the form sent is ignored, not passed on.
   let facts = null;
-  if (takesRunFacts(product.values.category)) {
+  if (takesRunFacts(product.publishedCategory)) {
     const parsed = parseRunFacts((field) => formData.get(field));
     if (!parsed.ok) return { problem: null, errors: parsed.errors };
     facts = parsed.facts;
