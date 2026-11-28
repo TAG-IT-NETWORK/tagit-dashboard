@@ -180,6 +180,12 @@ export interface ItemRun {
   made: number;
   /** The lot and dates the run was set up with, or null. */
   facts: RunFacts | null;
+  /**
+   * Only for a run that did not finish: true when the items were sent to be
+   * made but that was never confirmed, so they MAY exist. Trying again then
+   * finds them and finishes the run; it makes nothing twice.
+   */
+  unconfirmed: boolean;
 }
 
 /** One line of a product's run history. */
@@ -235,6 +241,8 @@ export function parseRun(
     state,
     made: state === "made" ? size : counted,
     facts: readRunFacts(batch.facts),
+    unconfirmed:
+      state === "failed" && isRecord(body.failure) && body.failure.code === "MINT_NOT_CONFIRMED",
   };
 }
 
@@ -277,7 +285,7 @@ const RUN_STATE_WORDS: Record<RunState, string> = {
   waiting: "Not started",
   making: "Being made",
   made: "Made",
-  failed: "Not made",
+  failed: "Not finished",
 };
 
 export function runStateWords(state: RunState): string {

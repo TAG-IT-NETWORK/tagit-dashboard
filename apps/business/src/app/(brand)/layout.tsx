@@ -53,7 +53,7 @@ export default async function BrandLayout({ children }: { children: ReactNode })
         </div>
       </header>
       <nav aria-label="Sections" className="border-b px-4 sm:px-6 md:px-10">
-        <BrandNav />
+        <BrandNav manager={session.role === "admin"} />
       </nav>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
       <footer className="flex h-14 items-center justify-center gap-2 border-t text-xs text-muted-foreground">

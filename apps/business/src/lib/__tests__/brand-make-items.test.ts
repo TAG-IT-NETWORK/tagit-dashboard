@@ -148,13 +148,21 @@ describe("parseRun", () => {
     parseRun(200, { ok: true, batch: batch(b), progress }, RUN, TPL);
 
   it("reads each state in plain terms, with nothing but id, size, state and count", () => {
-    expect(read({})).toEqual({ id: RUN, size: 25, state: "waiting", made: 0, facts: null });
+    expect(read({})).toEqual({
+      id: RUN,
+      size: 25,
+      state: "waiting",
+      made: 0,
+      facts: null,
+      unconfirmed: false,
+    });
     expect(read({ state: "minting" }, { expected: 25, minted: 10 })).toEqual({
       id: RUN,
       size: 25,
       state: "making",
       made: 10,
       facts: null,
+      unconfirmed: false,
     });
     expect(read({ state: "minted" }, { minted: 25 })).toEqual({
       id: RUN,
@@ -162,8 +170,21 @@ describe("parseRun", () => {
       state: "made",
       made: 25,
       facts: null,
+      unconfirmed: false,
     });
     expect(read({ state: "mint_failed" })?.state).toBe("failed");
+  });
+
+  it("tells a run that was never confirmed from one that plainly failed", () => {
+    const failed = (failure: unknown, state = "mint_failed") =>
+      parseRun(200, { ok: true, batch: batch({ state }), failure }, RUN, TPL)?.unconfirmed;
+    expect(failed({ code: "MINT_NOT_CONFIRMED", message: "server words" })).toBe(true);
+    expect(failed({ code: "MINT_REVERTED" })).toBe(false);
+    expect(failed(null)).toBe(false);
+    expect(failed("MINT_NOT_CONFIRMED")).toBe(false);
+    // Only a run that did not finish can be unconfirmed.
+    expect(failed({ code: "MINT_NOT_CONFIRMED" }, "minted")).toBe(false);
+    expect(failed({ code: "MINT_NOT_CONFIRMED" }, "minting")).toBe(false);
   });
 
   it("does not show a run of another product, or another run", () => {
@@ -407,7 +428,7 @@ describe("parseRuns", () => {
     ]);
     expect(runStateWords("waiting")).toBe("Not started");
     expect(runStateWords("made")).toBe("Made");
-    expect(runStateWords("failed")).toBe("Not made");
+    expect(runStateWords("failed")).toBe("Not finished");
     expect(runStateWords("making")).toBe("Being made");
   });
 

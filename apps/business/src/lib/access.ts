@@ -52,7 +52,7 @@ const OPEN_PREFIXES = ["/api/auth", "/api/demo-request", "/no-access"] as const;
 const PUBLIC_PAGES = ["/", "/signin"] as const;
 
 /** Everything a brand session may reach. */
-const BRAND_PREFIXES = ["/home", "/products"] as const;
+const BRAND_PREFIXES = ["/home", "/products", "/team"] as const;
 
 /** Where a brand session lands. */
 export const BRAND_HOME = "/home";
@@ -74,6 +74,9 @@ export const PATH_ROLES: ReadonlyArray<
   // itself, which is the check that counts (app/(brand)/products/actions.ts).
   ["/products/new", "operator"],
   ["/products", "operator", ["POST", "PUT", "PATCH", "DELETE"]],
+  // The team page, to read and to change: Managers only. The actions check
+  // it again, and so does tagit-services against the roster.
+  ["/team", "admin"],
 ];
 
 /** Prefix match on whole path segments: /home, /home/x, but not /homes. */
