@@ -344,6 +344,35 @@ describe("a product read back", () => {
   const read = (over: Record<string, unknown> = {}, brandId = "acme", id = "tpl_1") =>
     parseProductDetail(200, { ok: true, template: row(over), versions: [] }, id, brandId);
 
+  it("reads the category of the newest PUBLISHED version, not of the working copy", () => {
+    const withVersions = (versions: unknown) =>
+      parseProductDetail(
+        200,
+        { ok: true, template: row({ category: "Apparel" }), versions },
+        "tpl_1",
+        "acme",
+      );
+    expect(read()?.publishedCategory).toBeNull();
+    expect(withVersions(undefined)?.publishedCategory).toBeNull();
+    expect(withVersions("x")?.publishedCategory).toBeNull();
+    expect(
+      withVersions([
+        { version: 1, snapshot: { category: "Apparel" } },
+        { version: 3, snapshot: { category: " Cosmetics " } },
+        { version: 2, snapshot: { category: "Watches" } },
+        { version: "9", snapshot: { category: "Ignored" } },
+        null,
+      ])?.publishedCategory,
+    ).toBe("Cosmetics");
+    // The working copy says something else, and is not what items are made from.
+    expect(
+      withVersions([{ version: 1, snapshot: { category: "Cosmetics" } }])?.values.category,
+    ).toBe("Apparel");
+    // A published version with no category has none.
+    expect(withVersions([{ version: 1, snapshot: {} }])?.publishedCategory).toBe("");
+    expect(withVersions([{ version: 1, snapshot: null }])?.publishedCategory).toBe("");
+  });
+
   it("gives the form its values, the photo, and nothing else from the answer", () => {
     const product = read();
     expect(product).toMatchObject({

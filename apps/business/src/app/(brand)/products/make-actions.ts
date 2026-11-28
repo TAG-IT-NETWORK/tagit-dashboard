@@ -7,7 +7,10 @@ import {
   canMakeItems,
   MAX_ITEMS_PER_RUN,
   parseQuantity,
+  parseRunFacts,
   parseRunId,
+  takesRunFacts,
+  type RunFactField,
   startProblem,
 } from "@/lib/brand-make-items";
 import { parseProductId } from "@/lib/brand-product-form";
@@ -32,6 +35,8 @@ import { createBrandRun, getBrandProduct, getBrandRun, startBrandRun } from "@/l
 
 export interface MakeState {
   problem: string | null;
+  /** Problems with the lot and dates, by field. */
+  errors?: Partial<Record<RunFactField, string>>;
 }
 
 const MANAGERS_ONLY = "Only a Manager of your brand can make items.";
@@ -54,7 +59,16 @@ export async function prepareItems(_previous: MakeState, formData: FormData): Pr
     return { problem: NOT_PUBLISHED };
   }
 
-  const runId = await createBrandRun(session, product.id, quantity);
+  // Lot and dates: only for a product whose category takes them. For any
+  // other product whatever the form sent is ignored, not passed on.
+  let facts = null;
+  if (takesRunFacts(product.publishedCategory)) {
+    const parsed = parseRunFacts((field) => formData.get(field));
+    if (!parsed.ok) return { problem: null, errors: parsed.errors };
+    facts = parsed.facts;
+  }
+
+  const runId = await createBrandRun(session, product.id, quantity, facts);
   if (runId === null) {
     return {
       problem: "That could not be set up just now. Nothing was made. Try again in a moment.",

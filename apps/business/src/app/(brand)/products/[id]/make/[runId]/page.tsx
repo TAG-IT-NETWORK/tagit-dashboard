@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { StartButton, WatchRun } from "@/components/make-items";
 import { SIGN_IN_PATH } from "@/lib/access";
 import { countWords } from "@/lib/brand-catalog";
-import { canMakeItems, parseRunId } from "@/lib/brand-make-items";
+import { canMakeItems, factDayWords, parseRunId } from "@/lib/brand-make-items";
 import { parseProductId } from "@/lib/brand-product-form";
 import { loadBrand } from "@/lib/brand-request";
 import { getBrandProduct, getBrandRun } from "@/lib/brand-services";
@@ -31,6 +31,11 @@ export default async function ItemRunPage({
   if (run === null) notFound();
 
   const items = countWords(run.size, "item", "items");
+  const facts = [
+    run.facts?.lot ? `Lot ${run.facts.lot}` : null,
+    run.facts?.madeOn ? `Made on ${factDayWords(run.facts.madeOn)}` : null,
+    run.facts?.bestBefore ? `Best before ${factDayWords(run.facts.bestBefore)}` : null,
+  ].filter((line): line is string => line !== null);
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -42,8 +47,15 @@ export default async function ItemRunPage({
         <Link href={`/products/${product.id}`} className="underline">
           {product.values.name}
         </Link>
+        {" / "}
+        <Link href={`/products/${product.id}/make`} className="underline">
+          Make items
+        </Link>
       </p>
       <h1 className="break-words text-3xl font-semibold tracking-tight">Make items</h1>
+      {facts.length > 0 ? (
+        <p className="text-sm text-muted-foreground">{facts.join(" · ")}</p>
+      ) : null}
 
       {run.state === "waiting" ? (
         <section className="space-y-4 rounded-xl border p-5">

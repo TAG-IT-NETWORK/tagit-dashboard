@@ -60,15 +60,13 @@ export default async function ProductPage({
           <Link href={`/products/${product.id}/items`} className="underline">
             See this product&apos;s items
           </Link>
-          {canMakeItems(role) &&
-          (product.state === "live" || product.state === "live-with-changes") ? (
-            <>
-              {" · "}
-              <Link href={`/products/${product.id}/make`} className="underline">
-                Make items
-              </Link>
-            </>
-          ) : null}
+          {" · "}
+          <Link href={`/products/${product.id}/make`} className="underline">
+            {canMakeItems(role) &&
+            (product.state === "live" || product.state === "live-with-changes")
+              ? "Make items"
+              : "Item runs"}
+          </Link>
         </p>
       </div>
 

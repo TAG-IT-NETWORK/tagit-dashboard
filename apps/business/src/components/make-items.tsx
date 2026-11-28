@@ -9,7 +9,16 @@ import { prepareItems, startItems, type MakeState } from "@/app/(brand)/products
 const NOTHING: MakeState = { problem: null };
 
 /** Step 1: how many. Sets a run up; nothing is made yet. */
-export function QuantityForm({ productId, max }: { productId: string; max: number }) {
+export function QuantityForm({
+  productId,
+  max,
+  withFacts = false,
+}: {
+  productId: string;
+  max: number;
+  /** Offer a lot and dates (products that take them). */
+  withFacts?: boolean;
+}) {
   const [state, action, pending] = useActionState(prepareItems, NOTHING);
   return (
     <form action={action} className="space-y-4 rounded-xl border p-5">
@@ -33,6 +42,59 @@ export function QuantityForm({ productId, max }: { productId: string; max: numbe
           From 1 to {max} at a time.
         </p>
       </div>
+      {withFacts ? (
+        <fieldset className="space-y-4">
+          <legend className="text-sm font-medium">
+            Lot and dates <span className="font-normal text-muted-foreground">· optional</span>
+          </legend>
+          <p className="text-xs text-muted-foreground">
+            Shown to shoppers on each item of this run. They cannot be changed afterwards.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="lot">Lot</Label>
+            <Input
+              id="lot"
+              name="lot"
+              maxLength={60}
+              autoComplete="off"
+              className="max-w-xs"
+              aria-invalid={state.errors?.lot ? true : undefined}
+              aria-describedby={state.errors?.lot ? "lot-error" : undefined}
+            />
+            {state.errors?.lot ? (
+              <p id="lot-error" role="alert" className="text-sm text-red-700">
+                {state.errors.lot}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
+              [
+                ["madeOn", "Made on"],
+                ["bestBefore", "Best before"],
+              ] as const
+            ).map(([field, label]) => (
+              <div key={field} className="space-y-1.5">
+                <Label htmlFor={field}>{label}</Label>
+                <Input
+                  id={field}
+                  name={field}
+                  type="date"
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  aria-invalid={state.errors?.[field] ? true : undefined}
+                  aria-describedby={state.errors?.[field] ? `${field}-error` : undefined}
+                />
+                {state.errors?.[field] ? (
+                  <p id={`${field}-error`} role="alert" className="text-sm text-red-700">
+                    {state.errors[field]}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
       <Button type="submit" disabled={pending}>
         {pending ? "Setting up…" : "Continue"}
       </Button>
