@@ -169,6 +169,22 @@ describe("GET /api/verify — the app's check", () => {
     });
   });
 
+  it("passes on the caller's country, and nothing else about where they are", async () => {
+    await callVerify(tapQuery(8), {
+      "x-vercel-ip-country": "fr",
+      "x-forwarded-for": "203.0.113.9",
+    });
+
+    expect(store.openTapLink).toHaveBeenCalledExactlyOnceWith({
+      tagHash: uidToTagHash(UID),
+      tokenId: "58",
+      counter: 8,
+      device: null,
+      country: "FR",
+    });
+    expect(JSON.stringify(store.openTapLink.mock.calls)).not.toContain("203.0.113.9");
+  });
+
   it("asks with no device when the request carries none", async () => {
     await callVerify();
     expect(store.openTapLink.mock.calls[0]![0]).toMatchObject({ device: null });
@@ -264,6 +280,16 @@ describe("GET /api/dpp — the machine-readable passport", () => {
     expect(store.openTapLink.mock.calls.map(([request]) => request)).toEqual([
       { tagHash: uidToTagHash(UID), tokenId: "58", counter: 9, device },
       { tagHash: uidToTagHash(UID), tokenId: "58", counter: 10, device },
+    ]);
+  });
+
+  it("passes on the caller's country, on both forms of the address", async () => {
+    await callDpp(tapQuery(11), { "x-vercel-ip-country": "DE" });
+    await callDpp(tapQuery(12), { "x-vercel-ip-country": "XX" }, "01/09506000134352/21/SN-1");
+
+    expect(store.openTapLink.mock.calls.map(([request]) => request)).toEqual([
+      { tagHash: uidToTagHash(UID), tokenId: "58", counter: 11, device: null, country: "DE" },
+      { tagHash: uidToTagHash(UID), tokenId: "58", counter: 12, device: null },
     ]);
   });
 
