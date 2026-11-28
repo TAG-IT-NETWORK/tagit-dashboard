@@ -112,6 +112,8 @@ export interface TapContext extends TapObservers {
    * look for anyone.
    */
   device?: string | null;
+  /** The shopper's country (see @/lib/tap-country), or null. Counted, never checked. */
+  country?: string | null;
 }
 
 /**
@@ -123,7 +125,7 @@ export async function resolveTap(
   cmac?: string,
   context: TapContext = {},
 ): Promise<TapResolution> {
-  const { onTagRead, onTokenId, timer, device = null } = context;
+  const { onTagRead, onTokenId, timer, device = null, country = null } = context;
   if (!picc || !cmac) return { kind: "bad-params" };
 
   const masterKey = getMasterKey();
@@ -156,7 +158,13 @@ export async function resolveTap(
   // tagit-services, the second to the chain. `openTapLink` never rejects; it
   // answers "unavailable" instead, and that is never treated as a pass.
   const opening = timed("link", () =>
-    openTapLink({ tagHash, tokenId: tokenId.toString(), counter, device }),
+    openTapLink({
+      tagHash,
+      tokenId: tokenId.toString(),
+      counter,
+      device,
+      ...(country ? { country } : {}),
+    }),
   );
   // Asset + anchor are independent reads — one round-trip instead of two.
   const reads = timed("chain", () =>

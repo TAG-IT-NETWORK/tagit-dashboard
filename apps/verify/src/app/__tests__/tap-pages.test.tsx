@@ -58,6 +58,25 @@ describe.each([
     expect(JSON.stringify(taps.startTapRun.mock.calls)).not.toContain(id);
   });
 
+  it("hands the check the shopper's country and nothing else about where they are", async () => {
+    incoming.headers = new Headers({
+      "x-vercel-ip-country": "de",
+      "x-forwarded-for": "203.0.113.9",
+      "x-real-ip": "203.0.113.9",
+      "x-vercel-ip-city": "Berlin",
+      "x-vercel-ip-latitude": "52.52",
+    });
+
+    await page();
+
+    expect(taps.startTapRun).toHaveBeenCalledExactlyOnceWith(PICC, CMAC, startTapLookups, {
+      device: null,
+      country: "DE",
+    });
+    const sent = JSON.stringify(taps.startTapRun.mock.calls);
+    for (const never of ["203.0.113.9", "Berlin", "52.52"]) expect(sent).not.toContain(never);
+  });
+
   it("hands it no device when the request carries no usable id", async () => {
     for (const headers of [new Headers(), new Headers({ [TAP_DEVICE_HEADER]: "not-an-id" })]) {
       taps.startTapRun.mockClear();

@@ -43,6 +43,8 @@ export interface TapLinkRequest {
   counter: number;
   /** The requesting device (see @/lib/tap-device), or null when there is none. */
   device: string | null;
+  /** The shopper's country (see @/lib/tap-country), for the brand's tap numbers. Optional. */
+  country?: string | null;
 }
 
 /**
@@ -102,6 +104,8 @@ export async function openTapLink(request: TapLinkRequest): Promise<TapLinkUse> 
         tokenId: request.tokenId,
         counter: request.counter,
         device: request.device,
+        // Sent only when known. It decides nothing about the tap.
+        ...(request.country ? { country: request.country } : {}),
       }),
       // A tap's answer is for that tap alone. Never stored, never reused.
       cache: "no-store",

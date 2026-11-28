@@ -21,6 +21,7 @@ import { parseGs1Path } from "@/lib/gs1";
 import { resolveTap } from "@/lib/resolve";
 import { buildDpp, dppToVerifiableCredential, loadProduct, type ProductMetadata } from "@/lib/dpp";
 import { neverCacheControl } from "@/lib/cache";
+import { tapCountryOf } from "@/lib/tap-country";
 import { tapDeviceOf } from "@/lib/tap-device";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
 
@@ -79,6 +80,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ segments
     timer,
     // Lets the browser that opened the /01 page follow its passport link.
     device: tapDeviceOf(req.headers),
+    // The country only, for the brand's tap numbers (TAP-T18).
+    country: tapCountryOf(req.headers),
   });
   if (res.kind !== "resolved") logTap("/api/dpp", res.kind, timer);
   const timing = (): Record<string, string> => {

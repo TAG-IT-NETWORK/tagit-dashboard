@@ -81,6 +81,19 @@ describe("openTapLink — what it sends", () => {
     expect(JSON.parse(init.body as string)).toEqual({ ...REQUEST, device: null });
   });
 
+  it("sends the country when there is one, and no such key when there is none", async () => {
+    fetchMock.mockImplementation(async () => answer({ outcome: "fresh" }));
+    await openTapLink({ ...REQUEST, country: "DE" });
+    await openTapLink({ ...REQUEST, country: null });
+    await openTapLink(REQUEST);
+    const bodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse((call as [string, RequestInit])[1].body as string),
+    );
+    expect(bodies[0]).toEqual({ ...REQUEST, country: "DE" });
+    expect(bodies[1]).toEqual(REQUEST);
+    expect(bodies[2]).toEqual(REQUEST);
+  });
+
   it("is never stored or reused, and gives up after its time limit", async () => {
     fetchMock.mockResolvedValue(answer({ outcome: "fresh" }));
 

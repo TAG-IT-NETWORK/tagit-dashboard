@@ -36,6 +36,7 @@ import { TAP_STATES } from "@/lib/consumer-copy";
 import { resolveTap, isAuthenticState } from "@/lib/resolve";
 import { loadProduct, CHAIN_ID, CHAIN_NAME, type ProductMetadata } from "@/lib/dpp";
 import { STATES } from "@/lib/states";
+import { tapCountryOf } from "@/lib/tap-country";
 import { tapDeviceOf } from "@/lib/tap-device";
 import { createTapTimer, logTap } from "@/lib/tap-timing";
 
@@ -70,6 +71,8 @@ export async function GET(req: Request) {
     timer,
     // Lets the same device ask about its own link again for a few minutes.
     device: tapDeviceOf(req.headers),
+    // The country only, for the brand's tap numbers (TAP-T18).
+    country: tapCountryOf(req.headers),
   });
   if (res.kind !== "resolved") logTap("/api/verify", res.kind, timer);
   const chain = { id: CHAIN_ID, name: CHAIN_NAME };

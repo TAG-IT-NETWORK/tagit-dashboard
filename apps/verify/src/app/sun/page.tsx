@@ -16,6 +16,7 @@ import { Suspense } from "react";
 import { Checking } from "@/components/checking";
 import { TapResult } from "@/components/tap-result";
 import { TapVerdict } from "@/components/tap-verdict";
+import { tapCountryOf } from "@/lib/tap-country";
 import { tapDeviceOf } from "@/lib/tap-device";
 import { startTapLookups } from "@/lib/tap-lookups";
 import { startTapRun } from "@/lib/tap-run";
@@ -44,8 +45,14 @@ export default async function SunVerifyPage({ searchParams }: SunPageProps) {
   // Reviews follow the record (see @/lib/tap-lookups for why not side by side).
   // The device id lets this phone open its own link again for a few minutes;
   // the link itself is opened only once (TAP-T10, see @/lib/resolve).
-  const device = tapDeviceOf(await headers());
-  const run = startTapRun(picc, cmac, startTapLookups, { device });
+  const requestHeaders = await headers();
+  const device = tapDeviceOf(requestHeaders);
+  // The country only, for the brand's tap numbers (TAP-T18).
+  const country = tapCountryOf(requestHeaders);
+  const run = startTapRun(picc, cmac, startTapLookups, {
+    device,
+    ...(country ? { country } : {}),
+  });
   const again = `/sun?picc=${encodeURIComponent(picc)}&cmac=${encodeURIComponent(cmac)}`;
 
   return (
