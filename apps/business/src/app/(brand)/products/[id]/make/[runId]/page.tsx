@@ -103,11 +103,24 @@ export default async function ItemRunPage({
 
       {run.state === "failed" ? (
         <section className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-900">
-          <h2 className="font-semibold">These items were not made.</h2>
-          <p className="text-sm">
-            Something went wrong on our side. You can try again; nothing is made twice.
-          </p>
-          <StartButton productId={product.id} runId={run.id} label="Try again" />
+          {run.unconfirmed ? (
+            <>
+              <h2 className="font-semibold">We could not confirm these items were made.</h2>
+              <p className="text-sm">
+                They may have been made. Press Check again: if they were, this finishes the run and
+                they appear in your items. Nothing is made twice.
+              </p>
+              <StartButton productId={product.id} runId={run.id} label="Check again" />
+            </>
+          ) : (
+            <>
+              <h2 className="font-semibold">These items were not made.</h2>
+              <p className="text-sm">
+                Something went wrong on our side. You can try again; nothing is made twice.
+              </p>
+              <StartButton productId={product.id} runId={run.id} label="Try again" />
+            </>
+          )}
         </section>
       ) : null}
     </div>

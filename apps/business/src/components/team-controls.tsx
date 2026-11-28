@@ -76,6 +76,8 @@ export function MemberControls({ email, role }: { email: string; role: string })
   const [state, action, pending] = useActionState(changeMember, NOTHING);
   const [chosen, setChosen] = useState(role);
   const [open, setOpen] = useState(false);
+  // Removing takes two presses: ask, then confirm.
+  const [removing, setRemoving] = useState(false);
   return (
     <details
       className="w-full text-sm"
@@ -105,10 +107,38 @@ export function MemberControls({ email, role }: { email: string; role: string })
           <Button type="submit" name="intent" value="change" disabled={pending || chosen === role}>
             Save
           </Button>
-          <Button type="submit" name="intent" value="remove" variant="outline" disabled={pending}>
-            Remove from team
-          </Button>
+          {removing ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={() => setRemoving(true)}
+            >
+              Remove from team
+            </Button>
+          )}
         </div>
+        {removing ? (
+          <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
+            <p>
+              Remove <span className="break-all font-medium">{email}</span>? They will no longer be
+              able to sign in for your brand. You can add them again later.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" name="intent" value="remove" disabled={pending}>
+                Yes, remove
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending}
+                onClick={() => setRemoving(false)}
+              >
+                Keep
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           A change takes effect within a few minutes, also for someone who is signed in.
         </p>
