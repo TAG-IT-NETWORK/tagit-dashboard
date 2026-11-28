@@ -52,7 +52,7 @@ const OPEN_PREFIXES = ["/api/auth", "/api/demo-request", "/no-access"] as const;
 const PUBLIC_PAGES = ["/", "/signin"] as const;
 
 /** Everything a brand session may reach. */
-const BRAND_PREFIXES = ["/home", "/products", "/team"] as const;
+const BRAND_PREFIXES = ["/home", "/products", "/team", "/sales"] as const;
 
 /** Where a brand session lands. */
 export const BRAND_HOME = "/home";
@@ -77,6 +77,9 @@ export const PATH_ROLES: ReadonlyArray<
   // The team page, to read and to change: Managers only. The actions check
   // it again, and so does tagit-services against the roster.
   ["/team", "admin"],
+  // The sales file: Managers only (TAP-T18). The route checks it again, and
+  // so does tagit-services against the roster. The sales page is for everyone.
+  ["/sales/export", "admin"],
 ];
 
 /** Prefix match on whole path segments: /home, /home/x, but not /homes. */

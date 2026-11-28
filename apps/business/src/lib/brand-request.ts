@@ -1,7 +1,13 @@
 import { cache } from "react";
 
 import type { ItemCounts, ProductList } from "@/lib/brand-catalog";
-import { getBrandProducts, getBrandProfile, getBrandSummary } from "@/lib/brand-services";
+import type { TapNumbers } from "@/lib/brand-numbers";
+import {
+  getBrandProducts,
+  getBrandProfile,
+  getBrandSummary,
+  getBrandTaps,
+} from "@/lib/brand-services";
 import { getBrandSession, type BrandSession } from "@/lib/brand-session";
 import type { BrandProfile } from "@/lib/brand-view";
 
@@ -34,4 +40,10 @@ export const loadProducts = cache(async (): Promise<ProductList | null> => {
 export const loadItemCounts = cache(async (): Promise<ItemCounts | null> => {
   const session = await loadSession();
   return session === null ? null : getBrandSummary(session);
+});
+
+/** The signed-in brand's tap numbers (TAP-T18). Null: not a brand session, or not readable. */
+export const loadTaps = cache(async (): Promise<TapNumbers | null> => {
+  const session = await loadSession();
+  return session === null ? null : getBrandTaps(session);
 });

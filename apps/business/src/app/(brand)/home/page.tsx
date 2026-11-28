@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 
 import { SIGN_IN_PATH } from "@/lib/access";
 import { activeProductCount, countWords, tileNumber } from "@/lib/brand-catalog";
-import { loadBrand, loadItemCounts, loadProducts } from "@/lib/brand-request";
+import { countryWords } from "@/lib/brand-numbers";
+import { loadBrand, loadItemCounts, loadProducts, loadTaps } from "@/lib/brand-request";
 import { roleWords } from "@/lib/brand-view";
 
 export const metadata: Metadata = { title: "Home · TAG IT Business" };
@@ -21,11 +22,12 @@ function Tile({ label, value, hint }: { label: string; value: string; hint: stri
 
 /** The brand home (TAP-T17, slice 2: the brand's own numbers). */
 export default async function BrandHomePage() {
-  // All three reads start together: a slow services answer is waited for once.
-  const [brand, products, counts] = await Promise.all([
+  // All the reads start together: a slow services answer is waited for once.
+  const [brand, products, counts, taps] = await Promise.all([
     loadBrand(),
     loadProducts(),
     loadItemCounts(),
+    loadTaps(),
   ]);
   if (brand === null) redirect(SIGN_IN_PATH);
   const { session, profile } = brand;
@@ -73,6 +75,89 @@ export default async function BrandHomePage() {
           review. Your TAG IT contact can tell you more.
         </p>
       ) : null}
+
+      <section className="space-y-4" aria-labelledby="taps-heading">
+        <div className="space-y-1">
+          <h2 id="taps-heading" className="text-lg font-semibold">
+            Taps
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            How often shoppers tapped your items with a phone.
+          </p>
+        </div>
+        {taps === null ? (
+          <p role="status" className="rounded-xl border p-4 text-sm text-muted-foreground">
+            The tap numbers could not be loaded just now. Refresh the page in a moment.
+          </p>
+        ) : (
+          <>
+            <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Tile label="Taps, 7 days" value={tileNumber(taps.taps7)} hint="New taps this week" />
+              <Tile
+                label="Taps, 30 days"
+                value={tileNumber(taps.taps30)}
+                hint="New taps this month"
+              />
+              <Tile
+                label="Links reused, 7 days"
+                value={tileNumber(taps.usedLinks7)}
+                hint="A tap link opened again"
+              />
+              <Tile
+                label="Links reused, 30 days"
+                value={tileNumber(taps.usedLinks30)}
+                hint="Copied, forwarded or old"
+              />
+            </dl>
+            {taps.capped ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                There were more taps than this page counts. The numbers shown are the most recent.
+              </p>
+            ) : null}
+            {taps.taps30 === 0 ? (
+              <p className="rounded-xl border p-4 text-sm text-muted-foreground">
+                No taps in the last 30 days. Taps are counted from 28 November 2026.
+              </p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border p-5">
+                  <h3 className="text-sm font-medium">Most tapped items, 30 days</h3>
+                  <ol className="mt-3 space-y-2 text-sm">
+                    {taps.topItems.map((row) => (
+                      <li key={row.item} className="flex items-baseline justify-between gap-4">
+                        <span className="min-w-0 break-words">
+                          {row.name ?? "Item"}{" "}
+                          <span className="text-muted-foreground">· item {row.item}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {countWords(row.taps, "tap", "taps")}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                <div className="rounded-xl border p-5">
+                  <h3 className="text-sm font-medium">Where taps came from, 30 days</h3>
+                  {taps.topCountries.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">Not known yet.</p>
+                  ) : (
+                    <ol className="mt-3 space-y-2 text-sm">
+                      {taps.topCountries.map((row) => (
+                        <li key={row.country} className="flex items-baseline justify-between gap-4">
+                          <span>{countryWords(row.country)}</span>
+                          <span className="shrink-0 tabular-nums">
+                            {countWords(row.taps, "tap", "taps")}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="rounded-xl border p-6">
         <h2 className="text-lg font-semibold">Your products</h2>

@@ -26,6 +26,7 @@ import { TapResult } from "@/components/tap-result";
 import { TapVerdict } from "@/components/tap-verdict";
 import { COPY } from "@/lib/consumer-copy";
 import { parseGs1Path } from "@/lib/gs1";
+import { tapCountryOf } from "@/lib/tap-country";
 import { tapDeviceOf } from "@/lib/tap-device";
 import { startTapLookups } from "@/lib/tap-lookups";
 import { startTapRun } from "@/lib/tap-run";
@@ -60,8 +61,14 @@ export default async function Gs1ResolverPage({ params, searchParams }: PageProp
   // moment the tag resolves — while the item-state reads run, not after them.
   // The device id lets this phone open its own link again for a few minutes;
   // the link itself is opened only once (TAP-T10, see @/lib/resolve).
-  const device = tapDeviceOf(await headers());
-  const run = startTapRun(picc, cmac, startTapLookups, { device });
+  const requestHeaders = await headers();
+  const device = tapDeviceOf(requestHeaders);
+  // The country only, for the brand's tap numbers (TAP-T18).
+  const country = tapCountryOf(requestHeaders);
+  const run = startTapRun(picc, cmac, startTapLookups, {
+    device,
+    ...(country ? { country } : {}),
+  });
   const path = `/01/${segments.map(encodeURIComponent).join("/")}`;
   const query = new URLSearchParams({ picc, cmac }).toString();
   const again = `${path}?${query}`;

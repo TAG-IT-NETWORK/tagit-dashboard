@@ -94,6 +94,8 @@ export function startTapRun<T>(
   onItem: (tokenId: string, timer: TapTimer) => T,
   options: {
     device?: string | null;
+    /** The shopper's country (see @/lib/tap-country), for the brand's tap numbers. */
+    country?: string | null;
     now?: () => number;
     wait?: (ms: number) => Promise<void>;
   } = {},
@@ -114,6 +116,7 @@ export function startTapRun<T>(
     },
     timer,
     device: options.device ?? null,
+    ...(options.country ? { country: options.country } : {}),
   });
 
   const confirmed = resolution.then(

@@ -223,6 +223,20 @@ describe("resolveTap — a link is opened once (TAP-T10)", () => {
     });
   });
 
+  it("passes the country on when there is one", async () => {
+    const { picc, cmac } = mintTap(1234);
+
+    await resolveTap(picc, cmac, { device: DEVICE, country: "FR" });
+
+    expect(store.openTapLink).toHaveBeenCalledExactlyOnceWith({
+      tagHash: uidToTagHash(UID),
+      tokenId: "58",
+      counter: 1234,
+      device: DEVICE,
+      country: "FR",
+    });
+  });
+
   it("opens it with no device when the caller has none — there is no way to skip the step", async () => {
     const { picc, cmac } = mintTap();
 

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 export const BRAND_SECTIONS = [
   { href: "/home", label: "Home", managersOnly: false },
   { href: "/products", label: "Products", managersOnly: false },
+  { href: "/sales", label: "Sales", managersOnly: false },
   { href: "/team", label: "Team", managersOnly: true },
 ] as const;
 

@@ -1,5 +1,14 @@
 import type { BrandSession } from "@/lib/brand-session";
 import {
+  canExportSales,
+  parseSaleTime,
+  parseSales,
+  parseSalesFile,
+  parseTapNumbers,
+  type SalesPage,
+  type TapNumbers,
+} from "@/lib/brand-numbers";
+import {
   parseProducts,
   parseSummary,
   type ItemCounts,
@@ -85,6 +94,8 @@ export interface BrandCall {
    * ("files"). Not together with `body`.
    */
   file?: Blob;
+  /** Read the answer as text, not JSON (the sales file). */
+  text?: true;
 }
 
 /** The path must be a plain /api/v1/ path: no host, no dot segments, no tricks. */
@@ -145,6 +156,9 @@ export async function brandFetch(
     redirect: "error",
     signal: AbortSignal.timeout(SERVICES_TIMEOUT_MS),
   });
+  if (call.text === true) {
+    return { status: res.status, body: await res.text().catch(() => null) };
+  }
   const body: unknown = await res.json().catch(() => null);
   return { status: res.status, body };
 }
@@ -463,5 +477,51 @@ export async function removeBrandTeamMember(
     return parseTeamAnswer(answer.status, answer.body, "remove", email, session.brandId, null);
   } catch {
     return { kind: "failed" };
+  }
+}
+
+// ── Sales and tap numbers (TAP-T18) ──────────────────────────────────────────
+// Reads only. The brand is the session's, as everywhere; none of these takes
+// a brand, and none throws.
+
+/** The signed-in brand's tap numbers, or null when they could not be read. */
+export async function getBrandTaps(session: BrandSession): Promise<TapNumbers | null> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/insights/taps");
+    return parseTapNumbers(answer.status, answer.body);
+  } catch {
+    return null;
+  }
+}
+
+/** One page of the signed-in brand's sales, or null when it could not be read. */
+export async function getBrandSales(
+  session: BrandSession,
+  rawBefore?: unknown,
+): Promise<SalesPage | null> {
+  const before = rawBefore === undefined ? null : parseSaleTime(rawBefore);
+  if (rawBefore !== undefined && before === null) return null;
+  try {
+    const query = before ? `?limit=50&before=${encodeURIComponent(before)}` : "?limit=50";
+    const answer = await brandFetch(session, `/api/v1/admin/insights/sales${query}`);
+    return parseSales(answer.status, answer.body);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signed-in brand's sales as a file. MANAGERS ONLY: refused here before
+ * anything is asked, and again by tagit-services against the roster.
+ */
+export async function getBrandSalesFile(session: BrandSession): Promise<string | null> {
+  if (!canExportSales(session.role)) return null;
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/insights/sales/export.csv", {
+      text: true,
+    });
+    return parseSalesFile(answer.status, answer.body);
+  } catch {
+    return null;
   }
 }
