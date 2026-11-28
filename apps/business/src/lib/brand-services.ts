@@ -41,6 +41,14 @@ import {
   type SaleIntent,
   type SaleResult,
 } from "@/lib/brand-selling";
+import {
+  parseTeam,
+  parseTeamAnswer,
+  parseTeamEmail,
+  parseTeamRole,
+  type TeamMember,
+  type TeamResult,
+} from "@/lib/brand-team";
 import { parseBrandProfile, type BrandProfile } from "@/lib/brand-view";
 
 /**
@@ -384,6 +392,75 @@ export async function setBrandItemSale(
       body,
     });
     return parseSaleAnswer(answer.status, answer.body, number, intent);
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
+// ── Team (TAP-T17) ───────────────────────────────────────────────────────────
+// The role rule lives in the server actions (app/(brand)/team/actions.ts) and
+// again in tagit-services, on the roster. None of these throws. None of them
+// sends a brand in the body: the person joins the brand the session acts for.
+
+/** The signed-in brand's team, or null when it could not be read. */
+export async function getBrandTeam(session: BrandSession): Promise<TeamMember[] | null> {
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/users");
+    return parseTeam(answer.status, answer.body, session.brandId);
+  } catch {
+    return null;
+  }
+}
+
+export async function addBrandTeamMember(
+  session: BrandSession,
+  rawEmail: string,
+  rawRole: string,
+): Promise<TeamResult> {
+  const email = parseTeamEmail(rawEmail);
+  const role = parseTeamRole(rawRole);
+  if (email === null || role === null) return { kind: "failed" };
+  try {
+    const answer = await brandFetch(session, "/api/v1/admin/users", {
+      method: "POST",
+      body: { email, role },
+    });
+    return parseTeamAnswer(answer.status, answer.body, "add", email, session.brandId, role);
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
+export async function changeBrandTeamRole(
+  session: BrandSession,
+  rawEmail: string,
+  rawRole: string,
+): Promise<TeamResult> {
+  const email = parseTeamEmail(rawEmail);
+  const role = parseTeamRole(rawRole);
+  if (email === null || role === null) return { kind: "failed" };
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/users/${encodeURIComponent(email)}`, {
+      method: "PUT",
+      body: { role },
+    });
+    return parseTeamAnswer(answer.status, answer.body, "change", email, session.brandId, role);
+  } catch {
+    return { kind: "failed" };
+  }
+}
+
+export async function removeBrandTeamMember(
+  session: BrandSession,
+  rawEmail: string,
+): Promise<TeamResult> {
+  const email = parseTeamEmail(rawEmail);
+  if (email === null) return { kind: "failed" };
+  try {
+    const answer = await brandFetch(session, `/api/v1/admin/users/${encodeURIComponent(email)}`, {
+      method: "DELETE",
+    });
+    return parseTeamAnswer(answer.status, answer.body, "remove", email, session.brandId, null);
   } catch {
     return { kind: "failed" };
   }
